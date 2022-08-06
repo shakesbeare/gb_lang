@@ -24,6 +24,7 @@ enum TokenType {
     MULTIPLY,
     DIVIDE,
     EQUALS,
+    COLON,
 
     // control flow
     L_PAREN,
@@ -104,7 +105,7 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
             while cursor < char_vec.len() {
                 if char_vec[cursor].is_alphabetic() {
                     let err = Error::new(
-                        "",
+                        "Numeric literals cannot contain alphabetic characters. Identifiers cannot being with numeric characters.",
                         line_count,
                         column_count,
                         ErrorKind::INVALID_NUMERIC_LITERAL,
@@ -123,6 +124,19 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
             let token: String = token.into_iter().collect();
 
             if token.contains('.') {
+                let full_stop_count = token.matches('.').count();
+
+                if full_stop_count > 1 {
+                    let err = Error::new(
+                        "Numeric literals can only contain 0 or 1 decimal points",
+                        line_count,
+                        column_count,
+                        ErrorKind::INVALID_NUMERIC_LITERAL,
+                    );
+
+                    return Err(err);
+                }
+
                 tokens.push(Token {
                     token_type: TokenType::FLOAT,
                     value: Some(token),
@@ -165,6 +179,10 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
             },
             '=' => Token {
                 token_type: TokenType::EQUALS,
+                value: None,
+            },
+            ':' => Token {
+                token_type: TokenType::COLON,
                 value: None,
             },
             ';' => Token {
