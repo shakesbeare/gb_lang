@@ -1,5 +1,6 @@
 mod error;
 mod lexer;
+mod parser;
 
 use lexer::run_lexer;
 use std::fs;

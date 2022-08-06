@@ -1,9 +1,10 @@
 use crate::error::{Error, ErrorKind};
+use std::fmt;
 
 #[allow(dead_code)]
 #[allow(non_camel_case_types)]
-#[derive(Debug, Clone, Copy)]
-enum TokenType {
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum TokenType {
     // management symbols
     EOF,
     SEMICOLON,
@@ -39,10 +40,19 @@ enum TokenType {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
-    token_type: TokenType,
-    value: Option<String>,
+    pub token_type: TokenType,
+    pub value: Option<String>,
+}
+
+impl Token {
+    pub fn new(token_type: TokenType, value: Option<String>) -> Self {
+        Self {
+            token_type: token_type,
+            value: value,
+        }
+    }
 }
 
 pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
@@ -77,22 +87,13 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
 
             // check if token is a known reserved keyword:
             if token == "return".to_string() {
-                tokens.push(Token {
-                    token_type: TokenType::RETURN,
-                    value: None,
-                });
+                tokens.push(Token::new(TokenType::RETURN, None));
             } else if token == "let".to_string() {
-                tokens.push(Token {
-                    token_type: TokenType::LET,
-                    value: None,
-                })
+                tokens.push(Token::new(TokenType::LET, None));
             }
             // otherwise, token is a user-defined identifier
             else {
-                tokens.push(Token {
-                    token_type: TokenType::IDENTIFIER,
-                    value: Some(token.clone()),
-                });
+                tokens.push(Token::new(TokenType::IDENTIFIER, Some(token)));
             }
         }
         // token is a number of some kind
@@ -137,15 +138,9 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
                     return Err(err);
                 }
 
-                tokens.push(Token {
-                    token_type: TokenType::FLOAT,
-                    value: Some(token),
-                })
+                tokens.push(Token::new(TokenType::FLOAT, Some(token)));
             } else {
-                tokens.push(Token {
-                    token_type: TokenType::INTEGER,
-                    value: Some(token),
-                })
+                tokens.push(Token::new(TokenType::INTEGER, Some(token)));
             }
         }
         // token is a single length character
@@ -161,66 +156,24 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
         }
 
         tokens.push(match char_vec[cursor] {
-            '+' => Token {
-                token_type: TokenType::PLUS,
-                value: None,
-            },
-            '-' => Token {
-                token_type: TokenType::MINUS,
-                value: None,
-            },
-            '*' => Token {
-                token_type: TokenType::MULTIPLY,
-                value: None,
-            },
-            '/' => Token {
-                token_type: TokenType::DIVIDE,
-                value: None,
-            },
-            '=' => Token {
-                token_type: TokenType::EQUALS,
-                value: None,
-            },
-            ':' => Token {
-                token_type: TokenType::COLON,
-                value: None,
-            },
-            ';' => Token {
-                token_type: TokenType::SEMICOLON,
-                value: None,
-            },
-            '(' => Token {
-                token_type: TokenType::L_PAREN,
-                value: None,
-            },
-            ')' => Token {
-                token_type: TokenType::R_PAREN,
-                value: None,
-            },
-            '{' => Token {
-                token_type: TokenType::L_BRACE,
-                value: None,
-            },
-            '}' => Token {
-                token_type: TokenType::R_BRACE,
-                value: None,
-            },
-            '[' => Token {
-                token_type: TokenType::L_BRACKET,
-                value: None,
-            },
-            ']' => Token {
-                token_type: TokenType::R_BRACKET,
-                value: None,
-            },
-            '\0' => Token {
-                token_type: TokenType::EOF,
-                value: None,
-            },
-            _ => Token {
-                token_type: TokenType::UNKNOWN_SYMBOL,
-                value: Some(char_vec[cursor].to_string()),
-            },
+            '+' => Token::new(TokenType::PLUS, None),
+            '-' => Token::new(TokenType::MINUS, None),
+            '*' => Token::new(TokenType::MULTIPLY, None),
+            '/' => Token::new(TokenType::DIVIDE, None),
+            '=' => Token::new(TokenType::EQUALS, None),
+            ':' => Token::new(TokenType::COLON, None),
+            ';' => Token::new(TokenType::SEMICOLON, None),
+            '(' => Token::new(TokenType::L_PAREN, None),
+            ')' => Token::new(TokenType::R_PAREN, None),
+            '{' => Token::new(TokenType::L_BRACE, None),
+            '}' => Token::new(TokenType::R_BRACE, None),
+            '[' => Token::new(TokenType::L_BRACKET, None),
+            ']' => Token::new(TokenType::R_BRACKET, None),
+            '\0' => Token::new(TokenType::EOF, None),
+            _ => Token::new(
+                TokenType::UNKNOWN_SYMBOL,
+                Some(char_vec[cursor].to_string()),
+            ),
         });
 
         cursor += 1;
