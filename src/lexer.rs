@@ -47,8 +47,8 @@ pub struct Token {
 
 pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
     let mut cursor: usize = 0;
-    let mut line_count: usize = 0;
-    let mut column_count: usize = 0;
+    let mut line_count: usize = 1;
+    let mut column_count: usize = 1;
     let mut char_vec: Vec<char> = input.chars().collect();
 
     if char_vec[char_vec.len() - 1] != '\0' {
@@ -154,7 +154,7 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
 
             if char_vec[cursor] == '\n' {
                 line_count += 1;
-                column_count = 0;
+                column_count = 1;
             }
             cursor += 1;
             continue;
