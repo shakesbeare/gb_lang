@@ -6,8 +6,8 @@ use crate::error::{Error, ErrorKind};
 enum TokenType {
     // management symbols
     EOF,
-    EOL,     // this is ;
-    NEWLINE, // this is \n
+    SEMICOLON,
+    NEWLINE,
 
     // multicharacter symbols
     IDENTIFIER,
@@ -105,7 +105,7 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
             while cursor < char_vec.len() {
                 if char_vec[cursor].is_alphabetic() {
                     let err = Error::new(
-                        "Numeric literals cannot contain alphabetic characters. Identifiers cannot being with numeric characters.",
+                        "Numeric literals cannot contain alphabetic characters.",
                         line_count,
                         column_count,
                         ErrorKind::INVALID_NUMERIC_LITERAL,
@@ -186,7 +186,7 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
                 value: None,
             },
             ';' => Token {
-                token_type: TokenType::EOL,
+                token_type: TokenType::SEMICOLON,
                 value: None,
             },
             '(' => Token {
