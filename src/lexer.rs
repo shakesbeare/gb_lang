@@ -13,6 +13,7 @@ pub enum TokenType {
     IDENTIFIER,
     INTEGER,
     FLOAT,
+    STRING,
 
     // reserved keywords
     RETURN,
@@ -142,7 +143,34 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
                 tokens.push(Token::new(TokenType::INTEGER, Some(token)));
             }
         }
-        // token is a single length character
+        // token is the start of a string literal
+        else if char_vec[cursor] == '"' || char_vec[cursor] == '\'' {
+            let quote_type = char_vec[cursor];
+            let mut token: Vec<char> = Vec::<char>::new();
+
+            token.push(char_vec[cursor]);
+            cursor += 1;
+            column_count += 1;
+
+            while char_vec[cursor] != quote_type && cursor < char_vec.len() {
+                token.push(char_vec[cursor]);
+                cursor += 1;
+                column_count += 1;
+            }
+            token.push(char_vec[cursor]);
+            cursor += 1;
+            column_count += 1;
+
+            let token: String = token.into_iter().collect();
+            tokens.push(Token::new(TokenType::STRING, Some(token)));
+        }
+        // this line is a comment
+        else if char_vec[cursor] == '/' && char_vec[cursor + 1] == '/' {
+            while char_vec[cursor] != '\n' {
+                cursor += 1
+            }
+        }
+        // Token is whitespace
         if char_vec[cursor].is_whitespace() {
             // whitespace is ignored
 
@@ -152,31 +180,32 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
             }
             cursor += 1;
             continue;
+        } else {
+            // token is a single length character
+            tokens.push(match char_vec[cursor] {
+                '+' => Token::new(TokenType::PLUS, None),
+                '-' => Token::new(TokenType::MINUS, None),
+                '*' => Token::new(TokenType::MULTIPLY, None),
+                '/' => Token::new(TokenType::DIVIDE, None),
+                '=' => Token::new(TokenType::EQUALS, None),
+                ':' => Token::new(TokenType::COLON, None),
+                ';' => Token::new(TokenType::SEMICOLON, None),
+                '(' => Token::new(TokenType::L_PAREN, None),
+                ')' => Token::new(TokenType::R_PAREN, None),
+                '{' => Token::new(TokenType::L_BRACE, None),
+                '}' => Token::new(TokenType::R_BRACE, None),
+                '[' => Token::new(TokenType::L_BRACKET, None),
+                ']' => Token::new(TokenType::R_BRACKET, None),
+                '\0' => Token::new(TokenType::EOF, None),
+                _ => Token::new(
+                    TokenType::UNKNOWN_SYMBOL,
+                    Some(char_vec[cursor].to_string()),
+                ),
+            });
+
+            cursor += 1;
+            column_count += 1;
         }
-
-        tokens.push(match char_vec[cursor] {
-            '+' => Token::new(TokenType::PLUS, None),
-            '-' => Token::new(TokenType::MINUS, None),
-            '*' => Token::new(TokenType::MULTIPLY, None),
-            '/' => Token::new(TokenType::DIVIDE, None),
-            '=' => Token::new(TokenType::EQUALS, None),
-            ':' => Token::new(TokenType::COLON, None),
-            ';' => Token::new(TokenType::SEMICOLON, None),
-            '(' => Token::new(TokenType::L_PAREN, None),
-            ')' => Token::new(TokenType::R_PAREN, None),
-            '{' => Token::new(TokenType::L_BRACE, None),
-            '}' => Token::new(TokenType::R_BRACE, None),
-            '[' => Token::new(TokenType::L_BRACKET, None),
-            ']' => Token::new(TokenType::R_BRACKET, None),
-            '\0' => Token::new(TokenType::EOF, None),
-            _ => Token::new(
-                TokenType::UNKNOWN_SYMBOL,
-                Some(char_vec[cursor].to_string()),
-            ),
-        });
-
-        cursor += 1;
-        column_count += 1;
     }
 
     Ok(tokens)
