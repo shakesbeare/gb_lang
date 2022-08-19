@@ -3,7 +3,7 @@ use crate::error::{Error, ErrorKind};
 #[allow(dead_code)]
 #[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum TokenType {
+pub enum TT {
     // management symbols
     EOF,
     SEMICOLON,
@@ -42,15 +42,19 @@ pub enum TokenType {
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Token {
-    pub token_type: TokenType,
+    pub token_type: TT,
     pub value: Option<String>,
+    pub row: usize,
+    pub column: usize,
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, value: Option<String>) -> Self {
+    pub fn new(token_type: TT, value: Option<String>, row: usize, column: usize) -> Self {
         Self {
             token_type: token_type,
             value: value,
+            row: row,
+            column: column,
         }
     }
 }
@@ -87,13 +91,18 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
 
             // check if token is a known reserved keyword:
             if token == "return".to_string() {
-                tokens.push(Token::new(TokenType::RETURN, None));
+                tokens.push(Token::new(TT::RETURN, None, line_count, column_count));
             } else if token == "let".to_string() {
-                tokens.push(Token::new(TokenType::LET, None));
+                tokens.push(Token::new(TT::LET, None, line_count, column_count));
             }
             // otherwise, token is a user-defined identifier
             else {
-                tokens.push(Token::new(TokenType::IDENTIFIER, Some(token)));
+                tokens.push(Token::new(
+                    TT::IDENTIFIER,
+                    Some(token),
+                    line_count,
+                    column_count,
+                ));
             }
         }
         // token is a number of some kind
@@ -138,9 +147,14 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
                     return Err(err);
                 }
 
-                tokens.push(Token::new(TokenType::FLOAT, Some(token)));
+                tokens.push(Token::new(TT::FLOAT, Some(token), line_count, column_count));
             } else {
-                tokens.push(Token::new(TokenType::INTEGER, Some(token)));
+                tokens.push(Token::new(
+                    TT::INTEGER,
+                    Some(token),
+                    line_count,
+                    column_count,
+                ));
             }
         }
         // token is the start of a string literal
@@ -162,7 +176,12 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
             column_count += 1;
 
             let token: String = token.into_iter().collect();
-            tokens.push(Token::new(TokenType::STRING, Some(token)));
+            tokens.push(Token::new(
+                TT::STRING,
+                Some(token),
+                line_count,
+                column_count,
+            ));
         }
         // this line is a comment
         else if char_vec[cursor] == '/' && char_vec[cursor + 1] == '/' {
@@ -170,6 +189,7 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
                 cursor += 1
             }
         }
+
         // Token is whitespace
         if char_vec[cursor].is_whitespace() {
             // whitespace is ignored
@@ -183,23 +203,25 @@ pub fn run_lexer(input: String) -> Result<Vec<Token>, Error> {
         } else {
             // token is a single length character
             tokens.push(match char_vec[cursor] {
-                '+' => Token::new(TokenType::PLUS, None),
-                '-' => Token::new(TokenType::MINUS, None),
-                '*' => Token::new(TokenType::MULTIPLY, None),
-                '/' => Token::new(TokenType::DIVIDE, None),
-                '=' => Token::new(TokenType::EQUALS, None),
-                ':' => Token::new(TokenType::COLON, None),
-                ';' => Token::new(TokenType::SEMICOLON, None),
-                '(' => Token::new(TokenType::L_PAREN, None),
-                ')' => Token::new(TokenType::R_PAREN, None),
-                '{' => Token::new(TokenType::L_BRACE, None),
-                '}' => Token::new(TokenType::R_BRACE, None),
-                '[' => Token::new(TokenType::L_BRACKET, None),
-                ']' => Token::new(TokenType::R_BRACKET, None),
-                '\0' => Token::new(TokenType::EOF, None),
+                '+' => Token::new(TT::PLUS, None, line_count, column_count),
+                '-' => Token::new(TT::MINUS, None, line_count, column_count),
+                '*' => Token::new(TT::MULTIPLY, None, line_count, column_count),
+                '/' => Token::new(TT::DIVIDE, None, line_count, column_count),
+                '=' => Token::new(TT::EQUALS, None, line_count, column_count),
+                ':' => Token::new(TT::COLON, None, line_count, column_count),
+                ';' => Token::new(TT::SEMICOLON, None, line_count, column_count),
+                '(' => Token::new(TT::L_PAREN, None, line_count, column_count),
+                ')' => Token::new(TT::R_PAREN, None, line_count, column_count),
+                '{' => Token::new(TT::L_BRACE, None, line_count, column_count),
+                '}' => Token::new(TT::R_BRACE, None, line_count, column_count),
+                '[' => Token::new(TT::L_BRACKET, None, line_count, column_count),
+                ']' => Token::new(TT::R_BRACKET, None, line_count, column_count),
+                '\0' => Token::new(TT::EOF, None, line_count, column_count),
                 _ => Token::new(
-                    TokenType::UNKNOWN_SYMBOL,
+                    TT::UNKNOWN_SYMBOL,
                     Some(char_vec[cursor].to_string()),
+                    line_count,
+                    column_count,
                 ),
             });
 
