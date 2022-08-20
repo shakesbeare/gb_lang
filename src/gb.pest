@@ -7,18 +7,18 @@ COMMENT = _{
 
 // Nonterminals ------------------------
 program = _{ SOI ~ declList ~ EOI }
-declList = { declList decl | decl | "" } 
-decl = { varDecl | funDecl } // Gb programs may only have variable or function declarations at the top level
-
-varDeclIdentifiers = { lParen ~ multiVarDecl ~ rParen | identifier ~ varDeclInit }
+declList = _{ decl | declList* ~ decl } 
+decl = _{ varDecl | funDecl } // Gb programs may only have variable or function declarations at the top level
+varDecl = { varDeclIdentifiers ~ varDeclAssignment }
+varDeclIdentifiers = { lParen ~ varDeclMultiple ~ rParen | identifier ~ varDeclAssignment }
 varDeclMultiple = { identifier ~ comma ~ identifier | identifier } // `let x: int = 5;` or `let (x, y): int = 5;` 
 varDeclAssignment = { (typeHint)? ~ equal ~ simpleExp } // `let x = 5;` or `let x: int = 5`
 typeHint = { colon ~ identifier } // e.g. `: int`
 
 funDecl = { fnReturnType ~ identifier ~ lParen ~ params ~ rParen ~ stmt } // e.g. `void myFunc()...` or `MyType myFunc()...`
 fnReturnType = { "void" | identifier }
-params = { paramList | "" }
-paramList = { paramList | identifier ~ identifier } // e.g. (int x, int y)
+params = { identifier ~ identifier ~ paramsPrime} // e.g. (int x, int y)
+paramsPrime = { params | "" }
 
 stmt = {
       expStmt
@@ -29,8 +29,14 @@ stmt = {
     | breakStmt
 }
 expStmt = { exp ~ semicolon}
-compoundStmt = { lBrace ~ (compoundStmt ~ compoundStmt | declList | stmtList) ~ rBrace }
-    stmtList = { stmtList stmt | "" }
+compoundStmt = { 
+      lBrace ~ compoundStmt ~ rBrace
+    | lBrace ~ declList ~ rBrace
+    | lBrace ~ stmtList ~ rBrace 
+    | lBrace ~ "" ~ rBrace
+}
+    stmtList = { stmt ~ stmtListPrime }
+    stmtListPrime = { stmtList | "" }
 selectStmt = { ifKeyword ~ simpleExp ~ compoundStmt ~ (elseKeyword ~ compoundStmt)? }
 iterStmt = { whileKeyword ~ simpleExp ~ compoundStmt | forKeyword ~ identifier ~ inKeyword ~ identifier ~ compoundStmt }
 returnStmt = { returnKeyword ~ semicolon | returnKeyword ~ exp ~ semicolon }
@@ -47,14 +53,14 @@ exp = {
     | simpleExp
 }
 
-simpleExp = { simpleExp ~ orKeyword ~ andExp | andExp }
-andExp = { andExp ~ andKeyword ~ unaryRelExp | unaryRelExp }
+simpleExp = { andExp ~ orKeyword ~ simpleExp | andExp }
+andExp = { unaryRelExp ~ andKeyword ~ andExp | unaryRelExp }
 unaryRelExp = { notKeyword ~ unaryRelExp | relExp }
 relExp = { sumExp ~ relOp ~ sumExp | sumExp } 
-sumExp = { sumExp ~ sumOp ~ mulExp | mulExp }
+sumExp = { mulExp ~ sumOp ~ sumExp | mulExp }
     sumOp = { plus | minus }
-mulExp = { mulExp ~ mulOp ~ unaryExp | unaryExp }
-    mulOp = { multiply | divide | mod }
+mulExp = { unaryExp ~ mulOp ~ mulExp | unaryExp }
+    mulOp = { multiply | divide | modulo }
 unaryExp = {  unaryOp ~ unaryExp | factor }
     unaryOp = { minus ~ multiply ~ question }
 factor = { mutable | immutable }
@@ -62,30 +68,30 @@ mutable = { identifier }
 immutable = { lParen ~ exp ~ rParen | call | constant }
 call = { identifier ~ lParen ~ args ~ rParen }
 args = { argList | "" }
-argList = { argList ~ comma ~ exp | exp }
+argList = { exp ~ (comma ~ argList)* }
 constant = { number | string | trueKeyword | falseKeyword }
 
 
-// Terminals    ------------------------
+// Terminals    ------------------------:w
 
 // keywords 
-assignmentKeyword = { "let" | "const" }
-ifKeyword = { "if" }
-elseKeyword = { "else" }
-whileKeyword = { "while" }
-forKeyword = { "for" }
-inKeyword = { "in" }
-returnKeyword = { "return" }
-breakStmt = { "break" }
-trueKeyword = { "true" }
-falseKeyword = { "false" }
+assignmentKeyword = @{ "let" | "const" }
+ifKeyword = @{ "if" }
+elseKeyword = @{ "else" }
+whileKeyword = @{ "while" }
+forKeyword = @{ "for" }
+inKeyword = @{ "in" }
+returnKeyword = @{ "return" }
+breakKeyword = @{ "break" }
+trueKeyword = @{ "true" }
+falseKeyword = @{ "false" }
 
 
 // logical operators
-andKeyword = { "&&" }
-orKeyword = { "||" }
-notKeyword = { "!" }
-relOp = { 
+andKeyword = @{ "&&" }
+orKeyword = @{ "||" }
+notKeyword = @{ "!" }
+relOp = @{ 
       "<="
     | "<"
     | ">"
@@ -95,23 +101,23 @@ relOp = {
 }
 
 // mathematical operators
-plus = { "+" }
-minus = { "-" }
-multiply = { "*" }
-divide = { "/" }
-mod = { ""}
+plus = @{ "+" }
+minus = @{ "-" }
+multiply = @{ "*" }
+divide = @{ "/" }
+modulo = @{ ""}
 
 
 // tokens
-equal = { "=" }
-colon = { ":" }
-semicolon = { ";" }
-comma = { "," }
-question = { "?" }
-lParen = { "(" }
-rParen = { ")" }
-lBrace = { "{" }
-rBrace { "}" }
+equal = @{ "=" }
+colon = @{ ":" }
+semicolon = @{ ";" }
+comma = @{ "," }
+question = @{ "?" }
+lParen = @{ "(" }
+rParen = @{ ")" }
+lBrace = @{ "{" }
+rBrace = @{ "}" }
 
 
 number = @{ (ASCII_DIGIT | ".")+ }
