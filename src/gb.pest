@@ -6,13 +6,27 @@ COMMENT = _{
 }
 
 // Nonterminals ------------------------
-program = _{ SOI ~ declList ~ EOI }
-declList = _{ decl | declList* ~ decl } 
+program = _{ 
+      SOI ~  declList ~ EOI 
+    | SOI ~ "" ~ EOI
+}
+declList = _{ decl ~ declListPrime } 
+declListPrime = _{ declList | "" }
 decl = _{ varDecl | funDecl } // Gb programs may only have variable or function declarations at the top level
-varDecl = { varDeclIdentifiers ~ varDeclAssignment }
-varDeclIdentifiers = { lParen ~ varDeclMultiple ~ rParen | identifier ~ varDeclAssignment }
-varDeclMultiple = { identifier ~ comma ~ identifier | identifier } // `let x: int = 5;` or `let (x, y): int = 5;` 
-varDeclAssignment = { (typeHint)? ~ equal ~ simpleExp } // `let x = 5;` or `let x: int = 5`
+varDecl = { declarationKeyword ~ varDeclIdentifiers ~ varDeclAssignment }
+varDeclIdentifiers = { varDeclParen | identifier }
+    varDeclParen = {
+          lParen ~ varDeclMultiple ~ rParen 
+        | lParen ~ identifier ~ rParen
+} // `let x: int = 5;` or `let (x, y): int = 5;` 
+
+    varDeclMultiple = { identifier ~ varDeclMultiPrime }
+    varDeclMultiPrime = { comma ~ varDeclMultiple | "" }
+
+varDeclAssignment = {
+      equal ~ expStmt 
+    | typeHint ~ equal ~ expStmt 
+} // `let x = 5;` or `let x: int = 5`
 typeHint = { colon ~ identifier } // e.g. `: int`
 
 funDecl = { fnReturnType ~ identifier ~ lParen ~ params ~ rParen ~ stmt } // e.g. `void myFunc()...` or `MyType myFunc()...`
@@ -69,13 +83,14 @@ immutable = { lParen ~ exp ~ rParen | call | constant }
 call = { identifier ~ lParen ~ args ~ rParen }
 args = { argList | "" }
 argList = { exp ~ (comma ~ argList)* }
-constant = { number | string | trueKeyword | falseKeyword }
+constant = { number | string }
+number = { decimal | integer }
 
 
 // Terminals    ------------------------:w
 
 // keywords 
-assignmentKeyword = @{ "let" | "const" }
+declarationKeyword = @{ "let" | "const" }
 ifKeyword = @{ "if" }
 elseKeyword = @{ "else" }
 whileKeyword = @{ "while" }
@@ -120,7 +135,8 @@ lBrace = @{ "{" }
 rBrace = @{ "}" }
 
 
-number = @{ (ASCII_DIGIT | ".")+ }
+decimal = @{ ASCII_DIGIT ~ (ASCII_DIGIT)* ~ "." ~ (ASCII_DIGIT)* }
+integer = @{ (ASCII_DIGIT)+ }
 identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 string = @{ 
       "\"" ~ (!"\"" ~ ANY)* ~ "\""
