@@ -1,0 +1,40 @@
+// Prepatory    ------------------------
+WHITESPACE = _{ " " | "\n" | "\t" }
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* }
+
+// Nonterminals ------------------------
+program = _{ SOI ~ (statement ~ ";")* ~ EOI }
+statement = _{ expr }
+
+
+
+expr = {
+    dyadicExpression
+    | monadicExpression
+    | term
+    | string
+}
+
+dyadicExpression = { (monadicExpression | term) ~ verb ~ expr }
+monadicExpression = { verb ~ expr }
+assignmentExpression = { identifier ~ "=" ~ expr }
+initializationExpression = { assignmentKeyword ~ identifier ~ "=" ~ expr }
+
+
+term = { number | identifier | "(" ~ expr ~ ")" }
+
+// Terminals    ------------------------
+verb =  {
+      "+"
+    | "-"
+    | "*"
+    | "/"
+}
+number = @{ (ASCII_DIGIT | ".")+ }
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+string = @{ 
+      "\"" ~ (!"\"" ~ ANY)* ~ "\""
+    | "'" ~ (!"'" ~ ANY)* ~ "'" 
+}
+
+assignmentKeyword = { "let" }
