@@ -1,40 +1,122 @@
 // Prepatory    ------------------------
-WHITESPACE = _{ " " | "\n" | "\t" }
-COMMENT = _{ "//" ~ (!"\n" ~ ANY)* }
+WHITESPACE = _{ " " | "\n" | "\t" } // ' ', '\n', and '\t' will be ignored during lexing
+COMMENT = _{
+      "//" ~ (!"\n" ~ ANY)* // single line comment
+    | "/*" ~ (ANY)* ~ "*/"  // multi line comment 
+}
 
 // Nonterminals ------------------------
-program = _{ SOI ~ (statement ~ ";")* ~ EOI }
-statement = _{ expr }
+program = _{ SOI ~ declList ~ EOI }
+declList = { declList decl | decl | "" } 
+decl = { varDecl | funDecl } // Gb programs may only have variable or function declarations at the top level
 
+varDeclIdentifiers = { lParen ~ multiVarDecl ~ rParen | identifier ~ varDeclInit }
+varDeclMultiple = { identifier ~ comma ~ identifier | identifier } // `let x: int = 5;` or `let (x, y): int = 5;` 
+varDeclAssignment = { (typeHint)? ~ equal ~ simpleExp } // `let x = 5;` or `let x: int = 5`
+typeHint = { colon ~ identifier } // e.g. `: int`
 
+funDecl = { fnReturnType ~ identifier ~ lParen ~ params ~ rParen ~ stmt } // e.g. `void myFunc()...` or `MyType myFunc()...`
+fnReturnType = { "void" | identifier }
+params = { paramList | "" }
+paramList = { paramList | identifier ~ identifier } // e.g. (int x, int y)
 
-expr = {
-    dyadicExpression
-    | monadicExpression
-    | term
-    | string
+stmt = {
+      expStmt
+    | compoundStmt
+    | selectStmt
+    | iterStmt
+    | returnStmt
+    | breakStmt
+}
+expStmt = { exp ~ semicolon}
+compoundStmt = { lBrace ~ (compoundStmt ~ compoundStmt | declList | stmtList) ~ rBrace }
+    stmtList = { stmtList stmt | "" }
+selectStmt = { ifKeyword ~ simpleExp ~ compoundStmt ~ (elseKeyword ~ compoundStmt)? }
+iterStmt = { whileKeyword ~ simpleExp ~ compoundStmt | forKeyword ~ identifier ~ inKeyword ~ identifier ~ compoundStmt }
+returnStmt = { returnKeyword ~ semicolon | returnKeyword ~ exp ~ semicolon }
+breakStmt = { breakKeyword ~ semicolon }
+
+exp = { 
+      mutable ~ equal ~ exp
+    | mutable ~ plus ~ equal ~ exp
+    | mutable ~ minus ~ equal ~ exp
+    | mutable ~ multiply ~ equal ~ exp
+    | mutable ~ divide ~ equal ~ exp
+    | mutable ~ plus ~ plus
+    | mutable ~ minus ~ minus
+    | simpleExp
 }
 
-dyadicExpression = { (monadicExpression | term) ~ verb ~ expr }
-monadicExpression = { verb ~ expr }
-assignmentExpression = { identifier ~ "=" ~ expr }
-initializationExpression = { assignmentKeyword ~ identifier ~ "=" ~ expr }
+simpleExp = { simpleExp ~ orKeyword ~ andExp | andExp }
+andExp = { andExp ~ andKeyword ~ unaryRelExp | unaryRelExp }
+unaryRelExp = { notKeyword ~ unaryRelExp | relExp }
+relExp = { sumExp ~ relOp ~ sumExp | sumExp } 
+sumExp = { sumExp ~ sumOp ~ mulExp | mulExp }
+    sumOp = { plus | minus }
+mulExp = { mulExp ~ mulOp ~ unaryExp | unaryExp }
+    mulOp = { multiply | divide | mod }
+unaryExp = {  unaryOp ~ unaryExp | factor }
+    unaryOp = { minus ~ multiply ~ question }
+factor = { mutable | immutable }
+mutable = { identifier }
+immutable = { lParen ~ exp ~ rParen | call | constant }
+call = { identifier ~ lParen ~ args ~ rParen }
+args = { argList | "" }
+argList = { argList ~ comma ~ exp | exp }
+constant = { number | string | trueKeyword | falseKeyword }
 
-
-term = { number | identifier | "(" ~ expr ~ ")" }
 
 // Terminals    ------------------------
-verb =  {
-      "+"
-    | "-"
-    | "*"
-    | "/"
+
+// keywords 
+assignmentKeyword = { "let" | "const" }
+ifKeyword = { "if" }
+elseKeyword = { "else" }
+whileKeyword = { "while" }
+forKeyword = { "for" }
+inKeyword = { "in" }
+returnKeyword = { "return" }
+breakStmt = { "break" }
+trueKeyword = { "true" }
+falseKeyword = { "false" }
+
+
+// logical operators
+andKeyword = { "&&" }
+orKeyword = { "||" }
+notKeyword = { "!" }
+relOp = { 
+      "<="
+    | "<"
+    | ">"
+    | ">="
+    | "=="
+    | "!="
 }
+
+// mathematical operators
+plus = { "+" }
+minus = { "-" }
+multiply = { "*" }
+divide = { "/" }
+mod = { ""}
+
+
+// tokens
+equal = { "=" }
+colon = { ":" }
+semicolon = { ";" }
+comma = { "," }
+question = { "?" }
+lParen = { "(" }
+rParen = { ")" }
+lBrace = { "{" }
+rBrace { "}" }
+
+
 number = @{ (ASCII_DIGIT | ".")+ }
 identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 string = @{ 
       "\"" ~ (!"\"" ~ ANY)* ~ "\""
     | "'" ~ (!"'" ~ ANY)* ~ "'" 
 }
-
-assignmentKeyword = { "let" }
