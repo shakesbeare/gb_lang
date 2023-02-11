@@ -1,144 +1,68 @@
-// Prepatory    ------------------------
-WHITESPACE = _{ " " | "\n" | "\t" } // ' ', '\n', and '\t' will be ignored during lexing
-COMMENT = _{
-      "//" ~ (!"\n" ~ ANY)* // single line comment
-    | "/*" ~ (ANY)* ~ "*/"  // multi line comment 
+// Setup
+WHITESPACE = _{ " " | NEWLINE | "\t" }
+COMMENT = _{ "//" ~ (!NEWLINE ~ ANY)* }
+
+integer = @{ ASCII_DIGIT+ }
+float = @{
+      ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT*
+    | "." ~ ASCII_DIGIT+
+    | ASCII_DIGIT+ ~ "f"
 }
 
-// Nonterminals ------------------------
-program = _{ 
-      SOI ~  declList ~ EOI 
-    | SOI ~ "" ~ EOI
-}
-declList = _{ decl ~ declListPrime } 
-declListPrime = _{ declList | "" }
-decl = _{ varDecl | funDecl } // Gb programs may only have variable or function declarations at the top level
-varDecl = { declarationKeyword ~ varDeclIdentifiers ~ varDeclAssignment }
-varDeclIdentifiers = { varDeclParen | identifier }
-    varDeclParen = {
-          lParen ~ varDeclMultiple ~ rParen 
-        | lParen ~ identifier ~ rParen
-} // `let x: int = 5;` or `let (x, y): int = 5;` 
-
-    varDeclMultiple = { identifier ~ varDeclMultiPrime }
-    varDeclMultiPrime = { comma ~ varDeclMultiple | "" }
-
-varDeclAssignment = {
-      equal ~ expStmt 
-    | typeHint ~ equal ~ expStmt 
-} // `let x = 5;` or `let x: int = 5`
-typeHint = { colon ~ identifier } // e.g. `: int`
-
-funDecl = { fnReturnType ~ identifier ~ lParen ~ params ~ rParen ~ stmt } // e.g. `void myFunc()...` or `MyType myFunc()...`
-fnReturnType = { "void" | identifier }
-params = { identifier ~ identifier ~ paramsPrime} // e.g. (int x, int y)
-paramsPrime = { params | "" }
-
-stmt = {
-      expStmt
-    | compoundStmt
-    | selectStmt
-    | iterStmt
-    | returnStmt
-    | breakStmt
-}
-expStmt = { exp ~ semicolon}
-compoundStmt = { 
-      lBrace ~ compoundStmt ~ rBrace
-    | lBrace ~ declList ~ rBrace
-    | lBrace ~ stmtList ~ rBrace 
-    | lBrace ~ "" ~ rBrace
-}
-    stmtList = { stmt ~ stmtListPrime }
-    stmtListPrime = { stmtList | "" }
-selectStmt = { ifKeyword ~ simpleExp ~ compoundStmt ~ (elseKeyword ~ compoundStmt)? }
-iterStmt = { whileKeyword ~ simpleExp ~ compoundStmt | forKeyword ~ identifier ~ inKeyword ~ identifier ~ compoundStmt }
-returnStmt = { returnKeyword ~ semicolon | returnKeyword ~ exp ~ semicolon }
-breakStmt = { breakKeyword ~ semicolon }
-
-exp = { 
-      mutable ~ equal ~ exp
-    | mutable ~ plus ~ equal ~ exp
-    | mutable ~ minus ~ equal ~ exp
-    | mutable ~ multiply ~ equal ~ exp
-    | mutable ~ divide ~ equal ~ exp
-    | mutable ~ plus ~ plus
-    | mutable ~ minus ~ minus
-    | simpleExp
+keyword = _{
+      if_
+    | return_
+    | else_
+    | let_
 }
 
-simpleExp = { andExp ~ orKeyword ~ simpleExp | andExp }
-andExp = { unaryRelExp ~ andKeyword ~ andExp | unaryRelExp }
-unaryRelExp = { notKeyword ~ unaryRelExp | relExp }
-relExp = { sumExp ~ relOp ~ sumExp | sumExp } 
-sumExp = { mulExp ~ sumOp ~ sumExp | mulExp }
-    sumOp = { plus | minus }
-mulExp = { unaryExp ~ mulOp ~ mulExp | unaryExp }
-    mulOp = { multiply | divide | modulo }
-unaryExp = {  unaryOp ~ unaryExp | factor }
-    unaryOp = { minus ~ multiply ~ question }
-factor = { mutable | immutable }
-mutable = { identifier }
-immutable = { lParen ~ exp ~ rParen | call | constant }
-call = { identifier ~ lParen ~ args ~ rParen }
-args = { argList | "" }
-argList = { exp ~ (comma ~ argList)* }
-constant = { number | string }
-number = { decimal | integer }
+if_ = _{ "if" }
+let_ = _{ "let" }
+else_ = _{ "else" }
+return_ = _{ "return" }
+while_ = _{ "while" }
+fn_ = _{ "fn" }
+
+identifier = @{ (ASCII_ALPHA | "_")+ ~ ASCII_ALPHANUMERIC* }
+
+number = _{ float | integer }
+boolean = { "true" | "false" }
+atom = _{ boolean | identifier | number | unary_minus | "(" ~ expr ~ ")" | compound_expr }
 
 
-// Terminals    ------------------------:w
+bin_op = _{ unary_expr | add | subtract | multiply | divide | modulo | assign | less_than | greater_than }
+    assign = { "=" }
+    less_than = { "<" }
+    greater_than = { ">" }
+    add = { "+" }
+    subtract = { "-" }
+    multiply = { "*" }
+    divide = { "/" }
+    modulo = { "%" }
 
-// keywords 
-declarationKeyword = @{ "let" | "const" }
-ifKeyword = @{ "if" }
-elseKeyword = @{ "else" }
-whileKeyword = @{ "while" }
-forKeyword = @{ "for" }
-inKeyword = @{ "in" }
-returnKeyword = @{ "return" }
-breakKeyword = @{ "break" }
-trueKeyword = @{ "true" }
-falseKeyword = @{ "false" }
+unary_expr = _{ call | unary_minus }
+    call = {identifier ~  "(" ~ (expr ~ ",")* ~ ")" }
+    unary_minus = { "-" ~ atom }
 
-
-// logical operators
-andKeyword = @{ "&&" }
-orKeyword = @{ "||" }
-notKeyword = @{ "!" }
-relOp = @{ 
-      "<="
-    | "<"
-    | ">"
-    | ">="
-    | "=="
-    | "!="
+compound_expr = { "{" ~ expr* ~ "}" }
+expr = { 
+      return_expr
+    | if_expr
+    | while_expr
+    | function_definition
+    | atom ~ (bin_op ~ expr) ~ ";"?
+    | atom ~ (bin_op ~ atom)* ~ ";"?
 }
 
-// mathematical operators
-plus = @{ "+" }
-minus = @{ "-" }
-multiply = @{ "*" }
-divide = @{ "/" }
-modulo = @{ ""}
+expr_body = { compound_expr }
+
+return_expr = { return_ ~ expr }
+if_expr = { if_ ~ expr ~ expr_body ~ else_expr* }
+else_expr = { else_~ ( if_expr | expr) }
+let_expr = { let_ ~ identifier ~ assign ~ atom }
+while_expr = { while_ ~ expr ~ expr_body }
+function_definition = { fn_ ~ "(" ~ ( identifier ~ ":" ~ identifier ~ ",")* ~ compound_expr }
+
+file = _{ SOI ~ expr* ~ EOI }
 
 
-// tokens
-equal = @{ "=" }
-colon = @{ ":" }
-semicolon = @{ ";" }
-comma = @{ "," }
-question = @{ "?" }
-lParen = @{ "(" }
-rParen = @{ ")" }
-lBrace = @{ "{" }
-rBrace = @{ "}" }
-
-
-decimal = @{ ASCII_DIGIT ~ (ASCII_DIGIT)* ~ "." ~ (ASCII_DIGIT)* }
-integer = @{ (ASCII_DIGIT)+ }
-identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
-string = @{ 
-      "\"" ~ (!"\"" ~ ANY)* ~ "\""
-    | "'" ~ (!"'" ~ ANY)* ~ "'" 
-}
