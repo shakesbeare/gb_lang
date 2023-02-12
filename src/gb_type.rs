@@ -1,5 +1,5 @@
+use crate::ast::Expr;
 use std::fmt;
-use crate::Expr;
 
 pub fn variant_eq<T>(a: &T, b: &T) -> bool {
     std::mem::discriminant(a) == std::mem::discriminant(b)
@@ -20,22 +20,26 @@ impl PartialOrd for GbType {
         if !variant_eq(self, other) {
             return None;
         }
-        
+
         let is_less = match *self {
             GbType::Integer(x) => match *other {
                 GbType::Integer(y) => x < y,
                 GbType::Float(y) => (x as f64) < y,
-                _ => todo!()
-            }
+                _ => todo!(),
+            },
             GbType::Float(x) => match *other {
                 GbType::Float(y) => x < y,
                 GbType::Integer(y) => x < y as f64,
-                _ => todo!()
-            }
-            _ => todo!()
+                _ => todo!(),
+            },
+            _ => todo!(),
         };
 
-        if is_less { return Some(std::cmp::Ordering::Less) } else { return Some(std::cmp::Ordering::Greater) }
+        if is_less {
+            return Some(std::cmp::Ordering::Less);
+        } else {
+            return Some(std::cmp::Ordering::Greater);
+        }
     }
 }
 
@@ -129,9 +133,8 @@ impl std::fmt::Display for GbType {
                 GbType::Float(x) => x.to_string(),
                 GbType::String(x) => format!("\" {} \"", x).to_string(),
                 GbType::Boolean(x) => x.to_string(),
-                GbType::Typeless(x) => "".to_string(),
+                GbType::Typeless(_) => "".to_string(),
                 GbType::Function(x) => format!("Function: {:?}", x).to_string(),
-                _ => todo!(),
             }
         )
     }

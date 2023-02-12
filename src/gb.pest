@@ -27,10 +27,11 @@ identifier = @{ (ASCII_ALPHA | "_")+ ~ ASCII_ALPHANUMERIC* }
 
 number = _{ float | integer }
 boolean = { "true" | "false" }
-atom = _{ boolean | identifier | number | unary_minus | "(" ~ expr ~ ")" | compound_expr }
+atom = _{ unary_expr | boolean | identifier | number | "(" ~ expr ~ ")" | compound_expr }
 
+args = { (expr ~ ("," ~ expr)*)? }
 
-bin_op = _{ unary_expr | add | subtract | multiply | divide | modulo | assign | less_than | greater_than }
+bin_op = _{ add | subtract | multiply | divide | modulo | assign | less_than | greater_than }
     assign = { "=" }
     less_than = { "<" }
     greater_than = { ">" }
@@ -41,7 +42,7 @@ bin_op = _{ unary_expr | add | subtract | multiply | divide | modulo | assign | 
     modulo = { "%" }
 
 unary_expr = _{ call | unary_minus }
-    call = {identifier ~  "(" ~ (expr ~ ",")* ~ ")" }
+    call = { identifier ~ "(" ~ args ~ ")" }
     unary_minus = { "-" ~ atom }
 
 compound_expr = { "{" ~ expr* ~ "}" }
@@ -49,7 +50,6 @@ expr = {
       return_expr
     | if_expr
     | while_expr
-    | function_definition
     | atom ~ (bin_op ~ expr) ~ ";"?
     | atom ~ (bin_op ~ atom)* ~ ";"?
 }

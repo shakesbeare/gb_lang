@@ -2,6 +2,19 @@ use crate::ast::{Expr, Op};
 use crate::gb_type::{variant_eq, GbType};
 use crate::scope::Scope;
 
+pub fn init() -> Scope {
+    let mut global_scope = Scope::init();
+    global_scope.identifiers.insert(
+        "print".to_string(),
+        GbType::Function(Expr::FunctionDefinition {
+            arg_types: vec![],
+            arg_names: vec![],
+            body: Box::new(Expr::Print),
+        }),
+    );
+
+    return global_scope;
+}
 pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
     match input {
         Expr::Integer(x) => GbType::Integer(x),
@@ -15,7 +28,9 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
             };
             Clone::clone(value)
         }
-        Expr::UnaryMinus(x) => evaluate(*x, current_scope) * GbType::Integer(-1),
+        Expr::UnaryMinus(x) => {
+            evaluate(*x, current_scope) * GbType::Integer(-1)
+        }
         Expr::BinOp { lhs, op, rhs } => {
             let mut left = GbType::Typeless("".to_string());
             let right = evaluate((*rhs).clone(), current_scope);
@@ -39,13 +54,16 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
                     };
 
                     if std::mem::discriminant(&right)
-                        == std::mem::discriminant(&GbType::Typeless("".to_string()))
+                        == std::mem::discriminant(&GbType::Typeless(
+                            "".to_string(),
+                        ))
                     {
                         return GbType::Typeless(ident_name);
                     }
 
                     if current_scope.identifiers.contains_key(&ident_name) {
-                        let test = current_scope.identifiers.get(&ident_name).unwrap();
+                        let test =
+                            current_scope.identifiers.get(&ident_name).unwrap();
                         if !variant_eq(test, &right) {
                             println!("ERROR: Wrong Type");
                             return GbType::Typeless(ident_name);
@@ -91,8 +109,12 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
             }
         }
         Expr::While { condition, expr } => {
+            #[allow(unused_mut)]
             let mut last_result = None;
-            while evaluate(*condition.clone(), current_scope) == GbType::Boolean(true) {
+            while evaluate(*condition.clone(), current_scope)
+                == GbType::Boolean(true)
+            {
+                #[allow(unused_variables)]
                 let last_result = evaluate(*expr.clone(), current_scope);
             }
 
@@ -102,16 +124,24 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
                 return GbType::Typeless("".to_string());
             }
         }
-        Expr::FunctionCall(ident) => {
-            let expr_gb  = evaluate(*ident, current_scope);
+        Expr::FunctionCall { identifier, args } => {
+            let expr_gb = evaluate(*identifier, current_scope);
+            let mut args_gb = vec![];
 
-            if let GbType::Function(expr) = expr_gb { 
-                return evaluate(expr, current_scope);
+            for arg in args {
+                args_gb.push(evaluate(arg, current_scope));
             }
-            
+
+            if let GbType::Function(expr) = expr_gb {
+                let Some(x) = function_call(expr, args_gb, current_scope) else {
+                    return GbType::Typeless("".to_string());
+                };
+                return x;
+            }
+
             GbType::Typeless("".to_string())
         }
-        Expr::FnPrint => {
+        Expr::Print => {
             println!("hello");
             GbType::Typeless("".to_string())
         }
@@ -120,4 +150,31 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
             todo!()
         }
     }
+}
+
+#[allow(unused_variables)]
+fn function_call(
+    expr: Expr,
+    args: Vec<GbType>,
+    outer_scope: &mut Scope,
+) -> Option<GbType> {
+    let Expr::FunctionDefinition { arg_types, arg_names, body } = expr else {
+        return None;
+    };
+
+    if !(args.len() == arg_types.len()) {
+        return None;
+    }
+
+    let mut scope = Scope::init();
+
+    for (i, arg) in args.iter().enumerate() {
+        if variant_eq(arg, &arg_types[i]) {
+            return None;
+        } else {
+            scope.identifiers.insert(arg_names[i].clone(), arg.clone());
+        }
+    }
+
+    return Some(evaluate(*body, &mut scope));
 }

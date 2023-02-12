@@ -1,3 +1,6 @@
+use crate::gb_type::GbType;
+
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Identifier(String),
@@ -22,10 +25,17 @@ pub enum Expr {
         condition: Box<Expr>,
         expr: Box<Expr>,
     },
-    FunctionCall(Box<Expr>),
+    FunctionCall {
+        identifier: Box<Expr>,
+        args: Vec<Expr>,
+    },
+    FunctionDefinition {
+        arg_types: Vec<GbType>,
+        arg_names: Vec<String>,
+        body: Box<Expr>,
+    },
 
-
-    FnPrint,
+    Print,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
