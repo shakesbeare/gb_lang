@@ -14,8 +14,10 @@ pub fn init() -> Scope {
         }),
     );
     g.identifiers.insert("int".to_string(), GbType::Integer(0));
-    g.identifiers.insert("float".to_string(), GbType::Float(0.0));
-    g.identifiers.insert("str".to_string(), GbType::String("".to_string()));
+    g.identifiers
+        .insert("float".to_string(), GbType::Float(0.0));
+    g.identifiers
+        .insert("str".to_string(), GbType::String("".to_string()));
 
     return g;
 }
@@ -136,17 +138,18 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
 
             GbType::None
         }
-        Expr::FunctionDefinition { arg_types, arg_names, body } => {
-            GbType::Function(Expr::FunctionDefinition { arg_types, arg_names, body })
-
-        }
+        Expr::FunctionDefinition {
+            arg_types,
+            arg_names,
+            body,
+        } => GbType::Function(Expr::FunctionDefinition {
+            arg_types,
+            arg_names,
+            body,
+        }),
         Expr::Print => {
             println!("hello");
             GbType::None
-        }
-        _ => {
-            println!("{:?}", input);
-            todo!()
         }
     }
 }
@@ -169,7 +172,7 @@ fn function_call(expr: Expr, args: Vec<GbType>, outer_scope: &mut Scope) -> Opti
     let mut scope = Scope::init();
 
     for (i, arg) in args.iter().enumerate() {
-        if variant_eq(arg, &arg_types[i]) {
+        if !variant_eq(arg, &arg_types[i]) {
             return None;
         } else {
             scope.identifiers.insert(arg_names[i].clone(), arg.clone());

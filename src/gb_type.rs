@@ -1,5 +1,5 @@
 use crate::ast::Expr;
-use std::{fmt, mem::Discriminant};
+use std::fmt;
 
 pub fn variant_eq<T>(a: &T, b: &T) -> bool {
     std::mem::discriminant(a) == std::mem::discriminant(b)
@@ -13,12 +13,6 @@ pub enum GbType {
     Boolean(bool),
     Function(Expr),
     None,
-}
-
-impl GbType {
-    fn discriminant(&self) -> Discriminant<GbType> {
-        std::mem::discriminant(self)
-    }
 }
 
 impl PartialOrd for GbType {
