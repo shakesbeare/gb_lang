@@ -1,24 +1,12 @@
 // some cool math functions
 
+fibonacci = fn(x: int) {
+    result = 0
+    if x == 1 { result = 1 }
+    else if x < 1 { result = 0 }
+    else { result = fibonacci(x-1) + fibonacci(x-2) }
 
-subtract = fn(x: int, y: int) {
-        return x - y
+    return result
 };
 
-add = fn(x: int, y: int) {
-    return x + y
-};
-
-x = 0;
-y = 0;
-
-while x < 11 {
-    print(x, y)
-    x = add(x, 1)
-    y = subtract(y, x)
-};
-
-
-fib = fn(x: int) { 
-    if 
-}
+print(fibonacci(10));

@@ -2,8 +2,8 @@ use crate::ast::{Expr, Op};
 use crate::gb_type::{variant_eq, GbType};
 use crate::scope::Scope;
 
-pub fn init() -> Scope {
-    let mut g = Scope::init();
+pub fn init() -> Box<Scope> {
+    let mut g = Box::new(Scope::init());
 
     g.identifiers.insert(
         "print".to_string(),
@@ -182,7 +182,6 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
     }
 }
 
-#[allow(unused_variables)]
 fn function_call(
     fn_name: String,
     expr: Expr,
@@ -193,12 +192,6 @@ fn function_call(
         return None;
     };
 
-    if !variable_args {
-        if !(args.len() == arg_types.len()) {
-            return None;
-        }
-    }
-
     let arg_types: Vec<GbType> = arg_types
         .into_iter()
         .map(|x| evaluate(x, outer_scope))
@@ -206,6 +199,10 @@ fn function_call(
 
     let mut scope = init();
     if !variable_args {
+        if !(args.len() == arg_types.len()) {
+            return None;
+        }
+
         for (i, arg) in args.iter().enumerate() {
             if !variant_eq(arg, &arg_types[i]) {
                 return None;
