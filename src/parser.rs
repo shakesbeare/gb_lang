@@ -15,7 +15,7 @@ lazy_static::lazy_static! {
 
         PrecClimber::new(vec![
             Operator::new(assign, Right),
-            Operator::new(less_than, Left) | Operator::new(greater_than, Left),
+            Operator::new(less_than, Left) | Operator::new(greater_than, Left) | Operator::new(equal_to, Left),
             Operator::new(add, Left) | Operator::new(subtract, Left),
             Operator::new(multiply, Left) | Operator::new(divide, Left) | Operator::new(modulo, Left),
         ])
@@ -38,6 +38,7 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
                 Rule::assign => Op::Assign,
                 Rule::less_than => Op::LessThan,
                 Rule::greater_than => Op::GreaterThan,
+                Rule::equal_to => Op::EqualTo,
                 rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
             };
             Expr::BinOp {

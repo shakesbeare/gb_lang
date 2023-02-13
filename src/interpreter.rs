@@ -49,8 +49,10 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
                 Op::Divide => left / right,
                 Op::LessThan => GbType::Boolean(left < right),
                 Op::GreaterThan => GbType::Boolean(left > right),
+                Op::EqualTo => GbType::Boolean(left == right), 
                 Op::Modulo => {
-                    todo!()
+                    let temp = left.clone() / right;
+                    return left - temp;
                 }
                 Op::Assign => {
                     let Expr::Identifier(ident_name) = *lhs else {

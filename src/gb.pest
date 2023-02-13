@@ -33,10 +33,11 @@ args = { (expr ~ ("," ~ expr)*)? }
 define_arg = { identifier ~ ":" ~ identifier } // x: int
 define_args = { (define_arg ~ ("," ~ define_arg)*)? } // x: int, y: int
 
-bin_op = _{ add | subtract | multiply | divide | modulo | assign | less_than | greater_than }
+bin_op = _{ add | subtract | multiply | divide | modulo | equal_to | assign | less_than | greater_than }
     assign = { "=" }
     less_than = { "<" }
     greater_than = { ">" }
+    equal_to = { "==" }
     add = { "+" }
     subtract = { "-" }
     multiply = { "*" }
