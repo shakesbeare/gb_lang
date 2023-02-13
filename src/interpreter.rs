@@ -24,7 +24,7 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
         Expr::Identifier(x) => {
             let Some(value) = current_scope.lookup(&x) else {
                 println!("The identifier {} has not yet been defined", x);
-                return GbType::Typeless(x);
+                return GbType::None;
             };
             Clone::clone(value)
         }
@@ -32,7 +32,7 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
             evaluate(*x, current_scope) * GbType::Integer(-1)
         }
         Expr::BinOp { lhs, op, rhs } => {
-            let mut left = GbType::Typeless("".to_string());
+            let mut left = GbType::None;
             let right = evaluate((*rhs).clone(), current_scope);
             if op != Op::Assign {
                 left = evaluate((*lhs).clone(), current_scope);
@@ -54,11 +54,9 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
                     };
 
                     if std::mem::discriminant(&right)
-                        == std::mem::discriminant(&GbType::Typeless(
-                            "".to_string(),
-                        ))
+                        == std::mem::discriminant(&GbType::None)
                     {
-                        return GbType::Typeless(ident_name);
+                        return GbType::None;
                     }
 
                     if current_scope.identifiers.contains_key(&ident_name) {
@@ -66,7 +64,7 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
                             current_scope.identifiers.get(&ident_name).unwrap();
                         if !variant_eq(test, &right) {
                             println!("ERROR: Wrong Type");
-                            return GbType::Typeless(ident_name);
+                            return GbType::None;
                         }
                     }
                     current_scope
@@ -90,7 +88,7 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
             if let Some(x) = last_result {
                 return x;
             } else {
-                return GbType::Typeless("".to_string());
+                return GbType::None;
             }
         }
         Expr::Return(expr) => evaluate(*expr, current_scope),
@@ -105,7 +103,7 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
                 if let Some(els_inner) = els {
                     return evaluate(*els_inner, current_scope);
                 }
-                GbType::Typeless("".to_string())
+                GbType::None
             }
         }
         Expr::While { condition, expr } => {
@@ -121,7 +119,7 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
             if let Some(x) = last_result {
                 return x;
             } else {
-                return GbType::Typeless("".to_string());
+                return GbType::None;
             }
         }
         Expr::FunctionCall { identifier, args } => {
@@ -134,16 +132,16 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
 
             if let GbType::Function(expr) = expr_gb {
                 let Some(x) = function_call(expr, args_gb, current_scope) else {
-                    return GbType::Typeless("".to_string());
+                    return GbType::None;
                 };
                 return x;
             }
 
-            GbType::Typeless("".to_string())
+            GbType::None
         }
         Expr::Print => {
             println!("hello");
-            GbType::Typeless("".to_string())
+            GbType::None
         }
         _ => {
             println!("{:?}", input);

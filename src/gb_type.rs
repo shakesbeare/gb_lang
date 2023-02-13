@@ -11,8 +11,8 @@ pub enum GbType {
     Float(f64),
     String(String),
     Boolean(bool),
-    Typeless(String),
     Function(Expr),
+    None,
 }
 
 impl PartialOrd for GbType {
@@ -133,8 +133,8 @@ impl std::fmt::Display for GbType {
                 GbType::Float(x) => x.to_string(),
                 GbType::String(x) => format!("\" {} \"", x).to_string(),
                 GbType::Boolean(x) => x.to_string(),
-                GbType::Typeless(_) => "".to_string(),
                 GbType::Function(x) => format!("Function: {:?}", x).to_string(),
+                GbType::None => "".to_string(),
             }
         )
     }
