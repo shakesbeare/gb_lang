@@ -30,6 +30,8 @@ boolean = { "true" | "false" }
 atom = _{ unary_expr | boolean | identifier | number | "(" ~ expr ~ ")" | compound_expr }
 
 args = { (expr ~ ("," ~ expr)*)? }
+define_arg = { identifier ~ ":" ~ identifier } // x: int
+define_args = { (define_arg ~ ("," ~ define_arg)*)? } // x: int, y: int
 
 bin_op = _{ add | subtract | multiply | divide | modulo | assign | less_than | greater_than }
     assign = { "=" }
@@ -50,6 +52,7 @@ expr = {
       return_expr
     | if_expr
     | while_expr
+    | function_definition
     | atom ~ (bin_op ~ expr) ~ ";"?
     | atom ~ (bin_op ~ atom)* ~ ";"?
 }
@@ -61,7 +64,7 @@ if_expr = { if_ ~ expr ~ expr_body ~ else_expr* }
 else_expr = { else_~ ( if_expr | expr) }
 let_expr = { let_ ~ identifier ~ assign ~ atom }
 while_expr = { while_ ~ expr ~ expr_body }
-function_definition = { fn_ ~ "(" ~ ( identifier ~ ":" ~ identifier ~ ",")* ~ compound_expr }
+function_definition = { fn_ ~ "(" ~ define_args ~ ")" ~ compound_expr }
 
 file = _{ SOI ~ expr* ~ EOI }
 

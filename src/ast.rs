@@ -1,5 +1,3 @@
-use crate::gb_type::GbType;
-
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -30,7 +28,7 @@ pub enum Expr {
         args: Vec<Expr>,
     },
     FunctionDefinition {
-        arg_types: Vec<GbType>,
+        arg_types: Vec<Expr>,
         arg_names: Vec<String>,
         body: Box<Expr>,
     },

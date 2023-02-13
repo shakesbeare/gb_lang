@@ -28,9 +28,7 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
             };
             Clone::clone(value)
         }
-        Expr::UnaryMinus(x) => {
-            evaluate(*x, current_scope) * GbType::Integer(-1)
-        }
+        Expr::UnaryMinus(x) => evaluate(*x, current_scope) * GbType::Integer(-1),
         Expr::BinOp { lhs, op, rhs } => {
             let mut left = GbType::None;
             let right = evaluate((*rhs).clone(), current_scope);
@@ -53,15 +51,12 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
                         unreachable!()
                     };
 
-                    if std::mem::discriminant(&right)
-                        == std::mem::discriminant(&GbType::None)
-                    {
+                    if std::mem::discriminant(&right) == std::mem::discriminant(&GbType::None) {
                         return GbType::None;
                     }
 
                     if current_scope.identifiers.contains_key(&ident_name) {
-                        let test =
-                            current_scope.identifiers.get(&ident_name).unwrap();
+                        let test = current_scope.identifiers.get(&ident_name).unwrap();
                         if !variant_eq(test, &right) {
                             println!("ERROR: Wrong Type");
                             return GbType::None;
@@ -109,9 +104,7 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
         Expr::While { condition, expr } => {
             #[allow(unused_mut)]
             let mut last_result = None;
-            while evaluate(*condition.clone(), current_scope)
-                == GbType::Boolean(true)
-            {
+            while evaluate(*condition.clone(), current_scope) == GbType::Boolean(true) {
                 #[allow(unused_variables)]
                 let last_result = evaluate(*expr.clone(), current_scope);
             }
@@ -139,6 +132,10 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
 
             GbType::None
         }
+        Expr::FunctionDefinition { arg_types, arg_names, body } => {
+            GbType::Function(Expr::FunctionDefinition { arg_types, arg_names, body })
+
+        }
         Expr::Print => {
             println!("hello");
             GbType::None
@@ -151,11 +148,7 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
 }
 
 #[allow(unused_variables)]
-fn function_call(
-    expr: Expr,
-    args: Vec<GbType>,
-    outer_scope: &mut Scope,
-) -> Option<GbType> {
+fn function_call(expr: Expr, args: Vec<GbType>, outer_scope: &mut Scope) -> Option<GbType> {
     let Expr::FunctionDefinition { arg_types, arg_names, body } = expr else {
         return None;
     };
@@ -163,6 +156,11 @@ fn function_call(
     if !(args.len() == arg_types.len()) {
         return None;
     }
+
+    let arg_types: Vec<GbType> = arg_types
+        .into_iter()
+        .map(|x| evaluate(x, outer_scope))
+        .collect();
 
     let mut scope = Scope::init();
 

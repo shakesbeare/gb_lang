@@ -38,10 +38,7 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
                 Rule::assign => Op::Assign,
                 Rule::less_than => Op::LessThan,
                 Rule::greater_than => Op::GreaterThan,
-                rule => unreachable!(
-                    "Expr::parse expected infix operation, found {:?}",
-                    rule
-                ),
+                rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
             };
             Expr::BinOp {
                 lhs: Box::new(lhs),
@@ -79,12 +76,8 @@ fn parse_one(pair: Pair<Rule>) -> Expr {
 
             Expr::CompoundExpr(exprs)
         }
-        Rule::unary_minus => {
-            Expr::UnaryMinus(Box::new(parse_expr(pair.into_inner())))
-        }
-        Rule::return_expr => {
-            Expr::Return(Box::new(parse_expr(pair.into_inner())))
-        }
+        Rule::unary_minus => Expr::UnaryMinus(Box::new(parse_expr(pair.into_inner()))),
+        Rule::return_expr => Expr::Return(Box::new(parse_expr(pair.into_inner()))),
         Rule::if_expr => {
             let inner: Vec<Pair<Rule>> = pair.into_inner().collect();
             let condition = inner[0].clone();
@@ -129,6 +122,30 @@ fn parse_one(pair: Pair<Rule>) -> Expr {
             Expr::FunctionCall {
                 identifier: Box::new(parse_one(identifier)),
                 args,
+            }
+        }
+        Rule::function_definition => {
+            let inner: Vec<Pair<Rule>> = pair.into_inner().collect();
+            let inner_expr = Box::new(parse_one(inner[1].clone()));
+            let args_pair = inner[0].clone();
+
+            let mut types = vec![];
+            let mut names = vec![];
+
+            for arg_pair in args_pair.into_inner() {
+                let inner: Vec<Pair<Rule>> = arg_pair.into_inner().collect();
+                let arg_name = inner[0].to_owned();
+                let arg_type_name = inner[1].to_owned();
+
+                names.push(arg_name.as_str().to_string());
+                types.push(parse_one(arg_type_name));
+
+            }
+
+            Expr::FunctionDefinition {
+                arg_types: types,
+                arg_names: names,
+                body: inner_expr,
             }
         }
         rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
