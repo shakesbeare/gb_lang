@@ -3,8 +3,9 @@ use crate::gb_type::{variant_eq, GbType};
 use crate::scope::Scope;
 
 pub fn init() -> Scope {
-    let mut global_scope = Scope::init();
-    global_scope.identifiers.insert(
+    let mut g = Scope::init();
+
+    g.identifiers.insert(
         "print".to_string(),
         GbType::Function(Expr::FunctionDefinition {
             arg_types: vec![],
@@ -12,8 +13,11 @@ pub fn init() -> Scope {
             body: Box::new(Expr::Print),
         }),
     );
+    g.identifiers.insert("int".to_string(), GbType::Integer(0));
+    g.identifiers.insert("float".to_string(), GbType::Float(0.0));
+    g.identifiers.insert("str".to_string(), GbType::String("".to_string()));
 
-    return global_scope;
+    return g;
 }
 pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
     match input {
