@@ -11,6 +11,7 @@ pub fn init() -> Scope {
             arg_types: vec![],
             arg_names: vec![],
             body: Box::new(Expr::Print),
+            variable_args: true,
         }),
     );
     g.identifiers.insert("int".to_string(), GbType::Integer(0));
@@ -23,6 +24,13 @@ pub fn init() -> Scope {
 }
 pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
     match input {
+        Expr::Program(stmts) => {
+            for stmt in stmts {
+                evaluate(stmt, current_scope);
+            }
+
+            GbType::None
+        }
         Expr::Integer(x) => GbType::Integer(x),
         Expr::Float(x) => GbType::Float(x),
         Expr::String(x) => GbType::String(x),
@@ -49,7 +57,7 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
                 Op::Divide => left / right,
                 Op::LessThan => GbType::Boolean(left < right),
                 Op::GreaterThan => GbType::Boolean(left > right),
-                Op::EqualTo => GbType::Boolean(left == right), 
+                Op::EqualTo => GbType::Boolean(left == right),
                 Op::Modulo => {
                     let temp = left.clone() / right;
                     return left - temp;
@@ -124,15 +132,17 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
             }
         }
         Expr::FunctionCall { identifier, args } => {
-            let expr_gb = evaluate(*identifier, current_scope);
+            let expr_gb = evaluate(*identifier.clone(), current_scope);
             let mut args_gb = vec![];
 
             for arg in args {
                 args_gb.push(evaluate(arg, current_scope));
             }
 
+            let Expr::Identifier(ident) = *identifier else { return GbType::None };
+
             if let GbType::Function(expr) = expr_gb {
-                let Some(x) = function_call(expr, args_gb, current_scope) else {
+                let Some(x) = function_call(ident, expr, args_gb, current_scope) else {
                     return GbType::None;
                 };
                 return x;
@@ -144,26 +154,49 @@ pub fn evaluate(input: Expr, current_scope: &mut Scope) -> GbType {
             arg_types,
             arg_names,
             body,
+            variable_args: _,
         } => GbType::Function(Expr::FunctionDefinition {
             arg_types,
             arg_names,
             body,
+            variable_args: false,
         }),
         Expr::Print => {
-            println!("hello");
-            GbType::None
+            let Some(args_gb) = current_scope.lookup(&"args".to_string()) else {
+                panic!("Args for print were not properly bound to scope");
+            };
+
+            match args_gb {
+                GbType::Vector(args) => {
+                    for arg in args.into_iter() {
+                        print!("{} ", arg);
+                    }
+                    print!("\n");
+                    GbType::None
+                }
+                _ => panic!("Args supplied to print was not a GbType::Vector"),
+
+            }
+        
         }
     }
 }
 
 #[allow(unused_variables)]
-fn function_call(expr: Expr, args: Vec<GbType>, outer_scope: &mut Scope) -> Option<GbType> {
-    let Expr::FunctionDefinition { arg_types, arg_names, body } = expr else {
+fn function_call(
+    fn_name: String,
+    expr: Expr,
+    args: Vec<GbType>,
+    outer_scope: &mut Scope,
+) -> Option<GbType> {
+    let Expr::FunctionDefinition { arg_types, arg_names, body, variable_args } = expr.clone() else {
         return None;
     };
 
-    if !(args.len() == arg_types.len()) {
-        return None;
+    if !variable_args {
+        if !(args.len() == arg_types.len()) {
+            return None;
+        }
     }
 
     let arg_types: Vec<GbType> = arg_types
@@ -171,15 +204,21 @@ fn function_call(expr: Expr, args: Vec<GbType>, outer_scope: &mut Scope) -> Opti
         .map(|x| evaluate(x, outer_scope))
         .collect();
 
-    let mut scope = Scope::init();
-
-    for (i, arg) in args.iter().enumerate() {
-        if !variant_eq(arg, &arg_types[i]) {
-            return None;
-        } else {
-            scope.identifiers.insert(arg_names[i].clone(), arg.clone());
+    let mut scope = init();
+    if !variable_args {
+        for (i, arg) in args.iter().enumerate() {
+            if !variant_eq(arg, &arg_types[i]) {
+                return None;
+            } else {
+                scope.identifiers.insert(arg_names[i].clone(), arg.clone());
+            }
         }
+    } else {
+        // args are variable, so collect given args and bind them
+        scope.identifiers.insert("args".to_string(), GbType::Vector(args));
     }
+
+    scope.identifiers.insert(fn_name, GbType::Function(expr));
 
     return Some(evaluate(*body, &mut scope));
 }

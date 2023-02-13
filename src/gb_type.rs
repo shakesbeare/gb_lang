@@ -12,6 +12,7 @@ pub enum GbType {
     String(String),
     Boolean(bool),
     Function(Expr),
+    Vector(Vec<GbType>),
     None,
 }
 
@@ -134,6 +135,7 @@ impl std::fmt::Display for GbType {
                 GbType::String(x) => format!("\" {} \"", x).to_string(),
                 GbType::Boolean(x) => x.to_string(),
                 GbType::Function(x) => format!("Function: {:?}", x).to_string(),
+                GbType::Vector(x) => todo!(),
                 GbType::None => "".to_string(),
             }
         )

@@ -48,7 +48,7 @@ fn interactive_mode(global_scope: &mut scope::Scope) -> io::Result<()> {
     for line in io::stdin().lock().lines() {
         match parser::GbParser::parse(parser::Rule::file, &line?) {
             Ok(pairs) => {
-                let ast = parser::parse_expr(pairs);
+                let ast = parser::parse_many(pairs);
                 // println!("{:?}", ast);
                 println!("{}", interpreter::evaluate(ast, global_scope));
             }
@@ -66,12 +66,17 @@ fn static_mode(path: std::path::PathBuf, global_scope: &mut scope::Scope) {
 
     match parser::GbParser::parse(parser::Rule::file, &content) {
         Ok(pairs) => {
-            let ast = parser::parse_expr(pairs);
+            let ast = parser::parse_many(pairs);
+
             // println!("{:?}", ast);
-            interpreter::evaluate(ast, global_scope);
+            println!("{:?}", interpreter::evaluate(ast, global_scope));
         }
         Err(e) => {
             eprintln!("{:?}", e);
         }
     }
+}
+
+fn preprocess(content: String) {
+
 }

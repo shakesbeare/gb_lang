@@ -54,8 +54,8 @@ expr = {
     | if_expr
     | while_expr
     | function_definition
-    | atom ~ (bin_op ~ expr) ~ ";"?
-    | atom ~ (bin_op ~ atom)* ~ ";"?
+    | atom ~ (bin_op ~ expr)
+    | atom ~ (bin_op ~ atom)*
 }
 
 expr_body = { compound_expr }
@@ -67,6 +67,8 @@ let_expr = { let_ ~ identifier ~ assign ~ atom }
 while_expr = { while_ ~ expr ~ expr_body }
 function_definition = { fn_ ~ "(" ~ define_args ~ ")" ~ compound_expr }
 
-file = _{ SOI ~ expr* ~ EOI }
+program = { (expr ~ ";")* }
+
+file = _{ SOI ~ program ~ EOI }
 
 

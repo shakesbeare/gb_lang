@@ -1,6 +1,7 @@
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
+    Program(Vec<Expr>),
     Identifier(String),
     Integer(i64),
     Float(f64),
@@ -31,6 +32,7 @@ pub enum Expr {
         arg_types: Vec<Expr>,
         arg_names: Vec<String>,
         body: Box<Expr>,
+        variable_args: bool,
     },
 
     Print,

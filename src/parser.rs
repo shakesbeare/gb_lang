@@ -22,7 +22,7 @@ lazy_static::lazy_static! {
     };
 }
 
-pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
+pub fn parse_many(pairs: Pairs<Rule>) -> Expr {
     PREC_CLIMBER.climb(
         pairs,
         |pair: Pair<Rule>| match pair.as_rule() {
@@ -52,6 +52,17 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
 
 fn parse_one(pair: Pair<Rule>) -> Expr {
     match pair.as_rule() {
+        Rule::program => {
+            let inner: Vec<Pair<Rule>> = pair.into_inner().collect();
+
+            let mut stmts = vec![];
+
+            for pair in inner {
+                stmts.push(parse_one(pair));
+            }
+
+            Expr::Program(stmts)
+        },
         Rule::integer => Expr::Integer(pair.as_str().parse::<i64>().unwrap()),
         Rule::float => {
             let pair = pair.as_str();
@@ -65,20 +76,20 @@ fn parse_one(pair: Pair<Rule>) -> Expr {
         }
         Rule::identifier => Expr::Identifier(pair.as_str().to_string()),
         Rule::boolean => Expr::Boolean(pair.as_str().parse::<bool>().unwrap()),
-        Rule::expr => parse_expr(pair.into_inner()),
+        Rule::expr => parse_many(pair.into_inner()),
         Rule::compound_expr => {
             let mut exprs: Vec<Expr> = vec![];
 
             let pairs_inner = pair.into_inner();
 
             for x in pairs_inner {
-                exprs.push(parse_expr(x.into_inner()));
+                exprs.push(parse_many(x.into_inner()));
             }
 
             Expr::CompoundExpr(exprs)
         }
-        Rule::unary_minus => Expr::UnaryMinus(Box::new(parse_expr(pair.into_inner()))),
-        Rule::return_expr => Expr::Return(Box::new(parse_expr(pair.into_inner()))),
+        Rule::unary_minus => Expr::UnaryMinus(Box::new(parse_many(pair.into_inner()))),
+        Rule::return_expr => Expr::Return(Box::new(parse_many(pair.into_inner()))),
         Rule::if_expr => {
             let inner: Vec<Pair<Rule>> = pair.into_inner().collect();
             let condition = inner[0].clone();
@@ -90,12 +101,12 @@ fn parse_one(pair: Pair<Rule>) -> Expr {
             };
 
             Expr::If {
-                condition: Box::new(parse_expr(condition.into_inner())),
-                expr: Box::new(parse_expr(expr.into_inner())),
+                condition: Box::new(parse_many(condition.into_inner())),
+                expr: Box::new(parse_many(expr.into_inner())),
                 els: {
                     match els {
                         None => None,
-                        Some(x) => Some(Box::new(parse_expr(x.into_inner()))),
+                        Some(x) => Some(Box::new(parse_many(x.into_inner()))),
                     }
                 },
             }
@@ -106,8 +117,8 @@ fn parse_one(pair: Pair<Rule>) -> Expr {
             let expr = inner[1].clone();
 
             Expr::While {
-                condition: Box::new(parse_expr(condition.into_inner())),
-                expr: Box::new(parse_expr(expr.into_inner())),
+                condition: Box::new(parse_many(condition.into_inner())),
+                expr: Box::new(parse_many(expr.into_inner())),
             }
         }
         Rule::call => {
@@ -147,6 +158,7 @@ fn parse_one(pair: Pair<Rule>) -> Expr {
                 arg_types: types,
                 arg_names: names,
                 body: inner_expr,
+                variable_args: false,
             }
         }
         rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
