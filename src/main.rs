@@ -1,17 +1,13 @@
-extern crate pest;
-#[macro_use]
-extern crate pest_derive;
+mod lexer;
+mod token;
 
-mod ast;
-mod gb_type;
-mod interpreter;
-mod parser;
-mod scope;
-
+use anyhow::Result;
 use clap::Parser as ClapParser;
-use pest::Parser;
 use std::io;
 use std::io::BufRead;
+use std::io::BufReader;
+use std::fs::File;
+use std::io::Read;
 
 #[derive(clap::Parser)]
 struct Cli {
@@ -21,62 +17,37 @@ struct Cli {
     path: Option<std::path::PathBuf>,
 }
 
-fn main() -> io::Result<()> {
+fn main() -> Result<()> {
     let args = Cli::parse();
 
-    let mut global_scope = interpreter::init();
-
-    match &args.interactive_mode {
-        true => {
-            if args.path.is_some() {
-                static_mode(args.path.unwrap(), &mut global_scope);
-            }
-            interactive_mode(&mut global_scope)
-        }
-        false => {
-            if !args.path.is_some() {
-                eprintln!("No file provided");
-            } else {
-                static_mode(args.path.unwrap(), &mut global_scope);
-            }
-            Ok(())
-        }
+    if args.interactive_mode {
+        interactive_mode()?;
     }
-}
+    
+    let f = File::open("file.gb")?;
+    let mut reader = BufReader::new(f);
+    let mut buf = [0; 1];
+    let mut str = String::new();
 
-fn interactive_mode(global_scope: &mut scope::Scope) -> io::Result<()> {
-    for line in io::stdin().lock().lines() {
-        match parser::GbParser::parse(parser::Rule::file, &line?) {
-            Ok(pairs) => {
-                let ast = parser::parse_many(pairs);
-                // println!("{:?}", ast);
-                println!("{}", interpreter::evaluate(ast, global_scope));
-            }
-            Err(e) => {
-                eprintln!("{:?}", e);
-            }
-        }
+    while let Ok(bytes_read) = reader.read(&mut buf[..]) {
+        if bytes_read == 0 { break; }
+        str += &String::from_utf8_lossy(&buf);
+        println!("{}", &str);
     }
+
 
     Ok(())
 }
 
-fn static_mode(path: std::path::PathBuf, global_scope: &mut scope::Scope) {
-    let content = std::fs::read_to_string(&path).expect("File not found!");
-
-    match parser::GbParser::parse(parser::Rule::file, &content) {
-        Ok(pairs) => {
-            let ast = parser::parse_many(pairs);
-
-            // println!("{:?}", ast);
-            println!("{:?}", interpreter::evaluate(ast, global_scope));
-        }
-        Err(e) => {
-            eprintln!("{:?}", e);
+fn interactive_mode() -> Result<()> {
+    for line in io::stdin().lock().lines() {
+        match line {
+            Ok(val) => {
+                dbg!(val);
+                ()
+            }
+            Err(e) => return Err(e.into()),
         }
     }
-}
-
-fn preprocess(content: String) {
-
+    Ok(())
 }
