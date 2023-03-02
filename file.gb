@@ -1,12 +1,21 @@
-// some cool math functions
+// this is a comment
+aoeu
+1234
+1234.0
 
-fibonacci = fn(x: int) {
-    result = 0
-    if x == 1 { result = 1 }
-    else if x < 1 { result = 0 }
-    else { result = fibonacci(x-1) + fibonacci(x-2) }
+"double quote string"
+'single quote string'
 
-    return result
-};
++ - * /
 
-print(fibonacci(10));
+2345 / 1234
+
+/* multiline comment
+
+stuff goes on this line
+*/
+
+()
+{}
+[]
+
