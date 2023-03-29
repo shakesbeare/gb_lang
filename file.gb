@@ -1,21 +1,15 @@
-// this is a comment
-aoeu
-1234
-1234.0
-
-"double quote string"
-'single quote string'
-
-+ - * /
-
-2345 / 1234
-
+hello world
+1234 + 1234
+"string with spaces"
+// comment
 /* multiline comment
 
-stuff goes on this line
+
+
+
+
 */
 
-()
-{}
-[]
 
+
+final line
