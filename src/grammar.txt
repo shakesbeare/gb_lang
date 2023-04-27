@@ -1,5 +1,4 @@
-<statement_list> -> <stmt>*
-<stmt> -> <expr> 
+<expr_list> -> <expr>*
 <expr> -> <term> (('+' | '-') <expr>)?
 <term> -> <factor> (('*' | '/') <factor>)?
 <factor> <id> | <int_literal> | <float_literal> | '(' expr ')' 

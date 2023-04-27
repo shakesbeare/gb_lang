@@ -5,7 +5,7 @@ use std::fs::File;
 
 use std::io::{BufReader, Read};
 
-
+#[derive(Debug, Eq, PartialEq)]
 pub enum Status {
     Reading(char),
     EOF,
@@ -40,8 +40,8 @@ pub struct Lexer {
     buf: [u8; 1],
     need_new_char: bool,
 
-    line: usize,
-    col: usize,
+    pub line: usize,
+    pub col: usize,
 }
 
 impl Lexer {
@@ -126,11 +126,12 @@ impl Lexer {
         #[allow(unused_assignments)]
         let mut char_read = '\0';
 
-        // some parts of theh lexing process need to look at the next char
+        // some parts of the lexing process need to look at the next char
         // but not consume it, so this character has to be passed back into the
         // lexer
         if self.need_new_char {
             let Status::Reading(c) = self.get_char() else {
+                self.lex_eof();
                 return Status::EOF;
             };
             char_read = c;
@@ -369,6 +370,11 @@ impl Lexer {
                 self.lex_string(c);
             }
         }
+    }
+
+    fn lex_eof(&mut self) {
+        self.next_token = Some(Token::EOF);
+        self.next_lexeme = Some("\0".to_string());
     }
 }
 

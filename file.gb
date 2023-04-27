@@ -1,15 +1,1 @@
-hello world
-1234 + 1234
-"string with spaces"
-// comment
-/* multiline comment
-
-
-
-
-
-*/
-
-
-
-final line
+1234 + 1234;

@@ -21,4 +21,5 @@ pub enum Token {
     RBracket,
 
     EOL,
+    EOF,
 }
