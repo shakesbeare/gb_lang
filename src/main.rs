@@ -13,11 +13,11 @@ fn main() -> Result<()> {
     let mut parser = parser::Parser::new(lexer, true);
 
 
-    let ast = parser.parse_program();
-    // parser.lexer.lex_all();
+    // let ast = parser.parse_program();
+    parser.lexer.lex_all();
     dbg!(parser.lexer.token_stream);
     dbg!(parser.lexer.lexeme_stream);
-    dbg!(ast);
+    // dbg!(ast);
 
     Ok(())
 }

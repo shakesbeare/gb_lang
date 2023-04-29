@@ -5,6 +5,8 @@ pub enum Token {
     StringLiteral,
     Identifier,
 
+    Keyword,
+
     OpAdd,
     OpSub,
     OpMul,

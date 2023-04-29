@@ -5,6 +5,11 @@ use std::fs::File;
 
 use std::io::{BufReader, Read, BufRead};
 
+const KEYWORDS: [&str; 2] = [
+    "true", 
+    "false",
+];
+
 #[derive(Debug, Eq, PartialEq)]
 pub enum Status {
     Reading(char),
@@ -159,7 +164,7 @@ impl Lexer {
         match char_read {
             'a'..='z' | 'A'..='Z' | '_'=> {
                 self.current_word += &String::from(char_read);
-                self.lex_identifier();
+                self.lex_word();
             } // end identifier
             '0'..='9' => {
                 self.current_word += &String::from(char_read);
@@ -284,7 +289,7 @@ impl Lexer {
         return Status::Reading(char_read);
     }
 
-    fn lex_identifier(&mut self) {
+    fn lex_word(&mut self) {
         let Status::Reading(char_read) = self.get_char() else {
             self.next_token = Some(Token::Identifier);
             self.next_lexeme = Some(self.current_word.clone());
@@ -296,10 +301,15 @@ impl Lexer {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => {
                 // identifier continues
                 self.current_word += &String::from(char_read);
-                self.lex_identifier();
+                self.lex_word();
             }
             _ => {
-                self.next_token = Some(Token::Identifier);
+                
+                match &self.current_word {
+                    _ if KEYWORDS.contains(&self.current_word.as_str()) => self.next_token = Some(Token::Keyword),
+                    _ => self.next_token = Some(Token::Identifier),
+
+                }
                 self.next_lexeme = Some(self.current_word.clone());
                 self.need_new_char = false;
                 self.current_word = String::from(char_read);
