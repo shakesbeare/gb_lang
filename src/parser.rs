@@ -176,7 +176,7 @@ impl Parser {
         // corresponding RParen is checked for inside the LParen match arm)
         // Otherwise, there is a syntax error
         match token {
-            Token::IntLiteral | Token::FloatLiteral | Token::Identifier => {
+            Token::IntLiteral | Token::FloatLiteral | Token::Identifier | Token::Boolean => {
                 self.print(format!(
                     "Found atomic value: {:?}:{}",
                     token, lexeme
