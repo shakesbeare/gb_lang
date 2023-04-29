@@ -1,9 +1,9 @@
 use crate::token::Token;
 
-use anyhow::{Result, Error};
+use anyhow::Result;
 use std::fs::File;
 
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, BufRead};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Status {
@@ -57,7 +57,7 @@ impl Lexer {
 
             current_word: String::new(),
 
-            reader: BufReader::new(File::open(file.into())?),
+            reader: BufReader::with_capacity(1, File::open(file.into())?),
             buf: [0],
             need_new_char: true,
 
@@ -94,6 +94,11 @@ impl Lexer {
         self.col += 1;
 
         return Status::Reading(char_read);
+    }
+
+    fn peek(&mut self) -> char {
+        let buf = self.reader.fill_buf().expect("unable to read input buffer");
+        return buf[0] as char;
     }
 
     /// Consumes a portion of the input buffer and sets next_token and next_lexeme
@@ -142,6 +147,12 @@ impl Lexer {
         // reset the flag to default
         self.need_new_char = true;
 
+        // If current_word contains only a space, 
+        // replace it with nothing
+        if &self.current_word == " " {
+            self.current_word = String::new();
+        }
+
         // lex the character read
         // some characters need to read additional characters to be properly
         // lexed i.e. strings, identifiers and numbers
@@ -167,6 +178,7 @@ impl Lexer {
                 self.next_token = Some(Token::RParen);
                 self.next_lexeme = Some(String::from(char_read));
                 self.next_point = Some(Point::from((self.line, self.col)));
+                self.current_word = String::new();
             } // end R paren
             '{' => {
                 self.next_token = Some(Token::LBrace);
@@ -204,59 +216,39 @@ impl Lexer {
                 self.next_point = Some(Point::from((self.line, self.col)));
             } // end -
             '*' => {
-                let Some(last_lexeme) = self.lexeme_stream.last() else {
+                 if self.peek() == '*' {
+                    self.get_char();
+                    self.next_token = Some(Token::OpExp);
+                    self.next_lexeme = Some(String::from("**"));
+                    self.next_point = Some(Point::from((self.line, self.col)));
+                } else {
                     self.next_token = Some(Token::OpMul);
                     self.next_lexeme = Some(String::from(char_read));
                     self.next_point = Some(Point::from((self.line, self.col)));
-                    return Status::Reading(char_read);
-                };
-
-                if last_lexeme == "/" {
-                    self.lexeme_stream.pop();
-                    self.token_stream.pop();
-                    self.point_stream.pop();
-
-                    self.current_word = String::new();
-                    loop {
-                        let Status::Reading(char) = self.get_char() else {
-                                break;
-                        };
-
-                        if char == '*' {
-                            let Status::Reading(n_char) = self.get_char() else {
-                                break;
-                            };
-
-                            if n_char == '/' {
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    self.next_token = Some(Token::OpDiv);
-                    self.next_lexeme = Some(String::from(char_read));
                 }
             } // end *
             '/' => {
-                let Some(last_lexeme) = self.lexeme_stream.last() else {
-                    self.next_token = Some(Token::OpDiv);
-                    self.next_lexeme = Some(String::from(char_read));
-                    return Status::Reading(char_read);
-                };
-                
-                if last_lexeme == "/" {
-                    self.lexeme_stream.pop();
-                    self.token_stream.pop();
-
+                if self.peek() == '*'{
                     self.current_word = String::new();
                     loop {
                         let Status::Reading(char) = self.get_char() else {
-                                break;
+                            self.lex_eof();
+                            return Status::EOF;
+                        };
+
+                        if char == '*' && self.peek() == '/'{
+                            self.get_char();
+                            break;
+                        }
+                    }
+                } else if self.peek() == '/' {
+                    loop {
+                        let Status::Reading(char) = self.get_char() else {
+                            self.lex_eof();
+                            return Status::EOF;
                         };
 
                         if char == '\n' {
-                            self.current_word = String::from("\n");
-                            self.need_new_char = false;
                             break;
                         }
                     }
@@ -274,13 +266,16 @@ impl Lexer {
                 self.next_lexeme = Some(String::from(char_read));
             }
             ';' => {
-                self.next_token = Some(Token::EOL);
+                self.next_token = Some(Token::Semicolon);
                 self.next_lexeme = Some(String::from(char_read));
+                self.current_word = String::new();
             }
             '\n' => {
                 self.col = 0;
                 self.line += 1;
                 self.current_word = String::new();
+                self.next_token = Some(Token::EOL);
+                self.next_lexeme = Some(String::from("\n"));
             }
             _ => {
                 self.lex();
@@ -307,11 +302,7 @@ impl Lexer {
                 self.next_token = Some(Token::Identifier);
                 self.next_lexeme = Some(self.current_word.clone());
                 self.need_new_char = false;
-                if char_read != '\n' {
-                    self.current_word = String::from(char_read);
-                } else {
-                    self.current_word = String::from("\n");
-                }
+                self.current_word = String::from(char_read);
             }
         }
     }
@@ -338,12 +329,7 @@ impl Lexer {
 
                 self.next_lexeme = Some(self.current_word.clone());
                 self.need_new_char = false;
-                
-                if char_read != '\n' {
-                    self.current_word = String::from(char_read);
-                } else {
-                    self.current_word = String::from("\n");
-                }
+                self.current_word = String::from(char_read);
             }
         }
     }

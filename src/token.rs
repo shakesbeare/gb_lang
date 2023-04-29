@@ -9,6 +9,7 @@ pub enum Token {
     OpSub,
     OpMul,
     OpDiv,
+    OpExp,
     OpAssign,
     OpGt,
     OpLt,
@@ -20,6 +21,7 @@ pub enum Token {
     LBracket,
     RBracket,
 
+    Semicolon,
     EOL,
     EOF,
 }
