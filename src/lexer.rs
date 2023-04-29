@@ -5,9 +5,15 @@ use std::fs::File;
 
 use std::io::{BufReader, Read, BufRead};
 
-const KEYWORDS: [&str; 2] = [
+const KEYWORDS: [&str; 8] = [
     "true", 
     "false",
+    "if", 
+    "for",
+    "while",
+    "let",
+    "use",
+    "restrict",
 ];
 
 #[derive(Debug, Eq, PartialEq)]
@@ -306,7 +312,13 @@ impl Lexer {
             _ => {
                 
                 match &self.current_word {
-                    _ if KEYWORDS.contains(&self.current_word.as_str()) => self.next_token = Some(Token::Keyword),
+                    word if KEYWORDS.contains(&self.current_word.as_str()) => {
+                        if word == "true" || word == "false" {
+                            self.next_token = Some(Token::Boolean);
+                        } else {
+                            self.next_token = Some(Token::Keyword);
+                        }
+                    }
                     _ => self.next_token = Some(Token::Identifier),
 
                 }

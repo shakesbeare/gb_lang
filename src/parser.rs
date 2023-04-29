@@ -36,7 +36,7 @@ impl Parser {
     }
 
     fn parse_expr_list(&mut self) -> AstNode {
-        self.print("    start expr_list");
+        self.print("start expr_list");
 
         // Create the new node
         let mut expr_list = AstNode::new("Expression list", None, None);
@@ -64,12 +64,34 @@ impl Parser {
             }
         }
 
-        self.print("    end expr_list");
+        self.print("end expr_list");
         return expr_list;
     }
 
+    fn parse_assign(&mut self) -> AstNode {
+        self.print("start assignment");
+        
+        // get left identifier
+        let left = self.parse_factor();
+        
+        // get = sign
+        if self.lexer.next_token != Some(Token::OpAssign) {
+            self.syntax_error(self.lexer.next_token.clone().unwrap());
+        } else {
+            self.lexer.lex();
+        };
+
+        // parse rhs
+        let right = self.parse_expr();
+
+        let mut ast = AstNode::new("Assignment", None, None);
+        ast.children.append(&mut vec![right, left]);
+
+        return ast;
+    }
+
     fn parse_expr(&mut self) -> AstNode {
-        self.print("        start expression");
+        self.print("start expression");
         let mut left_child = self.parse_term();
 
         // if there is any operators
@@ -86,12 +108,12 @@ impl Parser {
             left_child = bin_op;
         }
 
-        self.print("        end expression");
+        self.print("end expression");
         return left_child;
     }
 
     fn parse_term(&mut self) -> AstNode {
-        self.print("            start term");
+        self.print("start term");
         let mut left_child = self.parse_exponentiation();
 
         // if there is any operators
@@ -108,12 +130,12 @@ impl Parser {
             left_child = bin_op;
         }
 
-        self.print("            end term");
+        self.print("end term");
         return left_child;
     }
 
     fn parse_exponentiation(&mut self) -> AstNode {
-        self.print("                start exponentiation");
+        self.print("start exponentiation");
         let mut left_child = self.parse_factor();
 
         // if there is any operators
@@ -128,12 +150,12 @@ impl Parser {
             left_child = bin_op;
         }
 
-        self.print("                end exponentiation");
+        self.print("end exponentiation");
         return left_child;
     }
 
     fn parse_factor(&mut self) -> AstNode {
-        self.print("                    start factor");
+        self.print("start factor");
 
         let Some(token) = &self.lexer.next_token.clone() else {
             dbg!(&self.lexer.token_stream);
@@ -156,7 +178,7 @@ impl Parser {
         match token {
             Token::IntLiteral | Token::FloatLiteral | Token::Identifier => {
                 self.print(format!(
-                    "                        Found atomic value: {:?}:{}",
+                    "Found atomic value: {:?}:{}",
                     token, lexeme
                 ));
                 ast = AstNode::new("Atom", Some(token.clone()), Some(&lexeme));
@@ -177,12 +199,21 @@ impl Parser {
 
                 self.print("END PAREN");
             }
+            Token::Keyword => {
+                match lexeme.as_str() {
+                    "let" => {
+                        self.lexer.lex();
+                        ast = self.parse_assign();
+                    },
+                    _ => self.syntax_error(token.clone()),
+                }
+            }
             x => self.syntax_error(x.clone()),
         };
 
         self.lexer.lex();
 
-        self.print("                    end factor");
+        self.print("end factor");
         return ast;
     }
 

@@ -4,6 +4,7 @@ pub enum Token {
     FloatLiteral,
     StringLiteral,
     Identifier,
+    Boolean,
 
     Keyword,
 
