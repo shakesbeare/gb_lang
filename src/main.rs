@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate lazy_static;
-
 mod ast;
 mod lexer;
 mod parser;
@@ -11,7 +8,6 @@ use anyhow::Result;
 fn main() -> Result<()> {
     let lexer = lexer::Lexer::new("file.gb")?;
     let mut parser = parser::Parser::new(lexer, true);
-
 
     let ast = parser.parse_program();
     // parser.lexer.lex_all();

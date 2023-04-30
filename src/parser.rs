@@ -9,10 +9,7 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(lexer: Lexer, verbose: bool) -> Self {
-        Self {
-            lexer,
-            verbose,
-        }
+        Self { lexer, verbose }
     }
 
     // Useful for debugging, set verbose to true
@@ -22,6 +19,8 @@ impl Parser {
         }
     }
 
+    /// Parses the entire program and returns the abstract syntax tree formed of AstNode instances.
+    /// This also saturates the fields of the internal lexer.
     pub fn parse_program(&mut self) -> AstNode {
         self.print("start program");
 
@@ -56,9 +55,7 @@ impl Parser {
                 self.lexer.lex();
             }
 
-            while self.lexer.next_token == Some(Token::EOL)
-                || self.lexer.next_token == None
-            {
+            while self.lexer.next_token == Some(Token::EOL) || self.lexer.next_token.is_none() {
                 self.lexer.lex();
                 dbg!(&self.lexer.next_token);
             }
@@ -70,10 +67,10 @@ impl Parser {
 
     fn parse_assign(&mut self) -> AstNode {
         self.print("start assignment");
-        
+
         // get left identifier
         let left = self.parse_factor();
-        
+
         // get = sign
         if self.lexer.next_token != Some(Token::OpAssign) {
             self.syntax_error(self.lexer.next_token.clone().unwrap());
@@ -177,11 +174,8 @@ impl Parser {
         // Otherwise, there is a syntax error
         match token {
             Token::IntLiteral | Token::FloatLiteral | Token::Identifier | Token::Boolean => {
-                self.print(format!(
-                    "Found atomic value: {:?}:{}",
-                    token, lexeme
-                ));
-                ast = AstNode::new("Atom", Some(token.clone()), Some(&lexeme));
+                self.print(format!("Found atomic value: {:?}:{}", token, lexeme));
+                ast = AstNode::new("Atom", Some(token.clone()), Some(lexeme));
             }
             Token::LParen => {
                 self.print("BEGIN PAREN");
@@ -199,15 +193,13 @@ impl Parser {
 
                 self.print("END PAREN");
             }
-            Token::Keyword => {
-                match lexeme.as_str() {
-                    "let" => {
-                        self.lexer.lex();
-                        ast = self.parse_assign();
-                    },
-                    _ => self.syntax_error(token.clone()),
+            Token::Keyword => match lexeme.as_str() {
+                "let" => {
+                    self.lexer.lex();
+                    ast = self.parse_assign();
                 }
-            }
+                _ => self.syntax_error(token.clone()),
+            },
             x => self.syntax_error(x.clone()),
         };
 

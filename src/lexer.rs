@@ -19,9 +19,10 @@ const KEYWORDS: [&str; 8] = [
 #[derive(Debug, Eq, PartialEq)]
 pub enum Status {
     Reading(char),
-    EOF,
+    Eof,
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct Point {
     line: usize,
@@ -77,16 +78,17 @@ impl Lexer {
         })
     }
 
+    /// Lexes the entire input buffer, consuming it. 
+    #[allow(dead_code)]
     pub fn lex_all(&mut self) -> Result<()> {
-        loop {
-            match self.lex() {
-                Status::Reading(_) => continue,
-                Status::EOF => break,
-            }
+        while let Status::Reading(_) = self.lex() {
         }
         return Ok(());
     }
 
+    /// Consumes and returns the next character of the input buffer
+    /// Will return Status::Eof if the end of the file has been reached.
+    /// or Status::Reading(char) if a character was read successfully.
     fn get_char(&mut self) -> Status {
         // get the next token
         let Ok(bytes_read) = self.reader.read(&mut self.buf[..]) else {
@@ -95,7 +97,7 @@ impl Lexer {
 
         // Ensure that EOF has not been reached
         if bytes_read == 0 {
-            return Status::EOF;
+            return Status::Eof;
         }
 
         // convert the bytes to char
@@ -107,12 +109,13 @@ impl Lexer {
         return Status::Reading(char_read);
     }
 
+    /// Checks the next character of the input buffer without consuming it
     fn peek(&mut self) -> char {
         let buf = self.reader.fill_buf().expect("unable to read input buffer");
         return buf[0] as char;
     }
 
-    /// Consumes a portion of the input buffer and sets next_token and next_lexeme
+    /// Consumes a portion of the input buffer 
     pub fn lex(&mut self) -> Status {
         // flush next_token, next_lexeme, and next_point to the streams
         if let Some(next_token) = &self.next_token {
@@ -132,7 +135,7 @@ impl Lexer {
 
         // if something went horribly wrong, crash the program
         // the streams should always be the same length
-        if !(self.token_stream.len() == self.lexeme_stream.len()) {
+        if self.token_stream.len() != self.lexeme_stream.len() {
             panic!("Token Stream and Lexeme Stream have different lengths");
         }
 
@@ -148,11 +151,11 @@ impl Lexer {
         if self.need_new_char {
             let Status::Reading(c) = self.get_char() else {
                 self.lex_eof();
-                return Status::EOF;
+                return Status::Eof;
             };
             char_read = c;
         } else {
-            char_read = self.current_word.chars().nth(0).expect("need new char is false, but current_word is empty");
+            char_read = self.current_word.chars().next().expect("need new char is false, but current_word is empty");
         }
 
         // reset the flag to default
@@ -244,7 +247,7 @@ impl Lexer {
                     loop {
                         let Status::Reading(char) = self.get_char() else {
                             self.lex_eof();
-                            return Status::EOF;
+                            return Status::Eof;
                         };
 
                         if char == '*' && self.peek() == '/'{
@@ -256,7 +259,7 @@ impl Lexer {
                     loop {
                         let Status::Reading(char) = self.get_char() else {
                             self.lex_eof();
-                            return Status::EOF;
+                            return Status::Eof;
                         };
 
                         if char == '\n' {
@@ -343,7 +346,7 @@ impl Lexer {
                 self.lex_number();
             }
             _ => {
-                if self.current_word.contains(".") { 
+                if self.current_word.contains('.') { 
                     self.next_token = Some(Token::FloatLiteral)
                 } else {
                     self.next_token = Some(Token::IntLiteral);
