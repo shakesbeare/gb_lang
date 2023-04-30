@@ -1,14 +1,16 @@
+use std::io::Read;
+
 use crate::ast::AstNode;
 use crate::lexer::Lexer;
 use crate::token::Token;
 
-pub struct Parser {
-    pub lexer: Lexer,
+pub struct Parser<T: Read> {
+    pub lexer: Lexer<T>,
     pub verbose: bool,
 }
 
-impl Parser {
-    pub fn new(lexer: Lexer, verbose: bool) -> Self {
+impl<R: Read> Parser<R> {
+    pub fn new(lexer: Lexer<R>, verbose: bool) -> Self {
         Self { lexer, verbose }
     }
 
@@ -21,20 +23,20 @@ impl Parser {
 
     /// Parses the entire program and returns the abstract syntax tree formed of AstNode instances.
     /// This also saturates the fields of the internal lexer.
-    pub fn parse_program(&mut self) -> AstNode {
+    pub fn parse(&mut self) -> AstNode {
         self.print("start program");
 
         // Grab the first token from the lexer and build the expression list
         // Must grab the token before parsing begins so that self.lexer.next_token is
         // not none
         self.lexer.lex();
-        let ast = self.parse_expr_list();
+        let ast = self.expression_list();
 
         self.print("end program");
         return ast;
     }
 
-    fn parse_expr_list(&mut self) -> AstNode {
+    fn expression_list(&mut self) -> AstNode {
         self.print("start expr_list");
 
         // Create the new node
@@ -46,7 +48,7 @@ impl Parser {
         // By passing over any extra EOL tokens and any potential None tokens
         // Before we reach the EOF token.
         while self.lexer.next_token != Some(Token::EOF) {
-            expr_list.children.push(self.parse_expr());
+            expr_list.children.push(self.add_sub());
 
             if self.lexer.next_token != Some(Token::Semicolon) {
                 self.syntax_error(self.lexer.next_token.clone().unwrap());
@@ -55,7 +57,9 @@ impl Parser {
                 self.lexer.lex();
             }
 
-            while self.lexer.next_token == Some(Token::EOL) || self.lexer.next_token.is_none() {
+            while self.lexer.next_token == Some(Token::EOL)
+                || self.lexer.next_token.is_none()
+            {
                 self.lexer.lex();
                 dbg!(&self.lexer.next_token);
             }
@@ -65,11 +69,11 @@ impl Parser {
         return expr_list;
     }
 
-    fn parse_assign(&mut self) -> AstNode {
+    fn assignment(&mut self) -> AstNode {
         self.print("start assignment");
 
         // get left identifier
-        let left = self.parse_factor();
+        let left = self.atom();
 
         // get = sign
         if self.lexer.next_token != Some(Token::OpAssign) {
@@ -79,7 +83,7 @@ impl Parser {
         };
 
         // parse rhs
-        let right = self.parse_expr();
+        let right = self.add_sub();
 
         let mut ast = AstNode::new("Assignment", None, None);
         ast.children.append(&mut vec![right, left]);
@@ -87,9 +91,9 @@ impl Parser {
         return ast;
     }
 
-    fn parse_expr(&mut self) -> AstNode {
+    fn add_sub(&mut self) -> AstNode {
         self.print("start expression");
-        let mut left_child = self.parse_term();
+        let mut left_child = self.mul_div();
 
         // if there is any operators
         // handle them and search for a right operand
@@ -98,7 +102,7 @@ impl Parser {
         {
             let op_tok = self.lexer.next_token.clone();
             self.lexer.lex();
-            let right_child = self.parse_term();
+            let right_child = self.mul_div();
             let mut bin_op = AstNode::new("Binary Operation", op_tok, None);
             bin_op.children.append(&mut vec![left_child, right_child]);
 
@@ -109,9 +113,9 @@ impl Parser {
         return left_child;
     }
 
-    fn parse_term(&mut self) -> AstNode {
+    fn mul_div(&mut self) -> AstNode {
         self.print("start term");
-        let mut left_child = self.parse_exponentiation();
+        let mut left_child = self.exponentiation();
 
         // if there is any operators
         // handle them and search for a right operand
@@ -120,7 +124,7 @@ impl Parser {
         {
             let op_tok = self.lexer.next_token.clone();
             self.lexer.lex();
-            let right_child = self.parse_exponentiation();
+            let right_child = self.exponentiation();
             let mut bin_op = AstNode::new("Binary Operation", op_tok, None);
             bin_op.children.append(&mut vec![left_child, right_child]);
 
@@ -131,18 +135,19 @@ impl Parser {
         return left_child;
     }
 
-    fn parse_exponentiation(&mut self) -> AstNode {
+    fn exponentiation(&mut self) -> AstNode {
         self.print("start exponentiation");
-        let mut left_child = self.parse_factor();
+        let mut left_child = self.atom();
 
         // if there is any operators
         // handle them and search for a right operand
         while self.lexer.next_token == Some(Token::OpExp) {
             let op_tok = self.lexer.next_token.clone();
             self.lexer.lex();
-            let right_child = self.parse_factor();
+            let right_child = self.atom();
             let mut bin_op = AstNode::new("Binary Operation", op_tok, None);
-            bin_op.children.append(&mut vec![right_child, left_child]); // exponetiation is right
+            // exponetiation is right associative
+            bin_op.children.append(&mut vec![right_child, left_child]);
 
             left_child = bin_op;
         }
@@ -151,7 +156,7 @@ impl Parser {
         return left_child;
     }
 
-    fn parse_factor(&mut self) -> AstNode {
+    fn atom(&mut self) -> AstNode {
         self.print("start factor");
 
         let Some(token) = &self.lexer.next_token.clone() else {
@@ -173,7 +178,10 @@ impl Parser {
         // corresponding RParen is checked for inside the LParen match arm)
         // Otherwise, there is a syntax error
         match token {
-            Token::IntLiteral | Token::FloatLiteral | Token::Identifier | Token::Boolean => {
+            Token::IntLiteral
+            | Token::FloatLiteral
+            | Token::Identifier
+            | Token::Boolean => {
                 self.print(format!("Found atomic value: {:?}:{}", token, lexeme));
                 ast = AstNode::new("Atom", Some(token.clone()), Some(lexeme));
             }
@@ -183,7 +191,7 @@ impl Parser {
                 self.lexer.lex();
 
                 // Parse the inner expressions
-                ast = self.parse_expr();
+                ast = self.add_sub();
 
                 // check for closing paren
                 if self.lexer.next_token != Some(Token::RParen) {
@@ -196,7 +204,7 @@ impl Parser {
             Token::Keyword => match lexeme.as_str() {
                 "let" => {
                     self.lexer.lex();
-                    ast = self.parse_assign();
+                    ast = self.assignment();
                 }
                 _ => self.syntax_error(token.clone()),
             },

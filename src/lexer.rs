@@ -4,6 +4,7 @@ use anyhow::Result;
 use std::fs::File;
 
 use std::io::{BufReader, Read, BufRead};
+use std::convert::TryInto;
 
 const KEYWORDS: [&str; 8] = [
     "true", 
@@ -38,7 +39,7 @@ impl From<(usize, usize)> for Point {
     }
 }
 
-pub struct Lexer {
+pub struct Lexer<T: Read> {
     pub next_token: Option<Token>,
     pub next_lexeme: Option<String>,
     pub next_point: Option<Point>,
@@ -48,7 +49,7 @@ pub struct Lexer {
     pub lexeme_stream: Vec<String>,
     pub point_stream: Vec<Point>,
 
-    reader: BufReader<File>,
+    reader: BufReader<T>,
     buf: [u8; 1],
     need_new_char: bool,
 
@@ -56,9 +57,9 @@ pub struct Lexer {
     pub col: usize,
 }
 
-impl Lexer {
-    pub fn new<S: Into<String>>(file: S) -> Result<Lexer> {
-        Ok(Lexer {
+impl From<&'static [u8]> for Lexer<&[u8]> {
+    fn from(value: &'static [u8]) -> Self {
+        Lexer {
             next_token: None,
             next_lexeme: None,
             next_point: None,
@@ -69,15 +70,47 @@ impl Lexer {
 
             current_word: String::new(),
 
-            reader: BufReader::with_capacity(1, File::open(file.into())?),
+            reader: BufReader::with_capacity(1, value),
             buf: [0],
             need_new_char: true,
 
             line: 0,
             col: 0,
-        })
+        }
     }
+}
 
+impl From<File> for Lexer<File> {
+    fn from(file: File) -> Lexer<File> {
+        Lexer {
+            next_token: None,
+            next_lexeme: None,
+            next_point: None,
+
+            token_stream: vec![],
+            lexeme_stream: vec![],
+            point_stream: vec![],
+
+            current_word: String::new(),
+
+            reader: BufReader::with_capacity(1, file),
+            buf: [0],
+            need_new_char: true,
+
+            line: 0,
+            col: 0,
+        }
+    }
+}
+
+impl Lexer<File> {
+    pub fn open_file<S: Into<String>>(filename: S) -> Result<Lexer<File>> {
+        let file = File::open(filename.into())?;
+        Ok(Lexer::from(file))
+    }
+}
+
+impl<T: Read> Lexer<T> {
     /// Lexes the entire input buffer, consuming it. 
     #[allow(dead_code)]
     pub fn lex_all(&mut self) -> Result<()> {
@@ -112,6 +145,9 @@ impl Lexer {
     /// Checks the next character of the input buffer without consuming it
     fn peek(&mut self) -> char {
         let buf = self.reader.fill_buf().expect("unable to read input buffer");
+        if buf.is_empty() {
+            return '\0';
+        }
         return buf[0] as char;
     }
 
