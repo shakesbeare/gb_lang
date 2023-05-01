@@ -21,7 +21,11 @@ fn basic_identifier() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -38,7 +42,11 @@ fn underscore_identifier() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -55,7 +63,11 @@ fn numbers_at_the_end_indentifier() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -72,7 +84,11 @@ fn identifier_underscore_and_numbers() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -90,7 +106,11 @@ fn identifier_numbers_at_beginning() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -109,7 +129,11 @@ fn identifier_symbol_at_end() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -126,7 +150,11 @@ fn integer() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -143,7 +171,11 @@ fn float_hanging_decimal() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -160,7 +192,11 @@ fn float_balanced_decimal() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -177,7 +213,11 @@ fn string_single() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -194,7 +234,11 @@ fn string_double() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -211,7 +255,11 @@ fn string_single_in_double() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -228,7 +276,11 @@ fn string_double_in_single() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -246,7 +298,11 @@ fn string_single_unclosed() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -264,7 +320,11 @@ fn string_double_unclosed() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -282,7 +342,11 @@ fn string_single_escaped_closer() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -300,7 +364,11 @@ fn string_double_escaped_closer() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -317,7 +385,11 @@ fn string_single_escaped_extra_closer() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -333,7 +405,11 @@ fn string_double_escaped_extra_closer() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -360,7 +436,11 @@ fn operators() {
         let res = lexer.lex();
         let tok = match res {
             LexStatus::Reading { token, .. } => token,
-            LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+            LexStatus::SyntaxError {
+                failed_lexeme,
+                location,
+                ..
+            } => {
                 panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
             }
             LexStatus::Eof => Token::Eof,
@@ -386,7 +466,11 @@ fn delimiters() {
         let res = lexer.lex();
         let tok = match res {
             LexStatus::Reading { token, .. } => token,
-            LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+            LexStatus::SyntaxError {
+                failed_lexeme,
+                location,
+                ..
+            } => {
                 panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
             }
             LexStatus::Eof => Token::Eof,
@@ -403,7 +487,11 @@ fn single_line_comment() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -438,7 +526,11 @@ fn block_comment() {
     let res = lexer.lex();
     let tok = match res {
         LexStatus::Reading { token, .. } => token,
-        LexStatus::SyntaxError { failed_lexeme, location, .. } => {
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
         LexStatus::Eof => Token::Eof,
@@ -463,6 +555,37 @@ fn block_comment_2() {
     );
 }
 
+#[test]
+fn keywords() {
+    let mut map: HashMap<&str, Token> = HashMap::new();
+    map.insert("true", Token::Boolean);
+    map.insert("false", Token::Boolean);
+    map.insert("for", Token::Keyword);
+    map.insert("while", Token::Keyword);
+    map.insert("let", Token::Keyword);
+    map.insert("if", Token::Keyword);
+    map.insert("else", Token::Keyword);
+    map.insert("use", Token::Keyword);
+    map.insert("restrict", Token::Keyword);
+
+    for (k, v) in map.iter() {
+        let mut lexer = Lexer::from(k.as_bytes());
+        let res = lexer.lex();
+        let tok = match res {
+            LexStatus::Reading { token, .. } => token,
+            LexStatus::SyntaxError {
+                failed_lexeme,
+                location,
+                ..
+            } => {
+                panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
+            }
+            LexStatus::Eof => Token::Eof,
+        };
+
+        assert_eq!(&tok, v);
+    }
+}
 
 // **************************************
 // LEXING TESTS

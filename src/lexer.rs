@@ -5,8 +5,8 @@ use std::fs::File;
 
 use std::io::{BufRead, BufReader, Read};
 
-const KEYWORDS: [&str; 8] = [
-    "true", "false", "if", "for", "while", "let", "use", "restrict",
+const KEYWORDS: [&str; 10] = [
+    "true", "false", "if", "for", "while", "let", "use", "restrict", "use", "else",
 ];
 
 #[derive(Debug, Eq, PartialEq)]
@@ -119,7 +119,7 @@ impl Lexer<File> {
 impl<T: Read> Lexer<T> {
     /// Lexes the entire input buffer, consuming it.
     #[allow(dead_code)]
-    pub fn lex_all(&mut self)  {
+    pub fn lex_all(&mut self) {
         loop {
             match self.lex() {
                 LexStatus::Reading { .. } => (),
@@ -181,7 +181,9 @@ impl<T: Read> Lexer<T> {
 
         // if something went horribly wrong, crash the program
         // the streams should always be the same length
-        if self.token_stream.len() != self.lexeme_stream.len() {
+        if self.token_stream.len() != self.lexeme_stream.len()
+            || self.token_stream.len() != self.point_stream.len()
+        {
             panic!("Token Stream and Lexeme Stream have different lengths");
         }
 
@@ -241,11 +243,24 @@ impl<T: Read> Lexer<T> {
                     }
                 }
 
-                self.next_lexeme = Some(lexeme.clone());
-                self.next_token = Some(Token::Identifier);
+                if KEYWORDS.contains(&lexeme.as_str()) {
+                    match &lexeme {
+                        _ if vec!["true", "false"].contains(&lexeme.as_str()) => {
+                            self.next_token = Some(Token::Boolean)
+                        }
+                        _ => {
+                            self.next_token = Some(Token::Keyword)
+                        }
+                    }
+                } else {
+                    self.next_token = Some(Token::Identifier);
+                }
+                dbg!(&lexeme);
+                self.next_lexeme = Some(lexeme);
+                self.next_point = Some(Point::from((self.line, self.col)));
                 return LexStatus::Reading {
-                    token: Token::Identifier,
-                    lexeme: lexeme.clone(),
+                    token: self.next_token.clone().unwrap(),
+                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             } // end identifier
             '0'..='9' => {
@@ -277,6 +292,7 @@ impl<T: Read> Lexer<T> {
                     _ if lexeme.contains('.') => Some(Token::FloatLiteral),
                     _ => Some(Token::IntLiteral),
                 };
+                self.next_point = Some(Point::from((self.line, self.col)));
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                     lexeme: self.next_lexeme.clone().unwrap(),
