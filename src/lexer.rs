@@ -119,7 +119,7 @@ impl Lexer<File> {
 impl<T: Read> Lexer<T> {
     /// Lexes the entire input buffer, consuming it.
     #[allow(dead_code)]
-    pub fn lex_all(&mut self) -> Result<()> {
+    pub fn lex_all(&mut self)  {
         loop {
             match self.lex() {
                 LexStatus::Reading { .. } => (),
@@ -127,7 +127,6 @@ impl<T: Read> Lexer<T> {
                 LexStatus::Eof => break,
             }
         }
-        return Ok(());
     }
 
     /// Consumes and returns the next character of the input buffer
