@@ -189,7 +189,7 @@ fn single_line_comment() {
     let mut lexer = Lexer::from(input);
     lexer.lex();
 
-    assert_eq!(lexer.next_token, Some(Token::EOF));
+    assert_eq!(lexer.next_token, Some(Token::Eof));
 }
 
 #[test]
@@ -211,7 +211,7 @@ fn block_comment() {
     let mut lexer = Lexer::from(input);
     lexer.lex();
 
-    assert_eq!(lexer.next_token, Some(Token::EOF));
+    assert_eq!(lexer.next_token, Some(Token::Eof));
 }
 
 #[test]

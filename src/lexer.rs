@@ -4,7 +4,6 @@ use anyhow::Result;
 use std::fs::File;
 
 use std::io::{BufReader, Read, BufRead};
-use std::convert::TryInto;
 
 const KEYWORDS: [&str; 8] = [
     "true", 
@@ -18,13 +17,20 @@ const KEYWORDS: [&str; 8] = [
 ];
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum Status {
+pub enum ReadCharStatus {
     Reading(char),
     Eof,
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum LexStatus {
+    Reading {token: Token, lexeme: String },
+    SyntaxError {failed_lexeme: String, location: Point },
+    Eof,
+}
+
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Point {
     line: usize,
     col: usize,
@@ -114,7 +120,7 @@ impl<T: Read> Lexer<T> {
     /// Lexes the entire input buffer, consuming it. 
     #[allow(dead_code)]
     pub fn lex_all(&mut self) -> Result<()> {
-        while let Status::Reading(_) = self.lex() {
+        while let LexStatus::Reading { .. } = self.lex() {
         }
         return Ok(());
     }
@@ -122,7 +128,7 @@ impl<T: Read> Lexer<T> {
     /// Consumes and returns the next character of the input buffer
     /// Will return Status::Eof if the end of the file has been reached.
     /// or Status::Reading(char) if a character was read successfully.
-    fn get_char(&mut self) -> Status {
+    fn get_char(&mut self) -> ReadCharStatus {
         // get the next token
         let Ok(bytes_read) = self.reader.read(&mut self.buf[..]) else {
             panic!("unable to read input buffer");
@@ -130,7 +136,7 @@ impl<T: Read> Lexer<T> {
 
         // Ensure that EOF has not been reached
         if bytes_read == 0 {
-            return Status::Eof;
+            return ReadCharStatus::Eof;
         }
 
         // convert the bytes to char
@@ -139,7 +145,7 @@ impl<T: Read> Lexer<T> {
         // advance column number
         self.col += 1;
 
-        return Status::Reading(char_read);
+        return ReadCharStatus::Reading(char_read);
     }
 
     /// Checks the next character of the input buffer without consuming it
@@ -152,7 +158,7 @@ impl<T: Read> Lexer<T> {
     }
 
     /// Consumes a portion of the input buffer 
-    pub fn lex(&mut self) -> Status {
+    pub fn lex(&mut self) -> LexStatus {
         // flush next_token, next_lexeme, and next_point to the streams
         if let Some(next_token) = &self.next_token {
             self.token_stream.push(next_token.clone());
@@ -185,9 +191,9 @@ impl<T: Read> Lexer<T> {
         // but not consume it, so this character has to be passed back into the
         // lexer
         if self.need_new_char {
-            let Status::Reading(c) = self.get_char() else {
+            let ReadCharStatus::Reading(c) = self.get_char() else {
                 self.lex_eof();
-                return Status::Eof;
+                return LexStatus::Eof;
             };
             char_read = c;
         } else {
@@ -207,9 +213,30 @@ impl<T: Read> Lexer<T> {
         // some characters need to read additional characters to be properly
         // lexed i.e. strings, identifiers and numbers
         match char_read {
-            'a'..='z' | 'A'..='Z' | '_'=> {
-                self.current_word += &String::from(char_read);
-                self.lex_word();
+            _ if char_read.is_alphabetic() => {
+                let mut word = String::from(char_read);
+                while self.peek() != '\0' {
+                    let next_char = self.peek();
+                    match self.peek() {
+                        c if next_char.is_alphanumeric() => {
+                            self.get_char(); // consume the peeked character
+                            word.push(c);
+                        }
+                        _ if next_char.is_whitespace() 
+                            || vec!["{", "}", "(", ")", "[", "]"].contains(&char_read.to_string().as_str()) => {
+                                self.next_lexeme = Some(word.clone());
+                                self.next_token = Some(Token::Identifier);
+                                return LexStatus::Reading{ token: Token::Identifier, lexeme: word.clone() };
+                            }
+                        _ => {
+                            return LexStatus::SyntaxError {failed_lexeme: word.clone(), location: Point::from((self.line, self.col))};
+                        } // syntax error
+                    }
+                }
+
+                self.next_lexeme = Some(word.clone());
+                self.next_token = Some(Token::Identifier);
+                return LexStatus::Reading{ token: Token::Identifier, lexeme: word.clone() };
             } // end identifier
             '0'..='9' => {
                 self.current_word += &String::from(char_read);
@@ -281,9 +308,9 @@ impl<T: Read> Lexer<T> {
                 if self.peek() == '*'{
                     self.current_word = String::new();
                     loop {
-                        let Status::Reading(char) = self.get_char() else {
+                        let ReadCharStatus::Reading(char) = self.get_char() else {
                             self.lex_eof();
-                            return Status::Eof;
+                            return LexStatus::Eof;
                         };
 
                         if char == '*' && self.peek() == '/'{
@@ -293,9 +320,9 @@ impl<T: Read> Lexer<T> {
                     }
                 } else if self.peek() == '/' {
                     loop {
-                        let Status::Reading(char) = self.get_char() else {
+                        let ReadCharStatus::Reading(char) = self.get_char() else {
                             self.lex_eof();
-                            return Status::Eof;
+                            return LexStatus::Eof;
                         };
 
                         if char == '\n' {
@@ -324,18 +351,18 @@ impl<T: Read> Lexer<T> {
                 self.col = 0;
                 self.line += 1;
                 self.current_word = String::new();
-                self.next_token = Some(Token::EOL);
+                self.next_token = Some(Token::Eol);
                 self.next_lexeme = Some(String::from("\n"));
             }
             _ => {
                 self.lex();
             }
         }
-        return Status::Reading(char_read);
+        return LexStatus::Reading{token: self.next_token.clone().unwrap(), lexeme: self.next_lexeme.clone().unwrap()};
     }
 
     fn lex_word(&mut self) {
-        let Status::Reading(char_read) = self.get_char() else {
+        let ReadCharStatus::Reading(char_read) = self.get_char() else {
             self.next_token = Some(Token::Identifier);
             self.next_lexeme = Some(self.current_word.clone());
             self.current_word = String::new();
@@ -369,7 +396,7 @@ impl<T: Read> Lexer<T> {
     }
 
    fn lex_number(&mut self) {
-        let Status::Reading(char_read) = self.get_char() else {
+        let ReadCharStatus::Reading(char_read) = self.get_char() else {
             self.next_token = Some(Token::IntLiteral);
             self.next_lexeme = Some(self.current_word.clone());
             self.current_word = String::new();
@@ -396,7 +423,7 @@ impl<T: Read> Lexer<T> {
     }
 
     fn lex_string(&mut self, c: char) {
-        let Status::Reading(char_read) = self.get_char() else {
+        let ReadCharStatus::Reading(char_read) = self.get_char() else {
             self.next_token = Some(Token::StringLiteral);
             self.next_lexeme = Some(self.current_word.clone());
             self.current_word = String::new();
@@ -420,7 +447,7 @@ impl<T: Read> Lexer<T> {
     }
 
     fn lex_eof(&mut self) {
-        self.next_token = Some(Token::EOF);
+        self.next_token = Some(Token::Eof);
         self.next_lexeme = Some("\0".to_string());
     }
 }

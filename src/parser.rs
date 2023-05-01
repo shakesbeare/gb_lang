@@ -47,7 +47,7 @@ impl<R: Read> Parser<R> {
         // We have to make sure that we reach the end of input
         // By passing over any extra EOL tokens and any potential None tokens
         // Before we reach the EOF token.
-        while self.lexer.next_token != Some(Token::EOF) {
+        while self.lexer.next_token != Some(Token::Eof) {
             expr_list.children.push(self.add_sub());
 
             if self.lexer.next_token != Some(Token::Semicolon) {
@@ -57,7 +57,7 @@ impl<R: Read> Parser<R> {
                 self.lexer.lex();
             }
 
-            while self.lexer.next_token == Some(Token::EOL)
+            while self.lexer.next_token == Some(Token::Eol)
                 || self.lexer.next_token.is_none()
             {
                 self.lexer.lex();

@@ -25,6 +25,6 @@ pub enum Token {
     RBracket,
 
     Semicolon,
-    EOL,
-    EOF,
+    Eol,
+    Eof,
 }
