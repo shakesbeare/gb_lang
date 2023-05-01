@@ -217,7 +217,7 @@ impl<T: Read> Lexer<T> {
                 let mut lexeme = String::from(char_read);
                 while self.peek() != '\0' {
                     let next_char = self.peek();
-                    match self.peek() {
+                    match next_char {
                         c if next_char.is_alphanumeric() => {
                             self.get_char(); // consume the peeked character
                             lexeme.push(c);
@@ -240,7 +240,7 @@ impl<T: Read> Lexer<T> {
                 let mut lexeme = String::from(char_read);
                 while self.peek() != '\0' {
                     let next_char = self.peek();
-                    match self.peek() {
+                    match next_char  {
                         c if next_char.is_numeric()
                             || next_char == '.' => {
                                 self.get_char();
@@ -260,11 +260,37 @@ impl<T: Read> Lexer<T> {
                 self.next_token = match lexeme {
                     _ if lexeme.contains('.') => { Some(Token::FloatLiteral) }
                     _  => { Some(Token::IntLiteral) }
-                }
+                };
+                return LexStatus::Reading { token: self.next_token.clone().unwrap(), lexeme: self.next_lexeme.clone().unwrap() };
             } // end number literal
             '"' | '\'' => {
-                self.current_word += &String::from(char_read);
-                self.lex_string(char_read);
+                let mut lexeme = String::from(char_read);
+                while self.peek() != '\0' {
+                    let next_char = self.peek();
+                    match next_char {
+                        c if next_char == char_read => {
+                            self.get_char();
+                            lexeme.push(c);
+                            break;
+                        }
+                        _ if next_char == '\\' => {
+                            self.get_char(); // pass over the \
+                            self.get_char(); // pass over the next character
+                        }
+                        c => {
+                            self.get_char();
+                            lexeme.push(c);
+                        }
+                    }
+                }
+
+                if !lexeme.ends_with(char_read) && lexeme.chars().nth_back(1).unwrap() != '\\' {
+                    return LexStatus::SyntaxError { failed_lexeme: lexeme, location: Point::from((self.line, self.col))};
+                } else {
+                    self.next_token = Some(Token::StringLiteral);
+                    self.next_lexeme = Some(lexeme.clone());
+                    return LexStatus::Reading { token: Token::StringLiteral, lexeme }
+                }
             } // end string literal
             '(' => {
                 self.next_token = Some(Token::LParen);
@@ -379,33 +405,6 @@ impl<T: Read> Lexer<T> {
             }
         }
         return LexStatus::Reading{token: self.next_token.clone().unwrap(), lexeme: self.next_lexeme.clone().unwrap()};
-    }
-
-   fn lex_number(&mut self) {
-        let ReadCharStatus::Reading(char_read) = self.get_char() else {
-            self.next_token = Some(Token::IntLiteral);
-            self.next_lexeme = Some(self.current_word.clone());
-            self.current_word = String::new();
-            return
-        };
-
-        match char_read {
-            '0'..='9' | '.' => {
-                self.current_word += &String::from(char_read);
-                self.lex_number();
-            }
-            _ => {
-                if self.current_word.contains('.') { 
-                    self.next_token = Some(Token::FloatLiteral)
-                } else {
-                    self.next_token = Some(Token::IntLiteral);
-                }
-
-                self.next_lexeme = Some(self.current_word.clone());
-                self.need_new_char = false;
-                self.current_word = String::from(char_read);
-            }
-        }
     }
 
     fn lex_string(&mut self, c: char) {

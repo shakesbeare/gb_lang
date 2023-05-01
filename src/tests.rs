@@ -129,7 +129,7 @@ fn string_double_in_single() {
 }
 
 #[test]
-fn not_a_string_single() {
+fn string_single_unclosed() {
     let input = r#"'hello"#.as_bytes();
     let mut lexer = Lexer::from(input);
     lexer.lex();
@@ -138,13 +138,49 @@ fn not_a_string_single() {
 }
 
 #[test]
-fn not_a_string_double() {
+fn string_double_unclosed() {
     let input = r#""hello"#.as_bytes();
     let mut lexer = Lexer::from(input);
     lexer.lex();
 
     assert_ne!(lexer.next_token, Some(Token::StringLiteral));
 }
+
+#[test]
+fn string_single_escaped_closer() {
+    let input = r#"'hello\'"#.as_bytes();
+    let mut lexer = Lexer::from(input);
+    lexer.lex();
+
+    assert_ne!(lexer.next_token, Some(Token::StringLiteral));
+}
+
+#[test]
+fn string_double_escaped_closer() {
+    let input = r#""hello\""#.as_bytes();
+    let mut lexer = Lexer::from(input);
+    lexer.lex();
+
+    assert_ne!(lexer.next_token, Some(Token::StringLiteral));
+}
+
+#[test]
+fn string_single_escaped_extra_closer() {
+    let input = r#"'he\'llo'"#.as_bytes();
+    let mut lexer = Lexer::from(input);
+    lexer.lex();
+
+    assert_eq!(lexer.next_token, Some(Token::StringLiteral));
+}
+#[test]
+fn string_double_escaped_extra_closer() {
+    let input = r#""he\"llo""#.as_bytes();
+    let mut lexer = Lexer::from(input);
+    lexer.lex();
+
+    assert_eq!(lexer.next_token, Some(Token::StringLiteral));
+}
+
 
 #[test]
 fn operators() {
