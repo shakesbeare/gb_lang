@@ -214,33 +214,53 @@ impl<T: Read> Lexer<T> {
         // lexed i.e. strings, identifiers and numbers
         match char_read {
             _ if char_read.is_alphabetic() => {
-                let mut word = String::from(char_read);
+                let mut lexeme = String::from(char_read);
                 while self.peek() != '\0' {
                     let next_char = self.peek();
                     match self.peek() {
                         c if next_char.is_alphanumeric() => {
                             self.get_char(); // consume the peeked character
-                            word.push(c);
+                            lexeme.push(c);
                         }
                         _ if next_char.is_whitespace() 
                             || vec!["{", "}", "(", ")", "[", "]"].contains(&char_read.to_string().as_str()) => {
-                                self.next_lexeme = Some(word.clone());
-                                self.next_token = Some(Token::Identifier);
-                                return LexStatus::Reading{ token: Token::Identifier, lexeme: word.clone() };
+                                break;
                             }
                         _ => {
-                            return LexStatus::SyntaxError {failed_lexeme: word.clone(), location: Point::from((self.line, self.col))};
+                            return LexStatus::SyntaxError {failed_lexeme: lexeme.clone(), location: Point::from((self.line, self.col))};
                         } // syntax error
                     }
                 }
 
-                self.next_lexeme = Some(word.clone());
+                self.next_lexeme = Some(lexeme.clone());
                 self.next_token = Some(Token::Identifier);
-                return LexStatus::Reading{ token: Token::Identifier, lexeme: word.clone() };
+                return LexStatus::Reading{ token: Token::Identifier, lexeme: lexeme.clone() };
             } // end identifier
             '0'..='9' => {
-                self.current_word += &String::from(char_read);
-                self.lex_number();
+                let mut lexeme = String::from(char_read);
+                while self.peek() != '\0' {
+                    let next_char = self.peek();
+                    match self.peek() {
+                        c if next_char.is_numeric()
+                            || next_char == '.' => {
+                                self.get_char();
+                                lexeme.push(c);
+                            }
+                        _ if next_char.is_whitespace() 
+                            || vec!["{", "}", "(", ")", "[", "]"].contains(&char_read.to_string().as_str()) => {
+                                break;
+                            }
+                        _ => {
+                            return LexStatus::SyntaxError {failed_lexeme: lexeme.clone(), location: Point::from((self.line, self.col))};
+                        } // syntax error
+                    }
+
+                }
+                self.next_lexeme = Some(lexeme.clone());
+                self.next_token = match lexeme {
+                    _ if lexeme.contains('.') => { Some(Token::FloatLiteral) }
+                    _  => { Some(Token::IntLiteral) }
+                }
             } // end number literal
             '"' | '\'' => {
                 self.current_word += &String::from(char_read);
@@ -359,40 +379,6 @@ impl<T: Read> Lexer<T> {
             }
         }
         return LexStatus::Reading{token: self.next_token.clone().unwrap(), lexeme: self.next_lexeme.clone().unwrap()};
-    }
-
-    fn lex_word(&mut self) {
-        let ReadCharStatus::Reading(char_read) = self.get_char() else {
-            self.next_token = Some(Token::Identifier);
-            self.next_lexeme = Some(self.current_word.clone());
-            self.current_word = String::new();
-            return 
-        };
-
-        match char_read {
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => {
-                // identifier continues
-                self.current_word += &String::from(char_read);
-                self.lex_word();
-            }
-            _ => {
-                
-                match &self.current_word {
-                    word if KEYWORDS.contains(&self.current_word.as_str()) => {
-                        if word == "true" || word == "false" {
-                            self.next_token = Some(Token::Boolean);
-                        } else {
-                            self.next_token = Some(Token::Keyword);
-                        }
-                    }
-                    _ => self.next_token = Some(Token::Identifier),
-
-                }
-                self.next_lexeme = Some(self.current_word.clone());
-                self.need_new_char = false;
-                self.current_word = String::from(char_read);
-            }
-        }
     }
 
    fn lex_number(&mut self) {
