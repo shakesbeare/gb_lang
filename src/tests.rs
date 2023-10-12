@@ -14,7 +14,7 @@ use crate::token::Token;
 // LEXING TESTS
 // **************************************
 #[test]
-fn basic_identifier() {
+fn identifier_basic() {
     let input = "Word".as_bytes();
     let mut lexer = Lexer::from(input);
 
@@ -35,7 +35,7 @@ fn basic_identifier() {
 }
 
 #[test]
-fn underscore_identifier() {
+fn identifier_underscore() {
     let input = "_Word".as_bytes();
     let mut lexer = Lexer::from(input);
 
@@ -56,7 +56,7 @@ fn underscore_identifier() {
 }
 
 #[test]
-fn numbers_at_the_end_indentifier() {
+fn identifier_numbers() {
     let input = "Word123".as_bytes();
     let mut lexer = Lexer::from(input);
 
@@ -590,3 +590,42 @@ fn keywords() {
 // **************************************
 // LEXING TESTS
 // **************************************
+
+// **************************************
+// PARSING TESTS
+// **************************************
+
+#[test]
+fn atomic_value() {
+    let input = "1234".as_bytes();
+    let lexer = Lexer::from(input);
+    let mut parser = Parser::new(lexer, false);
+
+    let ast = parser.parse();
+
+    assert_eq!(
+        ast.into_inner().get(0).unwrap().to_owned(),
+        AstNode::new("Atom", Some(Token::IntLiteral), Some("1234"))
+    );
+}
+
+#[test]
+fn binary_op() {
+    let input = "1234 + 1234".as_bytes();
+    let lexer = Lexer::from(input);
+    let mut parser = Parser::new(lexer, false);
+
+    let ast = parser.parse();
+
+    let mut expected = AstNode::new("Binary Operation", Some(Token::OpAdd), None);
+    expected.children.append(&mut vec![
+        AstNode::new("Atom", Some(Token::IntLiteral), Some("1234")),
+        AstNode::new("Atom", Some(Token::IntLiteral), Some("1234")),
+    ]);
+
+    assert_eq!(
+        ast.into_inner().get(0).unwrap(),
+        &expected
+    );
+}
+

@@ -29,7 +29,8 @@ impl<R: Read> Parser<R> {
         // Grab the first token from the lexer and build the expression list
         // Must grab the token before parsing begins so that self.lexer.next_token is
         // not none
-        self.lexer.lex();
+        let status = self.lexer.lex();
+        self.print(status);
         let ast = self.expression_list();
 
         self.print("end program");
@@ -54,14 +55,15 @@ impl<R: Read> Parser<R> {
                 self.syntax_error(self.lexer.next_token.clone().unwrap());
                 break;
             } else {
-                self.lexer.lex();
+                let status = self.lexer.lex();
+                self.print(status);
             }
 
             while self.lexer.next_token == Some(Token::Eol)
                 || self.lexer.next_token.is_none()
             {
-                self.lexer.lex();
-                dbg!(&self.lexer.next_token);
+                let status = self.lexer.lex();
+                self.print(status);
             }
         }
         self.print("end expr_list");
@@ -78,7 +80,8 @@ impl<R: Read> Parser<R> {
         if self.lexer.next_token != Some(Token::OpAssign) {
             self.syntax_error(self.lexer.next_token.clone().unwrap());
         } else {
-            self.lexer.lex();
+            let status = self.lexer.lex();
+            self.print(status);
         };
 
         // parse rhs
@@ -100,7 +103,8 @@ impl<R: Read> Parser<R> {
             || self.lexer.next_token == Some(Token::OpSub)
         {
             let op_tok = self.lexer.next_token.clone();
-            self.lexer.lex();
+            let status = self.lexer.lex();
+            self.print(status);
             let right_child = self.mul_div();
             let mut bin_op = AstNode::new("Binary Operation", op_tok, None);
             bin_op.children.append(&mut vec![left_child, right_child]);
@@ -122,7 +126,8 @@ impl<R: Read> Parser<R> {
             || self.lexer.next_token == Some(Token::OpDiv)
         {
             let op_tok = self.lexer.next_token.clone();
-            self.lexer.lex();
+            let status = self.lexer.lex();
+            self.print(status);
             let right_child = self.exponentiation();
             let mut bin_op = AstNode::new("Binary Operation", op_tok, None);
             bin_op.children.append(&mut vec![left_child, right_child]);
@@ -142,7 +147,8 @@ impl<R: Read> Parser<R> {
         // handle them and search for a right operand
         while self.lexer.next_token == Some(Token::OpExp) {
             let op_tok = self.lexer.next_token.clone();
-            self.lexer.lex();
+            let status = self.lexer.lex();
+            self.print(status);
             let right_child = self.atom();
             let mut bin_op = AstNode::new("Binary Operation", op_tok, None);
             // exponetiation is right associative
@@ -187,7 +193,8 @@ impl<R: Read> Parser<R> {
             Token::LParen => {
                 self.print("BEGIN PAREN");
                 // Pass over the paren
-                self.lexer.lex();
+                let status = self.lexer.lex();
+                self.print(status);
 
                 // Parse the inner expressions
                 ast = self.add_sub();
@@ -210,7 +217,8 @@ impl<R: Read> Parser<R> {
             x => self.syntax_error(x.clone()),
         };
 
-        self.lexer.lex();
+        let status = self.lexer.lex();
+        self.print(status);
 
         self.print("end factor");
         return ast;

@@ -1,7 +1,7 @@
 use crate::token::Token;
 
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AstNode {
     node_type: String,
     token: Option<Token>,
@@ -22,6 +22,10 @@ impl AstNode {
             lexeme: new_lexeme,
             children: vec![],
         }
+    }
+
+    pub fn into_inner(self) -> Vec<AstNode> {
+        return self.children;
     }
 }
 
