@@ -5,8 +5,9 @@ use std::fs::File;
 
 use std::io::{BufRead, BufReader, Read};
 
-const KEYWORDS: [&str; 10] = [
-    "true", "false", "if", "for", "while", "let", "use", "restrict", "use", "else",
+const KEYWORDS: [&str; 11] = [
+    "true", "false", "if", "for", "while", "let", "use", "restrict", "use",
+    "else", "fn",
 ];
 
 #[derive(Debug, Eq, PartialEq)]
@@ -57,7 +58,6 @@ pub struct Lexer<T: Read> {
 
     reader: BufReader<T>,
     buf: [u8; 1],
-    need_new_char: bool,
 
     pub line: usize,
     pub col: usize,
@@ -78,7 +78,6 @@ impl From<&'static [u8]> for Lexer<&[u8]> {
 
             reader: BufReader::with_capacity(1, value),
             buf: [0],
-            need_new_char: true,
 
             line: 0,
             col: 0,
@@ -101,7 +100,6 @@ impl From<File> for Lexer<File> {
 
             reader: BufReader::with_capacity(1, file),
             buf: [0],
-            need_new_char: true,
 
             line: 0,
             col: 0,
@@ -117,6 +115,23 @@ impl Lexer<File> {
 }
 
 impl<T: Read> Lexer<T> {
+    pub fn new_input(&mut self, value: T) {
+        self.next_token = None;
+        self.next_lexeme = None;
+        self.next_point = None;
+
+        self.token_stream.clear();
+        self.lexeme_stream.clear();
+        self.point_stream.clear();
+
+
+        self.reader = BufReader::with_capacity(1, value);
+        self.buf = [0];
+
+        self.line = 0;
+        self.col = 0;
+    }
+
     /// Lexes the entire input buffer, consuming it.
     #[allow(dead_code)]
     pub fn lex_all(&mut self) {
@@ -184,6 +199,11 @@ impl<T: Read> Lexer<T> {
         if self.token_stream.len() != self.lexeme_stream.len()
             || self.token_stream.len() != self.point_stream.len()
         {
+            dbg!(
+                self.token_stream.len(),
+                self.lexeme_stream.len(),
+                self.point_stream.len()
+            );
             panic!("Token Stream, Lexeme Stream, Point Stream have different lengths");
         }
 
@@ -196,22 +216,11 @@ impl<T: Read> Lexer<T> {
         // some parts of the lexing process need to look at the next char
         // but not consume it, so this character has to be passed back into the
         // lexer
-        if self.need_new_char {
-            let ReadCharStatus::Reading(c) = self.get_char() else {
-                self.lex_eof();
-                return LexStatus::Eof;
-            };
-            char_read = c;
-        } else {
-            char_read = self
-                .current_word
-                .chars()
-                .next()
-                .expect("need new char is false, but current_word is empty");
-        }
-
-        // reset the flag to default
-        self.need_new_char = true;
+        let ReadCharStatus::Reading(c) = self.get_char() else {
+            self.lex_eof();
+            return LexStatus::Eof;
+        };
+        char_read = c;
 
         // If current_word contains only a space,
         // replace it with nothing
@@ -226,11 +235,13 @@ impl<T: Read> Lexer<T> {
                 while self.peek() != '\0' {
                     let next_char = self.peek();
                     match next_char {
-                        c if next_char.is_alphanumeric() => {
+                        c if next_char.is_alphanumeric()
+                            || next_char == '_' =>
+                        {
                             self.get_char(); // consume the peeked character
                             lexeme.push(c);
                         }
-                        _ if vec!['\'', '\"'].contains(&next_char) => {
+                        _ if ['\'', '\"'].contains(&next_char) => {
                             return LexStatus::SyntaxError {
                                 failed_lexeme: lexeme.clone(),
                                 location: Point::from((self.line, self.col)),
@@ -245,7 +256,7 @@ impl<T: Read> Lexer<T> {
 
                 if KEYWORDS.contains(&lexeme.as_str()) {
                     match &lexeme {
-                        _ if vec!["true", "false"].contains(&lexeme.as_str()) => {
+                        _ if ["true", "false"].contains(&lexeme.as_str()) => {
                             self.next_token = Some(Token::Boolean)
                         }
                         _ => self.next_token = Some(Token::Keyword),
@@ -253,7 +264,6 @@ impl<T: Read> Lexer<T> {
                 } else {
                     self.next_token = Some(Token::Identifier);
                 }
-                dbg!(&lexeme);
                 self.next_lexeme = Some(lexeme);
                 self.next_point = Some(Point::from((self.line, self.col)));
                 return LexStatus::Reading {
@@ -271,7 +281,7 @@ impl<T: Read> Lexer<T> {
                             lexeme.push(c);
                         }
                         _ if next_char.is_whitespace()
-                            || vec!["{", "}", "(", ")", "[", "]"]
+                            || ["{", "}", "(", ")", "[", "]"]
                                 .contains(&char_read.to_string().as_str()) =>
                         {
                             break;
@@ -442,7 +452,8 @@ impl<T: Read> Lexer<T> {
                 if self.peek() == '*' {
                     self.get_char(); // pass over the *
                     loop {
-                        let ReadCharStatus::Reading(char) = self.get_char() else {
+                        let ReadCharStatus::Reading(char) = self.get_char()
+                        else {
                             self.lex_eof();
                             return LexStatus::Eof;
                         };
@@ -455,7 +466,8 @@ impl<T: Read> Lexer<T> {
                     return self.lex();
                 } else if self.peek() == '/' {
                     loop {
-                        let ReadCharStatus::Reading(char) = self.get_char() else {
+                        let ReadCharStatus::Reading(char) = self.get_char()
+                        else {
                             self.lex_eof();
                             return LexStatus::Eof;
                         };
@@ -493,8 +505,26 @@ impl<T: Read> Lexer<T> {
                     lexeme: self.next_lexeme.clone().unwrap(),
                 };
             }
+            '!' => {
+                self.next_token = Some(Token::OpBang);
+                self.next_lexeme = Some(String::from(char_read));
+                self.next_point = Some(Point::from((self.line, self.col)));
+                return LexStatus::Reading {
+                    token: self.next_token.clone().unwrap(),
+                    lexeme: self.next_lexeme.clone().unwrap(),
+                };
+            }
             ';' => {
                 self.next_token = Some(Token::Semicolon);
+                self.next_lexeme = Some(String::from(char_read));
+                self.next_point = Some(Point::from((self.line, self.col)));
+                return LexStatus::Reading {
+                    token: self.next_token.clone().unwrap(),
+                    lexeme: self.next_lexeme.clone().unwrap(),
+                };
+            }
+            ',' => {
+                self.next_token = Some(Token::Comma);
                 self.next_lexeme = Some(String::from(char_read));
                 self.next_point = Some(Point::from((self.line, self.col)));
                 return LexStatus::Reading {
@@ -529,5 +559,6 @@ impl<T: Read> Lexer<T> {
     fn lex_eof(&mut self) {
         self.next_token = Some(Token::Eof);
         self.next_lexeme = Some("\0".to_string());
+        self.next_point = Some(Point::from((self.line, self.col)));
     }
 }

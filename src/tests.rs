@@ -4,6 +4,8 @@ use std::collections::HashMap;
 #[allow(unused_imports)]
 use crate::ast::AstNode;
 #[allow(unused_imports)]
+use crate::ast::NodeType;
+#[allow(unused_imports)]
 use crate::lexer::{LexStatus, Lexer};
 #[allow(unused_imports)]
 use crate::parser::Parser;
@@ -53,6 +55,42 @@ fn identifier_underscore() {
     };
 
     assert_eq!(tok, Token::Identifier);
+}
+
+#[test]
+fn identifier_underscore_middle() {
+    let input = "my_word".as_bytes();
+    let mut lexer = Lexer::from(input);
+
+    let res = lexer.lex();
+    let tok = match res {
+        LexStatus::Reading { token, .. } => token,
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
+            panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
+        }
+        LexStatus::Eof => Token::Eof,
+    };
+
+    assert_eq!(tok, Token::Identifier);
+
+    let rest = lexer.lex();
+    let tok = match rest {
+        LexStatus::Reading { token, .. } => token,
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
+            panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
+        }
+        LexStatus::Eof => Token::Eof,
+    };
+
+    assert_eq!(tok, Token::Eof);
 }
 
 #[test]
@@ -441,7 +479,10 @@ fn operators() {
                 location,
                 ..
             } => {
-                panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
+                panic!(
+                    "Syntax Error at {:?}, lexeme: {}",
+                    location, failed_lexeme
+                )
             }
             LexStatus::Eof => Token::Eof,
         };
@@ -471,7 +512,10 @@ fn delimiters() {
                 location,
                 ..
             } => {
-                panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
+                panic!(
+                    "Syntax Error at {:?}, lexeme: {}",
+                    location, failed_lexeme
+                )
             }
             LexStatus::Eof => Token::Eof,
         };
@@ -578,7 +622,10 @@ fn keywords() {
                 location,
                 ..
             } => {
-                panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
+                panic!(
+                    "Syntax Error at {:?}, lexeme: {}",
+                    location, failed_lexeme
+                )
             }
             LexStatus::Eof => Token::Eof,
         };
@@ -604,8 +651,8 @@ fn atomic_value() {
     let ast = parser.parse();
 
     assert_eq!(
-        ast.into_inner().get(0).unwrap().to_owned(),
-        AstNode::new("Atom", Some(Token::IntLiteral), Some("1234"))
+        ast.into_inner().first().unwrap().to_owned(),
+        AstNode::new(NodeType::Atom, Some(Token::IntLiteral), Some("1234"))
     );
 }
 
@@ -617,15 +664,69 @@ fn binary_op() {
 
     let ast = parser.parse();
 
-    let mut expected = AstNode::new("Binary Operation", Some(Token::OpAdd), None);
+    let mut expected =
+        AstNode::new(NodeType::BinaryOperation, Some(Token::OpAdd), None);
     expected.children.append(&mut vec![
-        AstNode::new("Atom", Some(Token::IntLiteral), Some("1234")),
-        AstNode::new("Atom", Some(Token::IntLiteral), Some("1234")),
+        AstNode::new(NodeType::Atom, Some(Token::IntLiteral), Some("1234")),
+        AstNode::new(NodeType::Atom, Some(Token::IntLiteral), Some("1234")),
     ]);
 
-    assert_eq!(
-        ast.into_inner().get(0).unwrap(),
-        &expected
-    );
+    assert_eq!(ast.into_inner().first().unwrap(), &expected);
 }
 
+#[test]
+fn unary_op() {
+    let input = "-1234 + 1234".as_bytes();
+    let lexer = Lexer::from(input);
+    let mut parser = Parser::new(lexer, false);
+
+    let ast = parser.parse();
+    let mut expected =
+        AstNode::new(NodeType::BinaryOperation, Some(Token::OpAdd), None);
+    expected.children.push(AstNode::new(
+        NodeType::UnaryOperation,
+        Some(Token::OpSub),
+        None,
+    ));
+    expected.children.push(AstNode::new(
+        NodeType::Atom,
+        Some(Token::IntLiteral),
+        Some("1234"),
+    ));
+
+    expected
+        .children
+        .first_mut()
+        .unwrap()
+        .children
+        .push(AstNode::new(
+            NodeType::Atom,
+            Some(Token::IntLiteral),
+            Some("1234"),
+        ));
+
+    assert_eq!(ast.into_inner().first().unwrap(), &expected);
+}
+
+#[test]
+fn double_unary() {
+    let input = "!!true".as_bytes();
+    let lexer = Lexer::from(input);
+    let mut parser = Parser::new(lexer, false);
+
+    let ast = parser.parse();
+
+    let mut expected =
+        AstNode::new(NodeType::UnaryOperation, Some(Token::OpBang), None);
+    let mut inner =
+        AstNode::new(NodeType::UnaryOperation, Some(Token::OpBang), None);
+
+    inner.children.push(AstNode::new(
+        NodeType::Atom,
+        Some(Token::Boolean),
+        Some("true"),
+    ));
+    expected.children.push(inner);
+
+    assert_eq!(ast.into_inner().first().unwrap(), &expected);
+}
