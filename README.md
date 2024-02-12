@@ -50,5 +50,5 @@ provides.
 # The future of Gb
 
 I occasionally resume work on Gb. My plan is to one day make it a sleek scripting
-language with powerful support interop with Rust. As of now, development of the project
+language with support for interop with Rust. As of now, development of the project
 has taken the back seat to my studies in college. 
