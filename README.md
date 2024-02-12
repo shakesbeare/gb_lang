@@ -29,7 +29,7 @@ the other end with something that might resemble a functional program.
 
 First of all, I chose to use Rust. Not only is Rust extremely fun to use, but it
 presents unique advantages for this sort of exploration project that other languages in
-it's class don't have. Namely, it's memory safety. While I may have to fight with Rust
+it's class don't have. Namely, its memory safety. While I may have to fight with Rust
 itself a lot more, I feel that this choice generally allows me to focus on the details
 of the project I'm building more than debugging inane issues that might distract from
 the project at large. 
