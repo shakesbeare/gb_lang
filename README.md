@@ -4,6 +4,12 @@ Gb is a project I created to learn more about the inner workings of programming
 languages. While it is not fully functional, it has achieved this goal and (usually)
 works within its extremely constrained scope. 
 
+# Does it work?
+
+Probably not. This is a personal project and I'm largely using Git as a means of cloud
+storage in addition to version control. So, very frequently, the main branches will be
+broken. 
+
 # Why not use a parser generator?
 
 Since Gb was primarily a learning exercise, I wanted to try and do as much as possible
