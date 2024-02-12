@@ -139,7 +139,7 @@ impl<T: Read> Interpreter<T> {
                         let res = current_scope.bind(&lhs, rhs);
 
                         match res {
-                            Ok(value) => value,
+                            Ok(_) => GbType::None,
                             Err(e) => {
                                 let msg = e.to_string();
                                 self.error(msg);

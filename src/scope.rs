@@ -33,9 +33,7 @@ impl Scope {
 
     /// Creates a new scope as a child of self
     pub fn new_child(&mut self) -> Self {
-        let mut new_scope = Scope::init();
-        new_scope.parent = Some(Rc::new(RefCell::new(*self)));
-        self.child = Some(Rc::new(RefCell::new(new_scope)));
+        let new_scope = Scope::init();
         return new_scope;
     }
 
@@ -149,18 +147,18 @@ impl Scope {
     ) -> Result<GbType, ScopeError> {
         if self.identifiers.contains_key(identifier) {
             let index = self.identifiers.get(identifier).unwrap();
-            self.values[*index] = Box::new(value);
+            self.values[*index] = Box::new(value.clone());
             Ok(value)
         } else {
             match self.find_available_location() {
                 ScopeLocation::Existing(x) => {
-                    let obj_p = Box::new(value);
+                    let obj_p = Box::new(value.clone());
                     self.values[x] = obj_p;
                     self.final_owner[x] = true;
                     Ok(value)
                 }
                 ScopeLocation::End => {
-                    self.values.push(Box::new(value));
+                    self.values.push(Box::new(value.clone()));
                     self.identifiers
                         .insert(identifier.into(), self.values.len() - 1);
                     self.final_owner.push(true);
@@ -240,14 +238,14 @@ impl Scope {
         let current_value = self.lookup(&identifier.to_string())?;
 
         let current_type = gb_type_of(*current_value);
-        let new_type = gb_type_of(value);
+        let new_type = gb_type_of(value.clone());
 
         if current_type != new_type {
             return Err(ScopeError::TypeMismatch { expected: current_type, actual: new_type })
         }
         
         let index = *self.identifiers.get(identifier).unwrap();
-        self.values[index] = Box::new(value);
+        self.values[index] = Box::new(value.clone());
 
         Ok(value)
     }
@@ -265,15 +263,15 @@ impl Scope {
             });
         };
 
-        return Ok(self.values[index]);
+        return Ok(self.values[index].clone());
     }
 
     fn find_available_location(&self) -> ScopeLocation {
         for key in self.identifiers.keys() {
             let value = self.identifiers.get(key).unwrap();
-            let data = *self.values[*value];
+            let data = &self.values[*value];
 
-            match data {
+            match data.as_ref() {
                 GbType::Empty => {
                     return ScopeLocation::Existing(value.clone());
                 }
