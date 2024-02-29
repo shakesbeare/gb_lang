@@ -11,6 +11,8 @@ use crate::lexer::{LexStatus, Lexer};
 use crate::parser::Parser;
 #[allow(unused_imports)]
 use crate::token::Token;
+#[allow(unused_imports)]
+use crate::token::TokenKind;
 
 // **************************************
 // LEXING TESTS
@@ -22,7 +24,7 @@ fn identifier_basic() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -30,10 +32,10 @@ fn identifier_basic() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::Identifier);
+    assert_eq!(tok, TokenKind::Identifier);
 }
 
 #[test]
@@ -43,7 +45,7 @@ fn identifier_underscore() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -51,10 +53,10 @@ fn identifier_underscore() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::Identifier);
+    assert_eq!(tok, TokenKind::Identifier);
 }
 
 #[test]
@@ -64,7 +66,7 @@ fn identifier_underscore_middle() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -72,14 +74,14 @@ fn identifier_underscore_middle() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::Identifier);
+    assert_eq!(tok, TokenKind::Identifier);
 
     let rest = lexer.lex();
     let tok = match rest {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -87,10 +89,10 @@ fn identifier_underscore_middle() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::Eof);
+    assert_eq!(tok, TokenKind::Eof);
 }
 
 #[test]
@@ -100,7 +102,7 @@ fn identifier_numbers() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -108,10 +110,10 @@ fn identifier_numbers() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::Identifier);
+    assert_eq!(tok, TokenKind::Identifier);
 }
 
 #[test]
@@ -121,7 +123,7 @@ fn identifier_underscore_and_numbers() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -129,10 +131,10 @@ fn identifier_underscore_and_numbers() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::Identifier);
+    assert_eq!(tok, TokenKind::Identifier);
 }
 
 #[test]
@@ -143,7 +145,7 @@ fn identifier_numbers_at_beginning() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -151,11 +153,11 @@ fn identifier_numbers_at_beginning() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_ne!(tok, Token::Identifier);
-    assert_ne!(tok, Token::FloatLiteral);
+    assert_ne!(tok, TokenKind::Identifier);
+    assert_ne!(tok, TokenKind::FloatLiteral);
 }
 
 #[test]
@@ -166,7 +168,7 @@ fn identifier_symbol_at_end() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -174,10 +176,10 @@ fn identifier_symbol_at_end() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_ne!(tok, Token::Identifier);
+    assert_ne!(tok, TokenKind::Identifier);
 }
 
 #[test]
@@ -187,7 +189,7 @@ fn integer() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -195,10 +197,10 @@ fn integer() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::IntLiteral);
+    assert_eq!(tok, TokenKind::IntLiteral);
 }
 
 #[test]
@@ -208,7 +210,7 @@ fn float_hanging_decimal() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -216,10 +218,10 @@ fn float_hanging_decimal() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::FloatLiteral);
+    assert_eq!(tok, TokenKind::FloatLiteral);
 }
 
 #[test]
@@ -229,7 +231,7 @@ fn float_balanced_decimal() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -237,10 +239,10 @@ fn float_balanced_decimal() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::FloatLiteral);
+    assert_eq!(tok, TokenKind::FloatLiteral);
 }
 
 #[test]
@@ -250,7 +252,7 @@ fn string_single() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -258,10 +260,10 @@ fn string_single() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::StringLiteral);
+    assert_eq!(tok, TokenKind::StringLiteral);
 }
 
 #[test]
@@ -271,7 +273,7 @@ fn string_double() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -279,10 +281,10 @@ fn string_double() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::StringLiteral);
+    assert_eq!(tok, TokenKind::StringLiteral);
 }
 
 #[test]
@@ -292,7 +294,7 @@ fn string_single_in_double() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -300,10 +302,10 @@ fn string_single_in_double() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::StringLiteral);
+    assert_eq!(tok, TokenKind::StringLiteral);
 }
 
 #[test]
@@ -313,7 +315,7 @@ fn string_double_in_single() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -321,10 +323,10 @@ fn string_double_in_single() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::StringLiteral);
+    assert_eq!(tok, TokenKind::StringLiteral);
 }
 
 #[test]
@@ -335,7 +337,7 @@ fn string_single_unclosed() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -343,10 +345,10 @@ fn string_single_unclosed() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_ne!(tok, Token::StringLiteral);
+    assert_ne!(tok, TokenKind::StringLiteral);
 }
 
 #[test]
@@ -357,7 +359,7 @@ fn string_double_unclosed() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -365,10 +367,10 @@ fn string_double_unclosed() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_ne!(tok, Token::StringLiteral);
+    assert_ne!(tok, TokenKind::StringLiteral);
 }
 
 #[test]
@@ -379,7 +381,7 @@ fn string_single_escaped_closer() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -387,10 +389,10 @@ fn string_single_escaped_closer() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_ne!(tok, Token::StringLiteral);
+    assert_ne!(tok, TokenKind::StringLiteral);
 }
 
 #[test]
@@ -401,7 +403,7 @@ fn string_double_escaped_closer() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -409,10 +411,10 @@ fn string_double_escaped_closer() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_ne!(tok, Token::StringLiteral);
+    assert_ne!(tok, TokenKind::StringLiteral);
 }
 
 #[test]
@@ -422,7 +424,7 @@ fn string_single_escaped_extra_closer() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -430,10 +432,10 @@ fn string_single_escaped_extra_closer() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::StringLiteral);
+    assert_eq!(tok, TokenKind::StringLiteral);
 }
 #[test]
 fn string_double_escaped_extra_closer() {
@@ -442,7 +444,7 @@ fn string_double_escaped_extra_closer() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -450,41 +452,38 @@ fn string_double_escaped_extra_closer() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::StringLiteral);
+    assert_eq!(tok, TokenKind::StringLiteral);
 }
 
 #[test]
 fn operators() {
-    let mut map: HashMap<&str, Token> = HashMap::new();
-    map.insert("+", Token::OpAdd);
-    map.insert("-", Token::OpSub);
-    map.insert("*", Token::OpMul);
-    map.insert("/", Token::OpDiv);
-    map.insert("**", Token::OpExp);
-    map.insert("=", Token::OpAssign);
-    map.insert("<", Token::OpLt);
-    map.insert(">", Token::OpGt);
+    let mut map: HashMap<&str, TokenKind> = HashMap::new();
+    map.insert("+", TokenKind::OpAdd);
+    map.insert("-", TokenKind::OpSub);
+    map.insert("*", TokenKind::OpMul);
+    map.insert("/", TokenKind::OpDiv);
+    map.insert("**", TokenKind::OpExp);
+    map.insert("=", TokenKind::OpAssign);
+    map.insert("<", TokenKind::OpLt);
+    map.insert(">", TokenKind::OpGt);
 
     for (k, v) in map.iter() {
         let mut lexer = Lexer::from(k.as_bytes());
 
         let res = lexer.lex();
         let tok = match res {
-            LexStatus::Reading { token, .. } => token,
+            LexStatus::Reading { token, .. } => token.kind,
             LexStatus::SyntaxError {
                 failed_lexeme,
                 location,
                 ..
             } => {
-                panic!(
-                    "Syntax Error at {:?}, lexeme: {}",
-                    location, failed_lexeme
-                )
+                panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
             }
-            LexStatus::Eof => Token::Eof,
+            LexStatus::Eof => TokenKind::Eof,
         };
         assert_eq!(tok, v.clone());
     }
@@ -492,32 +491,29 @@ fn operators() {
 
 #[test]
 fn delimiters() {
-    let mut map: HashMap<&str, Token> = HashMap::new();
-    map.insert("(", Token::LParen);
-    map.insert(")", Token::RParen);
-    map.insert("{", Token::LBrace);
-    map.insert("}", Token::RBrace);
-    map.insert("[", Token::LBracket);
-    map.insert("]", Token::RBracket);
-    map.insert(";", Token::Semicolon);
+    let mut map: HashMap<&str, TokenKind> = HashMap::new();
+    map.insert("(", TokenKind::LParen);
+    map.insert(")", TokenKind::RParen);
+    map.insert("{", TokenKind::LBrace);
+    map.insert("}", TokenKind::RBrace);
+    map.insert("[", TokenKind::LBracket);
+    map.insert("]", TokenKind::RBracket);
+    map.insert(";", TokenKind::Semicolon);
 
     for (k, v) in map.iter() {
         let mut lexer = Lexer::from(k.as_bytes());
 
         let res = lexer.lex();
         let tok = match res {
-            LexStatus::Reading { token, .. } => token,
+            LexStatus::Reading { token, .. } => token.kind,
             LexStatus::SyntaxError {
                 failed_lexeme,
                 location,
                 ..
             } => {
-                panic!(
-                    "Syntax Error at {:?}, lexeme: {}",
-                    location, failed_lexeme
-                )
+                panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
             }
-            LexStatus::Eof => Token::Eof,
+            LexStatus::Eof => TokenKind::Eof,
         };
         assert_eq!(tok, v.clone());
     }
@@ -530,7 +526,7 @@ fn single_line_comment() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -538,10 +534,10 @@ fn single_line_comment() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::Eof);
+    assert_eq!(tok, TokenKind::Eof);
 }
 
 #[test]
@@ -553,8 +549,12 @@ fn single_line_comment_2() {
     lexer.lex_all();
 
     assert_eq!(
-        lexer.token_stream,
-        vec![Token::Identifier, Token::Identifier]
+        lexer
+            .token_stream
+            .iter()
+            .map(|t| t.kind)
+            .collect::<Vec<TokenKind>>(),
+        vec![TokenKind::Identifier, TokenKind::Identifier]
     );
 }
 
@@ -569,7 +569,7 @@ fn block_comment() {
 
     let res = lexer.lex();
     let tok = match res {
-        LexStatus::Reading { token, .. } => token,
+        LexStatus::Reading { token, .. } => token.kind,
         LexStatus::SyntaxError {
             failed_lexeme,
             location,
@@ -577,10 +577,10 @@ fn block_comment() {
         } => {
             panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
         }
-        LexStatus::Eof => Token::Eof,
+        LexStatus::Eof => TokenKind::Eof,
     };
 
-    assert_eq!(tok, Token::Eof);
+    assert_eq!(tok, TokenKind::Eof);
 }
 
 #[test]
@@ -594,40 +594,41 @@ fn block_comment_2() {
     lexer.lex_all();
 
     assert_eq!(
-        lexer.token_stream,
-        vec![Token::Identifier, Token::Identifier]
+        lexer
+            .token_stream
+            .iter()
+            .map(|t| t.kind)
+            .collect::<Vec<TokenKind>>(),
+        vec![TokenKind::Identifier, TokenKind::Identifier]
     );
 }
 
 #[test]
 fn keywords() {
-    let mut map: HashMap<&str, Token> = HashMap::new();
-    map.insert("true", Token::Boolean);
-    map.insert("false", Token::Boolean);
-    map.insert("for", Token::Keyword);
-    map.insert("while", Token::Keyword);
-    map.insert("let", Token::Keyword);
-    map.insert("if", Token::Keyword);
-    map.insert("else", Token::Keyword);
-    map.insert("use", Token::Keyword);
-    map.insert("restrict", Token::Keyword);
+    let mut map: HashMap<&str, TokenKind> = HashMap::new();
+    map.insert("true", TokenKind::Boolean);
+    map.insert("false", TokenKind::Boolean);
+    map.insert("for", TokenKind::Keyword);
+    map.insert("while", TokenKind::Keyword);
+    map.insert("let", TokenKind::Keyword);
+    map.insert("if", TokenKind::Keyword);
+    map.insert("else", TokenKind::Keyword);
+    map.insert("use", TokenKind::Keyword);
+    map.insert("restrict", TokenKind::Keyword);
 
     for (k, v) in map.iter() {
         let mut lexer = Lexer::from(k.as_bytes());
         let res = lexer.lex();
         let tok = match res {
-            LexStatus::Reading { token, .. } => token,
+            LexStatus::Reading { token, .. } => token.kind,
             LexStatus::SyntaxError {
                 failed_lexeme,
                 location,
                 ..
             } => {
-                panic!(
-                    "Syntax Error at {:?}, lexeme: {}",
-                    location, failed_lexeme
-                )
+                panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
             }
-            LexStatus::Eof => Token::Eof,
+            LexStatus::Eof => TokenKind::Eof,
         };
 
         assert_eq!(&tok, v);
@@ -652,7 +653,11 @@ fn atomic_value() {
 
     assert_eq!(
         ast.into_inner().first().unwrap().to_owned(),
-        AstNode::new(NodeType::Atom, Some(Token::IntLiteral), Some("1234"))
+        AstNode::new(
+            NodeType::Atom,
+            Some(Token::new("1234", TokenKind::IntLiteral, (0, 0))),
+            Some("1234")
+        )
     );
 }
 
@@ -664,11 +669,22 @@ fn binary_op() {
 
     let ast = parser.parse();
 
-    let mut expected =
-        AstNode::new(NodeType::BinaryOperation, Some(Token::OpAdd), None);
+    let mut expected = AstNode::new(
+        NodeType::BinaryOperation,
+        Some(Token::new("+", TokenKind::OpAdd, (0, 0))),
+        None,
+    );
     expected.children.append(&mut vec![
-        AstNode::new(NodeType::Atom, Some(Token::IntLiteral), Some("1234")),
-        AstNode::new(NodeType::Atom, Some(Token::IntLiteral), Some("1234")),
+        AstNode::new(
+            NodeType::Atom,
+            Some(Token::new("1234", TokenKind::IntLiteral, (0, 0))),
+            Some("1234"),
+        ),
+        AstNode::new(
+            NodeType::Atom,
+            Some(Token::new("1234", TokenKind::IntLiteral, (0, 0))),
+            Some("1234"),
+        ),
     ]);
 
     assert_eq!(ast.into_inner().first().unwrap(), &expected);
@@ -681,16 +697,19 @@ fn unary_op() {
     let mut parser = Parser::new(lexer, false);
 
     let ast = parser.parse();
-    let mut expected =
-        AstNode::new(NodeType::BinaryOperation, Some(Token::OpAdd), None);
+    let mut expected = AstNode::new(
+        NodeType::BinaryOperation,
+        Some(Token::new("+", TokenKind::OpAdd, (0, 0))),
+        None,
+    );
     expected.children.push(AstNode::new(
         NodeType::UnaryOperation,
-        Some(Token::OpSub),
+        Some(Token::new("-", TokenKind::OpSub, (0, 0))),
         None,
     ));
     expected.children.push(AstNode::new(
         NodeType::Atom,
-        Some(Token::IntLiteral),
+        Some(Token::new("1234", TokenKind::IntLiteral, (0, 0))),
         Some("1234"),
     ));
 
@@ -701,7 +720,7 @@ fn unary_op() {
         .children
         .push(AstNode::new(
             NodeType::Atom,
-            Some(Token::IntLiteral),
+            Some(Token::new("1234", TokenKind::IntLiteral, (0, 0))),
             Some("1234"),
         ));
 
@@ -717,13 +736,13 @@ fn double_unary() {
     let ast = parser.parse();
 
     let mut expected =
-        AstNode::new(NodeType::UnaryOperation, Some(Token::OpBang), None);
+        AstNode::new(NodeType::UnaryOperation, Some(Token::new("!", TokenKind::OpBang, (0, 0))), None);
     let mut inner =
-        AstNode::new(NodeType::UnaryOperation, Some(Token::OpBang), None);
+        AstNode::new(NodeType::UnaryOperation, Some(Token::new("!", TokenKind::OpBang, (0, 0))), None);
 
     inner.children.push(AstNode::new(
         NodeType::Atom,
-        Some(Token::Boolean),
+        Some(Token::new("true", TokenKind::Boolean, (0, 0))),
         Some("true"),
     ));
     expected.children.push(inner);

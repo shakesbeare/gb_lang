@@ -1,9 +1,10 @@
 use std::io::Read;
+use crate::token::HasKind;
 
 use crate::{
     ast::{AstNode, NodeType},
     lexer::Lexer,
-    token::Token,
+    token::{Token, TokenKind},
 };
 
 pub struct Parser<T: Read> {
@@ -35,7 +36,7 @@ impl<R: Read> Parser<R> {
         self.print(status);
         let ast = self.expression_list();
 
-        if self.lexer.next_token != Some(Token::Eof) {
+        if !self.lexer.next_token.has_kind(TokenKind::Eof) {
             self.syntax_error(self.lexer.next_token.clone().unwrap());
         }
 
@@ -54,12 +55,12 @@ impl<R: Read> Parser<R> {
         // We have to make sure that we reach the end of input
         // By passing over any extra EOL tokens and any potential None tokens
         // Before we reach the EOF token.
-        while self.lexer.next_token != Some(Token::Eof)
-            && self.lexer.next_token != Some(Token::RBrace)
+        while !self.lexer.next_token.has_kind(TokenKind::Eof)
+            && !self.lexer.next_token.has_kind(TokenKind::RBrace)
         {
             expr_list.children.push(self.add_sub());
 
-            if self.lexer.next_token != Some(Token::Semicolon) {
+            if !self.lexer.next_token.has_kind(TokenKind::Semicolon) {
                 self.syntax_error(self.lexer.next_token.clone().unwrap());
                 break;
             } else {
@@ -67,7 +68,7 @@ impl<R: Read> Parser<R> {
                 self.print(status);
             }
 
-            while self.lexer.next_token == Some(Token::Eol)
+            while self.lexer.next_token.has_kind(TokenKind::Eol)
                 || self.lexer.next_token.is_none()
             {
                 let status = self.lexer.lex();
@@ -85,7 +86,7 @@ impl<R: Read> Parser<R> {
         let left = self.atom();
 
         // get = sign
-        if self.lexer.next_token != Some(Token::OpAssign) {
+        if !self.lexer.next_token.has_kind(TokenKind::OpAssign) {
             self.syntax_error(self.lexer.next_token.clone().unwrap());
         } else {
             let status = self.lexer.lex();
@@ -104,12 +105,12 @@ impl<R: Read> Parser<R> {
     fn param_list(&mut self) -> AstNode {
         self.print("start param list");
         let mut params = vec![];
-        while self.lexer.next_token != Some(Token::RParen) {
+        while !self.lexer.next_token.has_kind(TokenKind::RParen) {
             params.push(self.atom());
 
-            if self.lexer.next_token == Some(Token::RParen) {
+            if self.lexer.next_token.has_kind(TokenKind::RParen) {
                 break;
-            } else if self.lexer.next_token == Some(Token::Comma) {
+            } else if self.lexer.next_token.has_kind(TokenKind::Comma) {
                 self.lexer.lex();
             }
         }
@@ -125,7 +126,7 @@ impl<R: Read> Parser<R> {
         self.print("start function definition");
 
         // parse the parameter list
-        if self.lexer.next_token != Some(Token::LParen) {
+        if !self.lexer.next_token.has_kind(TokenKind::LParen) {
             self.syntax_error(self.lexer.next_token.clone().unwrap());
             return AstNode::new(NodeType::Error, None, None);
         } else {
@@ -137,10 +138,10 @@ impl<R: Read> Parser<R> {
         let param_list = self.param_list();
 
         // pass over the r paren
-        while self.lexer.next_token != Some(Token::RParen) {
+        while !self.lexer.next_token.has_kind(TokenKind::RParen) {
             self.lexer.lex();
 
-            if self.lexer.next_token == Some(Token::Eof) {
+            if self.lexer.next_token.has_kind(TokenKind::Eof) {
                 self.syntax_error(self.lexer.next_token.clone().unwrap());
                 return AstNode::new(NodeType::Error, None, None);
             }
@@ -156,10 +157,10 @@ impl<R: Read> Parser<R> {
         let exp_list = self.expression_list();
 
         // pass over the r brace
-        while self.lexer.next_token != Some(Token::RBrace) {
+        while !self.lexer.next_token.has_kind(TokenKind::RBrace) {
             self.lexer.lex();
 
-            if self.lexer.next_token == Some(Token::Eof) {
+            if self.lexer.next_token.has_kind(TokenKind::Eof) {
                 self.syntax_error(self.lexer.next_token.clone().unwrap());
                 return AstNode::new(NodeType::Error, None, None);
             }
@@ -178,8 +179,8 @@ impl<R: Read> Parser<R> {
 
         // if there is any operators
         // handle them and search for a right operand
-        while self.lexer.next_token == Some(Token::OpAdd)
-            || self.lexer.next_token == Some(Token::OpSub)
+        while self.lexer.next_token.has_kind(TokenKind::OpAdd)
+            || self.lexer.next_token.has_kind(TokenKind::OpSub)
         {
             let op_tok = self.lexer.next_token.clone();
             let status = self.lexer.lex();
@@ -202,8 +203,8 @@ impl<R: Read> Parser<R> {
 
         // if there is any operators
         // handle them and search for a right operand
-        while self.lexer.next_token == Some(Token::OpMul)
-            || self.lexer.next_token == Some(Token::OpDiv)
+        while self.lexer.next_token.has_kind(TokenKind::OpMul)
+            || self.lexer.next_token.has_kind(TokenKind::OpDiv)
         {
             let op_tok = self.lexer.next_token.clone();
             let status = self.lexer.lex();
@@ -226,7 +227,7 @@ impl<R: Read> Parser<R> {
 
         // if there is any operators
         // handle them and search for a right operand
-        while self.lexer.next_token == Some(Token::OpExp) {
+        while self.lexer.next_token.has_kind(TokenKind::OpExp) {
             let op_tok = self.lexer.next_token.clone();
             let status = self.lexer.lex();
             self.print(status);
@@ -262,9 +263,9 @@ impl<R: Read> Parser<R> {
             panic!("Not a real token");
         };
 
-        match token {
-            _t if [Token::OpBang, Token::OpAdd, Token::OpSub]
-                .contains(&token) =>
+        match token.kind {
+            _t if [TokenKind::OpBang, TokenKind::OpAdd, TokenKind::OpSub]
+                .contains(&token.kind) =>
             {
                 self.lexer.lex();
                 return AstNode::new(NodeType::UnaryOperation, tok, None);
@@ -284,34 +285,28 @@ impl<R: Read> Parser<R> {
             unreachable!()
         };
 
-        let Some(lexeme) = &self.lexer.next_lexeme.clone() else {
-            dbg!(&self.lexer.lexeme_stream);
-            dbg!(&self.lexer.next_lexeme);
-            unreachable!();
-        };
-
         let mut ast = AstNode::new(NodeType::Error, None, None);
 
         // If the token is an atom, create a new node for it and return it
         // If the token is a LParen, handle it by calling back up to parse_expr (Note: the
         // corresponding RParen is checked for inside the LParen match arm)
         // Otherwise, there is a syntax error
-        match token {
-            Token::IntLiteral
-            | Token::FloatLiteral
-            | Token::Identifier
-            | Token::Boolean => {
+        match token.kind {
+            TokenKind::IntLiteral
+            | TokenKind::FloatLiteral
+            | TokenKind::Identifier
+            | TokenKind::Boolean => {
                 self.print(format!(
                     "Found atomic value: {:?}:{}",
-                    token, lexeme
+                    token, token.literal
                 ));
                 ast = AstNode::new(
                     NodeType::Atom,
                     Some(token.clone()),
-                    Some(lexeme),
+                    Some(&token.literal),
                 );
             }
-            Token::LParen => {
+            TokenKind::LParen => {
                 self.print("BEGIN PAREN");
                 // Pass over the paren
                 let status = self.lexer.lex();
@@ -321,14 +316,14 @@ impl<R: Read> Parser<R> {
                 ast = self.add_sub();
 
                 // check for closing paren
-                if self.lexer.next_token != Some(Token::RParen) {
+                if !self.lexer.next_token.has_kind(TokenKind::RParen) {
                     // malformed expression, syntax error
                     self.syntax_error(self.lexer.next_token.clone().unwrap());
                 }
 
                 self.print("END PAREN");
             }
-            Token::Keyword => match lexeme.as_str() {
+            TokenKind::Keyword => match token.literal.as_str() {
                 "let" => {
                     self.lexer.lex();
                     ast = self.assignment();
@@ -339,7 +334,7 @@ impl<R: Read> Parser<R> {
                 }
                 _ => self.syntax_error(token.clone()),
             },
-            x => self.syntax_error(x.clone()),
+            x => self.syntax_error(token.clone()),
         };
 
         let status = self.lexer.lex();

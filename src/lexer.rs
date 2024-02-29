@@ -1,4 +1,6 @@
 use crate::token::Token;
+use crate::token::TokenKind;
+use crate::token::Point;
 
 use anyhow::Result;
 use std::fs::File;
@@ -20,7 +22,6 @@ pub enum ReadCharStatus {
 pub enum LexStatus {
     Reading {
         token: Token,
-        lexeme: String,
     },
     SyntaxError {
         failed_lexeme: String,
@@ -31,30 +32,12 @@ pub enum LexStatus {
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct Point {
-    line: usize,
-    col: usize,
-}
-
-impl From<(usize, usize)> for Point {
-    fn from(value: (usize, usize)) -> Self {
-        Point {
-            line: value.0,
-            col: value.1,
-        }
-    }
-}
 
 pub struct Lexer<T: Read> {
     pub next_token: Option<Token>,
-    pub next_lexeme: Option<String>,
-    pub next_point: Option<Point>,
     current_word: String,
 
     pub token_stream: Vec<Token>,
-    pub lexeme_stream: Vec<String>,
-    pub point_stream: Vec<Point>,
 
     reader: BufReader<T>,
     buf: [u8; 1],
@@ -67,13 +50,7 @@ impl From<&'static [u8]> for Lexer<&[u8]> {
     fn from(value: &'static [u8]) -> Self {
         Lexer {
             next_token: None,
-            next_lexeme: None,
-            next_point: None,
-
             token_stream: vec![],
-            lexeme_stream: vec![],
-            point_stream: vec![],
-
             current_word: String::new(),
 
             reader: BufReader::with_capacity(1, value),
@@ -89,12 +66,7 @@ impl From<File> for Lexer<File> {
     fn from(file: File) -> Lexer<File> {
         Lexer {
             next_token: None,
-            next_lexeme: None,
-            next_point: None,
-
             token_stream: vec![],
-            lexeme_stream: vec![],
-            point_stream: vec![],
 
             current_word: String::new(),
 
@@ -117,17 +89,9 @@ impl Lexer<File> {
 impl<T: Read> Lexer<T> {
     pub fn new_input(&mut self, value: T) {
         self.next_token = None;
-        self.next_lexeme = None;
-        self.next_point = None;
-
         self.token_stream.clear();
-        self.lexeme_stream.clear();
-        self.point_stream.clear();
-
-
         self.reader = BufReader::with_capacity(1, value);
         self.buf = [0];
-
         self.line = 0;
         self.col = 0;
     }
@@ -184,29 +148,6 @@ impl<T: Read> Lexer<T> {
             self.next_token = None;
         }
 
-        if let Some(next_lexeme) = &self.next_lexeme {
-            self.lexeme_stream.push(next_lexeme.clone());
-            self.next_lexeme = None;
-        }
-
-        if let Some(next_point) = &self.next_point {
-            self.point_stream.push(next_point.clone());
-            self.next_point = None;
-        }
-
-        // if something went horribly wrong, crash the program
-        // the streams should always be the same length
-        if self.token_stream.len() != self.lexeme_stream.len()
-            || self.token_stream.len() != self.point_stream.len()
-        {
-            dbg!(
-                self.token_stream.len(),
-                self.lexeme_stream.len(),
-                self.point_stream.len()
-            );
-            panic!("Token Stream, Lexeme Stream, Point Stream have different lengths");
-        }
-
         // create this variable in this outer scope so we can use it later
         // \0 is the null character
         // because the type `char` cannot be empty
@@ -257,18 +198,17 @@ impl<T: Read> Lexer<T> {
                 if KEYWORDS.contains(&lexeme.as_str()) {
                     match &lexeme {
                         _ if ["true", "false"].contains(&lexeme.as_str()) => {
-                            self.next_token = Some(Token::Boolean)
+                            let token = Token::new(lexeme, TokenKind::Boolean, (self.line, self.col));
+
+                            self.next_token = Some(token)
                         }
-                        _ => self.next_token = Some(Token::Keyword),
+                        _ => self.next_token = Some(Token::new(lexeme, TokenKind::Keyword, (self.line, self.col))),
                     }
                 } else {
-                    self.next_token = Some(Token::Identifier);
+                    self.next_token = Some(Token::new(lexeme, TokenKind::Identifier, (self.line, self.col)));
                 }
-                self.next_lexeme = Some(lexeme);
-                self.next_point = Some(Point::from((self.line, self.col)));
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             } // end identifier
             '0'..='9' => {
@@ -298,15 +238,12 @@ impl<T: Read> Lexer<T> {
                         }
                     }
                 }
-                self.next_lexeme = Some(lexeme.clone());
                 self.next_token = match lexeme {
-                    _ if lexeme.contains('.') => Some(Token::FloatLiteral),
-                    _ => Some(Token::IntLiteral),
+                    _ if lexeme.contains('.') => Some(Token::new(lexeme, TokenKind::FloatLiteral, (self.line, self.col))),
+                    _ => Some(Token::new(lexeme, TokenKind::IntLiteral, (self.line, self.col))),
                 };
-                self.next_point = Some(Point::from((self.line, self.col)));
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             } // end number literal
             '"' | '\'' => {
@@ -339,112 +276,88 @@ impl<T: Read> Lexer<T> {
                         unexpected_char: lexeme.chars().last().unwrap(),
                     };
                 } else {
-                    self.next_token = Some(Token::StringLiteral);
-                    self.next_lexeme = Some(lexeme.clone());
+                    self.next_token = Some(Token::new(lexeme, TokenKind::StringLiteral, (self.line, self.col)));
                     return LexStatus::Reading {
-                        token: Token::StringLiteral,
-                        lexeme,
+                        token: self.next_token.clone().unwrap()
                     };
                 }
             } // end string literal
             '(' => {
-                self.next_token = Some(Token::LParen);
-                self.next_lexeme = Some(String::from(char_read));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::LParen, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             } // end L paren
             ')' => {
-                self.next_token = Some(Token::RParen);
-                self.next_lexeme = Some(String::from(char_read));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::RParen, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             } // end R paren
             '{' => {
-                self.next_token = Some(Token::LBrace);
-                self.next_lexeme = Some(String::from(char_read));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::LBrace, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             } // end L brace
             '}' => {
-                self.next_token = Some(Token::RBrace);
-                self.next_lexeme = Some(String::from(char_read));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::RBrace, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             } // end R brace
             '[' => {
-                self.next_token = Some(Token::LBracket);
-                self.next_lexeme = Some(String::from(char_read));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::LBracket, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             } // end L bracket
             ']' => {
-                self.next_token = Some(Token::RBracket);
-                self.next_lexeme = Some(String::from(char_read));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::RBracket, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             } // end R bracket
             '=' => {
-                self.next_token = Some(Token::OpAssign);
-                self.next_lexeme = Some(String::from(char_read));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::OpAssign, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             }
             '+' => {
-                self.next_token = Some(Token::OpAdd);
-                self.next_lexeme = Some(String::from(char_read));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::OpAdd, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             } // end +
             '-' => {
-                self.next_token = Some(Token::OpSub);
-                self.next_lexeme = Some(String::from(char_read));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::OpSub, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             } // end -
             '*' => {
                 if self.peek() == '*' {
                     self.get_char();
-                    self.next_token = Some(Token::OpExp);
-                    self.next_lexeme = Some(String::from("**"));
-                    self.next_point = Some(Point::from((self.line, self.col)));
+                    let token = Token::new("**", TokenKind::OpExp, (self.line, self.col));
+                    self.next_token = Some(token);
                     return LexStatus::Reading {
                         token: self.next_token.clone().unwrap(),
-                        lexeme: self.next_lexeme.clone().unwrap(),
                     };
                 } else {
-                    self.next_token = Some(Token::OpMul);
-                    self.next_lexeme = Some(String::from(char_read));
-                    self.next_point = Some(Point::from((self.line, self.col)));
+                    let token = Token::new(char_read, TokenKind::OpMul, (self.line, self.col));
+                    self.next_token = Some(token);
                     return LexStatus::Reading {
                         token: self.next_token.clone().unwrap(),
-                        lexeme: self.next_lexeme.clone().unwrap(),
                     };
                 }
             } // end *
@@ -478,69 +391,55 @@ impl<T: Read> Lexer<T> {
                     }
                     return self.lex();
                 } else {
-                    self.next_token = Some(Token::OpDiv);
-                    self.next_lexeme = Some(String::from(char_read));
-                    self.next_point = Some(Point::from((self.line, self.col)));
+                    let token = Token::new(char_read, TokenKind::OpDiv, (self.line, self.col));
+                    self.next_token = Some(token);
                     return LexStatus::Reading {
                         token: self.next_token.clone().unwrap(),
-                        lexeme: self.next_lexeme.clone().unwrap(),
                     };
                 }
             } // end /
             '>' => {
-                self.next_token = Some(Token::OpGt);
-                self.next_lexeme = Some(String::from(char_read));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::OpGt, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             }
             '<' => {
-                self.next_token = Some(Token::OpLt);
-                self.next_lexeme = Some(String::from(char_read));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::OpLt, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             }
             '!' => {
-                self.next_token = Some(Token::OpBang);
-                self.next_lexeme = Some(String::from(char_read));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::OpBang, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             }
             ';' => {
-                self.next_token = Some(Token::Semicolon);
-                self.next_lexeme = Some(String::from(char_read));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::Semicolon, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             }
             ',' => {
-                self.next_token = Some(Token::Comma);
-                self.next_lexeme = Some(String::from(char_read));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::Comma, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             }
             '\n' => {
                 self.col = 0;
                 self.line += 1;
-                self.next_token = Some(Token::Eol);
-                self.next_lexeme = Some(String::from("\n"));
-                self.next_point = Some(Point::from((self.line, self.col)));
+                let token = Token::new(char_read, TokenKind::Eol, (self.line, self.col));
+                self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
-                    lexeme: self.next_lexeme.clone().unwrap(),
                 };
             }
             ' ' => {
@@ -557,8 +456,7 @@ impl<T: Read> Lexer<T> {
     }
 
     fn lex_eof(&mut self) {
-        self.next_token = Some(Token::Eof);
-        self.next_lexeme = Some("\0".to_string());
-        self.next_point = Some(Point::from((self.line, self.col)));
+        let token = Token::new("\0", TokenKind::Eof, (self.line, self.col));
+        self.next_token = Some(token);
     }
 }

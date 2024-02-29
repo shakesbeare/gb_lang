@@ -8,7 +8,7 @@ use crate::{
     scope::Scope,
 };
 
-use crate::token::Token;
+use crate::token::TokenKind;
 
 use std::{fs::File, io::Read};
 
@@ -92,10 +92,10 @@ impl<T: Read> Interpreter<T> {
                     current_scope,
                 );
 
-                match op_tok {
-                    Token::OpAdd => expression,
-                    Token::OpSub => GbType::Integer(0) - expression,
-                    Token::OpBang => !expression,
+                match op_tok.kind {
+                    TokenKind::OpAdd => expression,
+                    TokenKind::OpSub => GbType::Integer(0) - expression,
+                    TokenKind::OpBang => !expression,
                     _ => {
                         self.error("Encountered unary operation, but operator token was not a unary operator");
                         return GbType::Error;
@@ -117,13 +117,13 @@ impl<T: Read> Interpreter<T> {
                     current_scope,
                 );
 
-                match op_tok {
-                    Token::OpAdd => left + right,
-                    Token::OpSub => left - right,
-                    Token::OpMul => left * right,
-                    Token::OpDiv => left / right,
-                    Token::OpExp => gb_pow(right, left), // exponentiation is right associative
-                    Token::OpAssign => {
+                match op_tok.kind {
+                    TokenKind::OpAdd => left + right,
+                    TokenKind::OpSub => left - right,
+                    TokenKind::OpMul => left * right,
+                    TokenKind::OpDiv => left / right,
+                    TokenKind::OpExp => gb_pow(right, left), // exponentiation is right associative
+                    TokenKind::OpAssign => {
                         let rhs = self.evaluate(
                             ast.children.first().unwrap().clone(),
                             current_scope,
@@ -147,8 +147,8 @@ impl<T: Read> Interpreter<T> {
                             }
                         }
                     }
-                    Token::OpGt => GbType::Boolean(left > right),
-                    Token::OpLt => GbType::Boolean(left < right),
+                    TokenKind::OpGt => GbType::Boolean(left > right),
+                    TokenKind::OpLt => GbType::Boolean(left < right),
                     _ => {
                         self.error("Encountered binary operation, but operator token was not a binary operator");
                         return GbType::Error;
@@ -163,8 +163,8 @@ impl<T: Read> Interpreter<T> {
             self.error("Expected a Token,  but received None");
             return GbType::Error;
         };
-        match token {
-            Token::IntLiteral => {
+        match token.kind {
+            TokenKind::IntLiteral => {
                 let Some(lexeme) = ast.lexeme else {
                     self.error(
                         "IntLiteral requires a lexeme but one was not provided",
@@ -181,9 +181,9 @@ impl<T: Read> Interpreter<T> {
 
                 return GbType::Integer(val);
             }
-            Token::FloatLiteral => todo!(),
-            Token::StringLiteral => todo!(),
-            Token::Identifier => {
+            TokenKind::FloatLiteral => todo!(),
+            TokenKind::StringLiteral => todo!(),
+            TokenKind::Identifier => {
                 let Some(lexeme) = ast.lexeme else {
                     self.error(
                         "Identifier requires a lexeme but one was not provided",
@@ -201,7 +201,7 @@ impl<T: Read> Interpreter<T> {
 
                 Clone::clone(&value)
             }
-            Token::Boolean => {
+            TokenKind::Boolean => {
                 let Some(lexeme) = ast.lexeme else {
                     self.error(
                         "Boolean requires a lexeme but one was not provided",
@@ -217,26 +217,26 @@ impl<T: Read> Interpreter<T> {
 
                 return GbType::Boolean(val);
             }
-            Token::Keyword => todo!(),
-            Token::OpAdd => todo!(),
-            Token::OpSub => todo!(),
-            Token::OpMul => todo!(),
-            Token::OpDiv => todo!(),
-            Token::OpExp => todo!(),
-            Token::OpAssign => todo!(),
-            Token::OpGt => todo!(),
-            Token::OpLt => todo!(),
-            Token::OpBang => todo!(),
-            Token::LParen => todo!(),
-            Token::RParen => todo!(),
-            Token::LBrace => todo!(),
-            Token::RBrace => todo!(),
-            Token::LBracket => todo!(),
-            Token::RBracket => todo!(),
-            Token::Comma => todo!(),
-            Token::Semicolon => todo!(),
-            Token::Eol => todo!(),
-            Token::Eof => todo!(),
+            TokenKind::Keyword => todo!(),
+            TokenKind::OpAdd => todo!(),
+            TokenKind::OpSub => todo!(),
+            TokenKind::OpMul => todo!(),
+            TokenKind::OpDiv => todo!(),
+            TokenKind::OpExp => todo!(),
+            TokenKind::OpAssign => todo!(),
+            TokenKind::OpGt => todo!(),
+            TokenKind::OpLt => todo!(),
+            TokenKind::OpBang => todo!(),
+            TokenKind::LParen => todo!(),
+            TokenKind::RParen => todo!(),
+            TokenKind::LBrace => todo!(),
+            TokenKind::RBrace => todo!(),
+            TokenKind::LBracket => todo!(),
+            TokenKind::RBracket => todo!(),
+            TokenKind::Comma => todo!(),
+            TokenKind::Semicolon => todo!(),
+            TokenKind::Eol => todo!(),
+            TokenKind::Eof => todo!(),
         }
     }
 }
