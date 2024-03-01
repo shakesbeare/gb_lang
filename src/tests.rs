@@ -1,17 +1,15 @@
+#![allow(unused_imports)]
+
 #[cfg(test)]
 use std::collections::HashMap;
 
-#[allow(unused_imports)]
-use crate::ast::AstNode;
-#[allow(unused_imports)]
-use crate::ast::NodeType;
-#[allow(unused_imports)]
+use crate::ast::Expression;
+use crate::ast::LetStatement;
+use crate::ast::Node;
+use crate::ast::Statement;
 use crate::lexer::{LexStatus, Lexer};
-#[allow(unused_imports)]
 use crate::parser::Parser;
-#[allow(unused_imports)]
 use crate::token::Token;
-#[allow(unused_imports)]
 use crate::token::TokenKind;
 
 // **************************************
@@ -608,13 +606,13 @@ fn keywords() {
     let mut map: HashMap<&str, TokenKind> = HashMap::new();
     map.insert("true", TokenKind::Boolean);
     map.insert("false", TokenKind::Boolean);
-    map.insert("for", TokenKind::Keyword);
-    map.insert("while", TokenKind::Keyword);
-    map.insert("let", TokenKind::Keyword);
-    map.insert("if", TokenKind::Keyword);
-    map.insert("else", TokenKind::Keyword);
-    map.insert("use", TokenKind::Keyword);
-    map.insert("restrict", TokenKind::Keyword);
+    map.insert("for", TokenKind::For);
+    map.insert("while", TokenKind::While);
+    map.insert("let", TokenKind::Let);
+    map.insert("if", TokenKind::If);
+    map.insert("else", TokenKind::Else);
+    // map.insert("use", TokenKind::Keyword);
+    // map.insert("restrict", TokenKind::Keyword);
 
     for (k, v) in map.iter() {
         let mut lexer = Lexer::from(k.as_bytes());
@@ -644,108 +642,162 @@ fn keywords() {
 // **************************************
 
 #[test]
-fn atomic_value() {
-    let input = "1234".as_bytes();
-    let lexer = Lexer::from(input);
-    let mut parser = Parser::new(lexer, false);
+fn let_statements() {
+    let input = r#"
+let x = 5;
+let y = 10;
+let foobar = 838383;
+"#;
 
+    let mut parser = Parser::new(Lexer::from(input.as_bytes()), false);
     let ast = parser.parse();
+    parser.check_parser_errors();
 
-    assert_eq!(
-        ast.into_inner().first().unwrap().to_owned(),
-        AstNode::new(
-            NodeType::Atom,
-            Some(Token::new("1234", TokenKind::IntLiteral, (0, 0))),
-            Some("1234")
-        )
-    );
+    let children = ast.statements;
+    assert_eq!(children.len(), 3);
+
+    let expected_identifiers = ["x", "y", "foobar"];
+
+    for (i, child) in children.iter().enumerate() {
+        let Node::Statement(Statement::LetStatement(stmt)) = child else {
+            panic!("Expected LetStatement, got {:?}", child);
+        };
+
+        assert_eq!(stmt.token.kind, TokenKind::Let);
+        assert_eq!(stmt.token.literal, "let");
+        assert_eq!(stmt.name.value(), expected_identifiers[i]);
+    }
 }
 
 #[test]
-fn binary_op() {
-    let input = "1234 + 1234".as_bytes();
-    let lexer = Lexer::from(input);
-    let mut parser = Parser::new(lexer, false);
-
+fn return_statements() {
+    let input = r#"
+return 5;
+return 10;
+return 993322;
+"#;
+    let mut parser = Parser::new(Lexer::from(input.as_bytes()), false);
     let ast = parser.parse();
+    parser.check_parser_errors();
 
-    let mut expected = AstNode::new(
-        NodeType::BinaryOperation,
-        Some(Token::new("+", TokenKind::OpAdd, (0, 0))),
-        None,
-    );
-    expected.children.append(&mut vec![
-        AstNode::new(
-            NodeType::Atom,
-            Some(Token::new("1234", TokenKind::IntLiteral, (0, 0))),
-            Some("1234"),
-        ),
-        AstNode::new(
-            NodeType::Atom,
-            Some(Token::new("1234", TokenKind::IntLiteral, (0, 0))),
-            Some("1234"),
-        ),
-    ]);
+    let children = ast.statements;
+    assert_eq!(children.len(), 3);
 
-    assert_eq!(ast.into_inner().first().unwrap(), &expected);
+    for child in children {
+        let Node::Statement(Statement::ReturnStatement(stmt)) = child else {
+            panic!("Expected ReturnStatement, got {:?}", child);
+        };
+
+        assert_eq!(stmt.token.kind, TokenKind::Return);
+        assert_eq!(stmt.token.literal, "return");
+    }
 }
 
 #[test]
-fn unary_op() {
-    let input = "-1234 + 1234".as_bytes();
-    let lexer = Lexer::from(input);
-    let mut parser = Parser::new(lexer, false);
-
+fn identifier_expression() {
+    let input = "foobar;".as_bytes();
+    let mut parser = Parser::new(Lexer::from(input), false);
     let ast = parser.parse();
-    let mut expected = AstNode::new(
-        NodeType::BinaryOperation,
-        Some(Token::new("+", TokenKind::OpAdd, (0, 0))),
-        None,
-    );
-    expected.children.push(AstNode::new(
-        NodeType::UnaryOperation,
-        Some(Token::new("-", TokenKind::OpSub, (0, 0))),
-        None,
-    ));
-    expected.children.push(AstNode::new(
-        NodeType::Atom,
-        Some(Token::new("1234", TokenKind::IntLiteral, (0, 0))),
-        Some("1234"),
-    ));
+    parser.check_parser_errors();
 
-    expected
-        .children
-        .first_mut()
-        .unwrap()
-        .children
-        .push(AstNode::new(
-            NodeType::Atom,
-            Some(Token::new("1234", TokenKind::IntLiteral, (0, 0))),
-            Some("1234"),
-        ));
+    let children = ast.statements;
+    assert_eq!(children.len(), 1);
 
-    assert_eq!(ast.into_inner().first().unwrap(), &expected);
+    let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0] else {
+        panic!("Expected ExpressionStatement, got {:?}", children[0]);
+    };
+    let Expression::Identifier(ref ident) = *stmt.expression else {
+        panic!("Expected Identifier, got {:?}", stmt.expression);
+    };
+    assert_eq!(ident.token.kind, TokenKind::Identifier);
+    assert_eq!(ident.value(), "foobar");
+    assert_eq!(ident.token.literal, "foobar");
 }
 
 #[test]
-fn double_unary() {
-    let input = "!!true".as_bytes();
-    let lexer = Lexer::from(input);
-    let mut parser = Parser::new(lexer, false);
-
+fn integer_literal_expression() {
+    let input = "5;".as_bytes();
+    let mut parser = Parser::new(Lexer::from(input), false);
     let ast = parser.parse();
+    parser.check_parser_errors();
 
-    let mut expected =
-        AstNode::new(NodeType::UnaryOperation, Some(Token::new("!", TokenKind::OpBang, (0, 0))), None);
-    let mut inner =
-        AstNode::new(NodeType::UnaryOperation, Some(Token::new("!", TokenKind::OpBang, (0, 0))), None);
+    let children = ast.statements;
+    assert_eq!(children.len(), 1);
 
-    inner.children.push(AstNode::new(
-        NodeType::Atom,
-        Some(Token::new("true", TokenKind::Boolean, (0, 0))),
-        Some("true"),
-    ));
-    expected.children.push(inner);
+    let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0] else {
+        panic!("Expected ExpressionStatement, got {:?}", children[0]);
+    };
+    let Expression::IntegerLiteral(ref lit) = *stmt.expression else {
+        panic!("Expected IntegerLiteral, got {:?}", stmt.expression);
+    };
+    assert_eq!(lit.token.kind, TokenKind::IntLiteral);
+    assert_eq!(lit.value, 5);
+    assert_eq!(lit.token.literal, "5");
+}
 
-    assert_eq!(ast.into_inner().first().unwrap(), &expected);
+#[test]
+fn prefix_expression() {
+    let input: Vec<(&str, &str, i64)> = vec![("!5;", "!", 5), ("-15;", "-", 15)];
+
+
+    for (inp, op, int) in input {
+        let mut parser = Parser::new(Lexer::from(inp.as_bytes()), false);
+        let ast = parser.parse();
+        let children = ast.statements;
+        parser.check_parser_errors();
+        assert_eq!(children.len(), 1);
+        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0] else {
+            panic!("Expected ExpressionStatement, got {:?}", children[0]);
+        };
+        let Expression::PrefixExpression(ref prefix) = *stmt.expression else {
+            panic!("Expected PrefixExpression, got {:?}", stmt.expression);
+        };
+        assert_eq!(prefix.operator, op);
+        let Expression::IntegerLiteral(ref right) = *prefix.right else {
+            panic!("Expected IntegerLiteral, got {:?}", prefix.right);
+        };
+        assert_eq!(right.value, int);
+        assert_eq!(right.token.literal, int.to_string());
+    }
+}
+
+#[test]
+fn infix_expression() {
+    let input: Vec<(&str, i64, &str, i64)> = vec![
+        ("5 + 5;", 5, "+", 5),
+        ("5 - 5;", 5, "-", 5),
+        ("5 * 5;", 5, "*", 5),
+        ("5 / 5;", 5, "/", 5),
+        ("5 > 5;", 5, ">", 5),
+        ("5 < 5;", 5, "<", 5),
+        ("5 == 5;", 5, "==", 5),
+        ("5 != 5;", 5, "!=", 5),
+    ];
+
+    for (inp, left, op, right) in input {
+        let mut parser = Parser::new(Lexer::from(inp.as_bytes()), false);
+        let ast = parser.parse();
+        let children = ast.statements;
+        parser.check_parser_errors();
+        assert_eq!(children.len(), 1);
+        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0] else {
+            panic!("Expected ExpressionStatement, got {:?}", children[0]);
+        };
+
+        let Expression::InfixExpression(ref infix) = *stmt.expression else {
+            panic!("Expected InfixExpression, got {:?}", stmt.expression);
+        };
+
+        let Expression::IntegerLiteral(ref a_left) = *infix.left else {
+            panic!("Expected IntegerLiteral, got {:?}", infix.left);
+        };
+        let Expression::IntegerLiteral(ref a_right) = *infix.right else {
+            panic!("Expected IntegerLiteral, got {:?}", infix.right);
+        };
+        assert_eq!(infix.operator, op);
+        assert_eq!(a_left.value, left);
+        assert_eq!(a_right.value, right);
+    }
+
+
 }

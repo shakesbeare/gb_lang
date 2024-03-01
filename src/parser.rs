@@ -1,20 +1,90 @@
-use std::io::Read;
-use crate::token::HasKind;
-
 use crate::{
-    ast::{AstNode, NodeType},
-    lexer::Lexer,
-    token::{Token, TokenKind},
+    ast::*,
+    lexer::LexStatus,
+    token::{HasKind, TokenKind},
 };
+use std::rc::Rc;
+use std::{collections::HashMap, io::Read};
 
-pub struct Parser<T: Read> {
-    pub lexer: Lexer<T>,
+use crate::{lexer::Lexer, token::Token};
+
+type PrefixParseFn<R> = fn(&mut Parser<R>) -> Expression;
+type InfixParseFn<R> = fn(&mut Parser<R>, Expression) -> Expression;
+
+#[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone, Copy)]
+enum Precedence {
+    Lowest,
+    Equals,
+    LessGreater,
+    Sum,
+    Product,
+    Prefix,
+    Call,
+}
+
+pub struct Parser<R: Read> {
+    /// If true, the parser will print debug information
     pub verbose: bool,
+    lexer: Lexer<R>,
+    cur_token: Rc<Token>,
+    peek_token: Rc<Token>,
+    errors: Vec<String>,
+
+    prefix_parse_fns: HashMap<TokenKind, PrefixParseFn<R>>,
+    infix_parse_fns: HashMap<TokenKind, InfixParseFn<R>>,
+
+    precedencies: HashMap<TokenKind, Precedence>,
 }
 
 impl<R: Read> Parser<R> {
-    pub fn new(lexer: Lexer<R>, verbose: bool) -> Self {
-        Self { lexer, verbose }
+    pub fn new(mut lexer: Lexer<R>, verbose: bool) -> Self {
+        let LexStatus::Reading { token } = lexer.lex() else {
+            panic!("Failed to read first token");
+        };
+        let first = token;
+
+        let LexStatus::Reading { token } = lexer.lex() else {
+            panic!("Failed to read second token");
+        };
+        let second = token;
+        let mut p = Self {
+            lexer,
+            verbose,
+            cur_token: Rc::new(first),
+            peek_token: Rc::new(second),
+            errors: Vec::new(),
+            prefix_parse_fns: HashMap::new(),
+            infix_parse_fns: HashMap::new(),
+            precedencies: HashMap::new(),
+        };
+
+        p.precedencies.insert(TokenKind::OpEq, Precedence::Equals);
+        p.precedencies
+            .insert(TokenKind::OpNotEq, Precedence::Equals);
+        p.precedencies
+            .insert(TokenKind::OpLt, Precedence::LessGreater);
+        p.precedencies
+            .insert(TokenKind::OpGt, Precedence::LessGreater);
+        p.precedencies.insert(TokenKind::OpAdd, Precedence::Sum);
+        p.precedencies.insert(TokenKind::OpSub, Precedence::Sum);
+        p.precedencies.insert(TokenKind::OpDiv, Precedence::Product);
+        p.precedencies.insert(TokenKind::OpMul, Precedence::Product);
+
+        p.register_prefix(TokenKind::Identifier, Parser::parse_identifier);
+        p.register_prefix(TokenKind::IntLiteral, Parser::parse_integer_literal);
+        p.register_prefix(TokenKind::OpBang, Parser::parse_prefix_expression);
+        p.register_prefix(TokenKind::OpSub, Parser::parse_prefix_expression);
+
+        p.register_infix(TokenKind::OpAdd, Parser::parse_infix_expression);
+        p.register_infix(TokenKind::OpSub, Parser::parse_infix_expression);
+        p.register_infix(TokenKind::OpDiv, Parser::parse_infix_expression);
+        p.register_infix(TokenKind::OpMul, Parser::parse_infix_expression);
+        p.register_infix(TokenKind::OpEq, Parser::parse_infix_expression);
+        p.register_infix(TokenKind::OpNotEq, Parser::parse_infix_expression);
+        p.register_infix(TokenKind::OpLt, Parser::parse_infix_expression);
+        p.register_infix(TokenKind::OpGt, Parser::parse_infix_expression);
+
+        return p;
     }
 
     // Useful for debugging, set verbose to true
@@ -24,330 +94,221 @@ impl<R: Read> Parser<R> {
         }
     }
 
-    /// Parses the entire program and returns the abstract syntax tree formed of AstNode instances.
-    /// This also saturates the fields of the internal lexer.
-    pub fn parse(&mut self) -> AstNode {
-        self.print("start program");
-
-        // Grab the first token from the lexer and build the expression list
-        // Must grab the token before parsing begins so that self.lexer.next_token is
-        // not none
-        let status = self.lexer.lex();
-        self.print(status);
-        let ast = self.expression_list();
-
-        if !self.lexer.next_token.has_kind(TokenKind::Eof) {
-            self.syntax_error(self.lexer.next_token.clone().unwrap());
-        }
-
-        self.print("end program");
-        return ast;
-    }
-
-    fn expression_list(&mut self) -> AstNode {
-        self.print("start expr_list");
-
-        // Create the new node
-        let mut expr_list = AstNode::new(NodeType::ExpressionList, None, None);
-
-        // While there are expressions left to parse,
-        // Parse them
-        // We have to make sure that we reach the end of input
-        // By passing over any extra EOL tokens and any potential None tokens
-        // Before we reach the EOF token.
-        while !self.lexer.next_token.has_kind(TokenKind::Eof)
-            && !self.lexer.next_token.has_kind(TokenKind::RBrace)
-        {
-            expr_list.children.push(self.add_sub());
-
-            if !self.lexer.next_token.has_kind(TokenKind::Semicolon) {
-                self.syntax_error(self.lexer.next_token.clone().unwrap());
-                break;
-            } else {
-                let status = self.lexer.lex();
-                self.print(status);
-            }
-
-            while self.lexer.next_token.has_kind(TokenKind::Eol)
-                || self.lexer.next_token.is_none()
-            {
-                let status = self.lexer.lex();
-                self.print(status);
+    fn next_token(&mut self) {
+        if let LexStatus::Reading { token } = self.lexer.lex() {
+            self.cur_token = self.peek_token.clone();
+            self.peek_token = token.into();
+        } else if let LexStatus::Eof = self.lexer.lex() {
+            self.cur_token = self.peek_token.clone();
+            if !self.peek_token.has_kind(TokenKind::Eof) {
+                self.peek_token = Rc::new(Token::eof());
             }
         }
-        self.print("end expr_list");
-        return expr_list;
     }
 
-    fn assignment(&mut self) -> AstNode {
-        self.print("start assignment");
-
-        // get left identifier
-        let left = self.atom();
-
-        // get = sign
-        if !self.lexer.next_token.has_kind(TokenKind::OpAssign) {
-            self.syntax_error(self.lexer.next_token.clone().unwrap());
+    fn peek_precedence(&mut self) -> Precedence {
+        if let Some(p) = self.precedencies.get(&self.peek_token.kind) {
+            return *p;
         } else {
-            let status = self.lexer.lex();
-            self.print(status);
-        };
-
-        // parse rhs
-        let right = self.add_sub();
-
-        let mut ast = AstNode::new(NodeType::Assignment, None, None);
-        ast.children.append(&mut vec![right, left]);
-
-        return ast;
-    }
-
-    fn param_list(&mut self) -> AstNode {
-        self.print("start param list");
-        let mut params = vec![];
-        while !self.lexer.next_token.has_kind(TokenKind::RParen) {
-            params.push(self.atom());
-
-            if self.lexer.next_token.has_kind(TokenKind::RParen) {
-                break;
-            } else if self.lexer.next_token.has_kind(TokenKind::Comma) {
-                self.lexer.lex();
-            }
+            return Precedence::Lowest;
         }
-
-        let mut ast = AstNode::new(NodeType::ParameterList, None, None);
-        ast.children.append(&mut params);
-
-        self.print("end param list");
-        return ast;
     }
 
-    fn func_definition(&mut self) -> AstNode {
-        self.print("start function definition");
-
-        // parse the parameter list
-        if !self.lexer.next_token.has_kind(TokenKind::LParen) {
-            self.syntax_error(self.lexer.next_token.clone().unwrap());
-            return AstNode::new(NodeType::Error, None, None);
+    fn cur_precedence(&mut self) -> Precedence {
+        if let Some(p) = self.precedencies.get(&self.cur_token.kind) {
+            return *p;
         } else {
-            let status = self.lexer.lex();
-            self.print(status);
-        }
-
-        // parse the parameter list
-        let param_list = self.param_list();
-
-        // pass over the r paren
-        while !self.lexer.next_token.has_kind(TokenKind::RParen) {
-            self.lexer.lex();
-
-            if self.lexer.next_token.has_kind(TokenKind::Eof) {
-                self.syntax_error(self.lexer.next_token.clone().unwrap());
-                return AstNode::new(NodeType::Error, None, None);
-            }
-        }
-
-        self.lexer.lex();
-
-        // pass over the l brace
-        // we can guarantee this is here by the calling context
-        self.lexer.lex();
-
-        // parse the expression list
-        let exp_list = self.expression_list();
-
-        // pass over the r brace
-        while !self.lexer.next_token.has_kind(TokenKind::RBrace) {
-            self.lexer.lex();
-
-            if self.lexer.next_token.has_kind(TokenKind::Eof) {
-                self.syntax_error(self.lexer.next_token.clone().unwrap());
-                return AstNode::new(NodeType::Error, None, None);
-            }
-        }
-
-        let mut ast = AstNode::new(NodeType::FunctionDefinition, None, None);
-        ast.children.append(&mut vec![exp_list, param_list]);
-
-        self.print("end function definition");
-        return ast;
-    }
-
-    fn add_sub(&mut self) -> AstNode {
-        self.print("start add_sub");
-        let mut left_child = self.mul_div();
-
-        // if there is any operators
-        // handle them and search for a right operand
-        while self.lexer.next_token.has_kind(TokenKind::OpAdd)
-            || self.lexer.next_token.has_kind(TokenKind::OpSub)
-        {
-            let op_tok = self.lexer.next_token.clone();
-            let status = self.lexer.lex();
-            self.print(status);
-            let right_child = self.mul_div();
-            let mut bin_op =
-                AstNode::new(NodeType::BinaryOperation, op_tok, None);
-            bin_op.children.append(&mut vec![left_child, right_child]);
-
-            left_child = bin_op;
-        }
-
-        self.print("end add_sub");
-        return left_child;
-    }
-
-    fn mul_div(&mut self) -> AstNode {
-        self.print("start mul_div");
-        let mut left_child = self.exponentiation();
-
-        // if there is any operators
-        // handle them and search for a right operand
-        while self.lexer.next_token.has_kind(TokenKind::OpMul)
-            || self.lexer.next_token.has_kind(TokenKind::OpDiv)
-        {
-            let op_tok = self.lexer.next_token.clone();
-            let status = self.lexer.lex();
-            self.print(status);
-            let right_child = self.exponentiation();
-            let mut bin_op =
-                AstNode::new(NodeType::BinaryOperation, op_tok, None);
-            bin_op.children.append(&mut vec![left_child, right_child]);
-
-            left_child = bin_op;
-        }
-
-        self.print("end mul_div");
-        return left_child;
-    }
-
-    fn exponentiation(&mut self) -> AstNode {
-        self.print("start exponentiation");
-        let mut left_child = self.unary_op();
-
-        // if there is any operators
-        // handle them and search for a right operand
-        while self.lexer.next_token.has_kind(TokenKind::OpExp) {
-            let op_tok = self.lexer.next_token.clone();
-            let status = self.lexer.lex();
-            self.print(status);
-            let right_child = self.unary_op();
-            let mut bin_op =
-                AstNode::new(NodeType::BinaryOperation, op_tok, None);
-            // exponentiation is right associative
-            bin_op.children.append(&mut vec![right_child, left_child]);
-
-            left_child = bin_op;
-        }
-
-        self.print("end exponentiation");
-        return left_child;
-    }
-
-    fn unary_op(&mut self) -> AstNode {
-        self.print("start unary operation");
-        let mut node = self.get_unary_operator();
-
-        if node.node_type == NodeType::UnaryOperation {
-            let child = self.unary_op();
-            node.children.push(child);
-        }
-
-        return node;
-    }
-
-    fn get_unary_operator(&mut self) -> AstNode {
-        let tok = self.lexer.next_token.clone();
-
-        let Some(token) = tok.clone() else {
-            panic!("Not a real token");
-        };
-
-        match token.kind {
-            _t if [TokenKind::OpBang, TokenKind::OpAdd, TokenKind::OpSub]
-                .contains(&token.kind) =>
-            {
-                self.lexer.lex();
-                return AstNode::new(NodeType::UnaryOperation, tok, None);
-            }
-            _ => {
-                return self.atom();
-            }
+            return Precedence::Lowest;
         }
     }
 
-    fn atom(&mut self) -> AstNode {
-        self.print("start atom");
-
-        let Some(token) = &self.lexer.next_token.clone() else {
-            dbg!(&self.lexer.token_stream);
-            dbg!(&self.lexer.next_token);
-            unreachable!()
-        };
-
-        let mut ast = AstNode::new(NodeType::Error, None, None);
-
-        // If the token is an atom, create a new node for it and return it
-        // If the token is a LParen, handle it by calling back up to parse_expr (Note: the
-        // corresponding RParen is checked for inside the LParen match arm)
-        // Otherwise, there is a syntax error
-        match token.kind {
-            TokenKind::IntLiteral
-            | TokenKind::FloatLiteral
-            | TokenKind::Identifier
-            | TokenKind::Boolean => {
-                self.print(format!(
-                    "Found atomic value: {:?}:{}",
-                    token, token.literal
-                ));
-                ast = AstNode::new(
-                    NodeType::Atom,
-                    Some(token.clone()),
-                    Some(&token.literal),
-                );
-            }
-            TokenKind::LParen => {
-                self.print("BEGIN PAREN");
-                // Pass over the paren
-                let status = self.lexer.lex();
-                self.print(status);
-
-                // Parse the inner expressions
-                ast = self.add_sub();
-
-                // check for closing paren
-                if !self.lexer.next_token.has_kind(TokenKind::RParen) {
-                    // malformed expression, syntax error
-                    self.syntax_error(self.lexer.next_token.clone().unwrap());
-                }
-
-                self.print("END PAREN");
-            }
-            TokenKind::Keyword => match token.literal.as_str() {
-                "let" => {
-                    self.lexer.lex();
-                    ast = self.assignment();
-                }
-                "fn" => {
-                    self.lexer.lex();
-                    ast = self.func_definition();
-                }
-                _ => self.syntax_error(token.clone()),
-            },
-            x => self.syntax_error(token.clone()),
-        };
-
-        let status = self.lexer.lex();
-        self.print(status);
-
-        self.print("end atom");
-        return ast;
+    /// Advances to the next token if the peek token has the expected kind
+    fn expect_peek(&mut self, kind: TokenKind) -> bool {
+        if self.peek_token.has_kind(kind) {
+            self.next_token();
+            return true;
+        } else {
+            self.syntax_error(self.peek_token.as_ref().clone());
+            return false;
+        }
     }
 
-    fn syntax_error(&self, token: Token) {
-        println!(
+    fn syntax_error(&mut self, token: Token) {
+        let e_string = format!(
             "Encountered a syntax error at {}, {}: Unexpected {:?}",
             self.lexer.line, self.lexer.col, token
         );
+        eprintln!("{}", e_string);
+        self.errors.push(e_string);
+    }
+
+    fn no_prefix_parse_function_error(&mut self, kind: TokenKind) {
+        let e_string = format!("No prefix parse function for {:?} found", kind);
+        eprintln!("{}", e_string);
+        self.errors.push(e_string);
+    }
+
+    pub fn check_parser_errors(&self) {
+        if self.errors.is_empty() {
+            return;
+        }
+
+        let errs = self.errors.join("\n");
+        panic!("Parser encountered errors:\n{}", errs);
+    }
+
+    fn register_prefix(&mut self, kind: TokenKind, func: PrefixParseFn<R>) {
+        self.prefix_parse_fns.insert(kind, func);
+    }
+
+    fn register_infix(&mut self, kind: TokenKind, func: InfixParseFn<R>) {
+        self.infix_parse_fns.insert(kind, func);
+    }
+
+    /// Parses the entire program and returns the abstract syntax tree
+    /// This also saturates the fields of the internal lexer.
+    pub fn parse(&mut self) -> Program {
+        self.print("start program");
+        let mut program = Program {
+            statements: Vec::new(),
+        };
+
+        while !self.cur_token.has_kind(TokenKind::Eof) {
+            if let Some(stmt) = self.parse_statement() {
+                program.statements.push(Node::Statement(stmt));
+            }
+
+            self.next_token();
+        }
+
+        self.print("end program");
+        return program;
+    }
+
+    fn parse_statement(&mut self) -> Option<Statement> {
+        match self.cur_token.kind {
+            TokenKind::Let => self.parse_let_statement(),
+            TokenKind::Return => self.parse_return_statement(),
+            TokenKind::Eol => None,
+            _ => self.parse_expression_statement(),
+        }
+    }
+
+    fn parse_let_statement(&mut self) -> Option<Statement> {
+        let token = self.cur_token.as_ref().clone();
+        self.expect_peek(TokenKind::Identifier);
+        let name = Identifier {
+            token: self.cur_token.as_ref().clone(),
+        };
+        self.expect_peek(TokenKind::OpAssign);
+
+        // temporary
+        while !self.cur_token.has_kind(TokenKind::Semicolon) {
+            self.next_token();
+        } //
+
+        Some(Statement::LetStatement(LetStatement {
+            token,
+            name,
+            value: Rc::new(Expression::Null),
+        }))
+    }
+
+    fn parse_return_statement(&mut self) -> Option<Statement> {
+        let token = self.cur_token.as_ref().clone();
+        self.next_token();
+
+        // temp
+        while !self.cur_token.has_kind(TokenKind::Semicolon) {
+            self.next_token();
+        } //
+          //
+        Some(Statement::ReturnStatement(ReturnStatement {
+            token,
+            return_value: Rc::new(Expression::Null),
+        }))
+    }
+
+    fn parse_expression_statement(&mut self) -> Option<Statement> {
+        let token = self.cur_token.as_ref().clone();
+        let expression = self.parse_expression(Precedence::Lowest);
+        if self.peek_token.has_kind(TokenKind::Semicolon) {
+            self.next_token();
+        }
+        Some(Statement::ExpressionStatement(ExpressionStatement {
+            token,
+            expression: Rc::new(expression?),
+        }))
+    }
+
+    fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
+        let Some(prefix) = self.prefix_parse_fns.get(&self.cur_token.kind) else {
+            self.no_prefix_parse_function_error(self.cur_token.kind);
+            return None;
+        };
+        let mut left_exp = prefix(self);
+
+        while !self.peek_token.has_kind(TokenKind::Semicolon)
+            && precedence < self.peek_precedence()
+        {
+            let p_self = unsafe {
+                // SAFETY:
+                //     - `infix` is not used until after `p_self` is done being used
+                // Reasoning:
+                //     - Using unsafe here avoids matching the pattern below twice
+                &mut *(self as *mut Parser<R>)
+            };
+            let Some(infix) = self.infix_parse_fns.get(&self.peek_token.kind) else {
+                return Some(left_exp);
+            };
+            p_self.next_token();
+
+            left_exp = infix(self, left_exp);
+        }
+
+        return Some(left_exp);
+    }
+
+    fn parse_identifier(&mut self) -> Expression {
+        Expression::Identifier(Identifier {
+            token: self.cur_token.as_ref().clone(),
+        })
+    }
+
+    fn parse_integer_literal(&mut self) -> Expression {
+        Expression::IntegerLiteral(IntegerLiteral {
+            token: self.cur_token.as_ref().clone(),
+            value: self.cur_token.literal.parse().unwrap(),
+        })
+    }
+
+    fn parse_prefix_expression(&mut self) -> Expression {
+        let token = self.cur_token.as_ref().clone();
+        let op = token.literal.clone();
+        self.next_token();
+        let Some(right) = self.parse_expression(Precedence::Prefix) else {
+            return Expression::Null;
+        };
+        Expression::PrefixExpression(PrefixExpression {
+            token,
+            operator: op,
+            right: Rc::new(right),
+        })
+    }
+
+    fn parse_infix_expression(&mut self, left: Expression) -> Expression {
+        let token = self.cur_token.as_ref().clone();
+        let op = token.literal.clone();
+        let precedence = self.cur_precedence();
+        self.next_token();
+        let Some(right) = self.parse_expression(precedence) else {
+            return Expression::Null;
+        };
+        Expression::InfixExpression(InfixExpression {
+            token,
+            operator: op,
+            left: Rc::new(left),
+            right: Rc::new(right),
+        })
     }
 }

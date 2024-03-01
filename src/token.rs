@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 #[derive(Clone, Debug)]
 pub struct Token {
     pub kind: TokenKind,
@@ -21,7 +23,11 @@ impl std::hash::Hash for Token {
 impl Eq for Token {}
 
 impl Token {
-    pub fn new<S: Into<String>, P: Into<Point>>(literal: S, kind: TokenKind, location: P) -> Self {
+    pub fn new<S: Into<String>, P: Into<Point>>(
+        literal: S,
+        kind: TokenKind,
+        location: P,
+    ) -> Self {
         Self {
             literal: literal.into(),
             kind,
@@ -41,24 +47,36 @@ impl Token {
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum TokenKind {
+    // Literals
     IntLiteral,
     FloatLiteral,
     StringLiteral,
     Identifier,
     Boolean,
 
-    Keyword,
+    // Keywords
+    If,
+    For,
+    While,
+    Let,
+    Else,
+    Fn,
+    Return,
 
+    // Operators
     OpAdd,
     OpSub,
     OpMul,
     OpDiv,
     OpExp,
     OpAssign,
+    OpEq,
+    OpNotEq,
     OpGt,
     OpLt,
     OpBang,
 
+    // Delimiters
     LParen,
     RParen,
     LBrace,
@@ -66,10 +84,35 @@ pub enum TokenKind {
     LBracket,
     RBracket,
 
+    // Punctuation
     Comma,
     Semicolon,
     Eol,
     Eof,
+}
+
+impl From<&String> for TokenKind {
+    fn from(val: &String) -> Self {
+        if val == "let" {
+            return TokenKind::Let;
+        } else if val == "if" {
+            return TokenKind::If;
+        } else if val == "for" {
+            return TokenKind::For;
+        } else if val == "while" {
+            return TokenKind::While;
+        } else if val == "else" {
+            return TokenKind::Else;
+        } else if val == "fn" {
+            return TokenKind::Fn;
+        } else if val == "return" {
+            return TokenKind::Return;
+        } else if val == "!" {
+            return TokenKind::OpBang;
+        } else {
+            return TokenKind::Identifier;
+        }
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
@@ -91,7 +134,6 @@ pub trait HasKind {
     fn has_kind(&self, kind: TokenKind) -> bool;
 }
 
-
 impl HasKind for Option<Token> {
     fn has_kind(&self, kind: TokenKind) -> bool {
         match self {
@@ -101,4 +143,8 @@ impl HasKind for Option<Token> {
     }
 }
 
-
+impl HasKind for Rc<Token> {
+    fn has_kind(&self, kind: TokenKind) -> bool {
+        self.kind == kind
+    }
+}

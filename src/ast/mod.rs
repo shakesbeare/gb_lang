@@ -1,63 +1,79 @@
+use std::rc::Rc;
 use crate::token::Token;
 
-trait NodeType: std::fmt::Display {}
-
-pub enum Node {
-    Program(Program),
-}
-
-impl std::fmt::Display for Node {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let node = self.into_inner().as_ref();
-        write!(f, "{}", node)
-    }
-}
-
-impl Node {
-    fn into_inner(self) -> Box<dyn NodeType> {
-        match self {
-            Node::Program(v) => Box::new(v),
-        }
-    }
-}
-
-enum Statement {
-
-}
-
-impl NodeType for Statement {}
-
-impl std::fmt::Display for Statement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", "statement")
-    }
-}
-
-enum Expression {
-
-}
-
-impl NodeType for Expression {}
-
-impl std::fmt::Display for Expression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", "expression")
-    }
-}
-
 pub struct Program {
-    statements: Vec<Statement>,
+    pub statements: Vec<Node>,
 }
 
-impl NodeType for Program {}
+#[derive(Debug)]
+pub enum Node {
+    Statement(Statement),
+    Expression(Expression),
+}
 
-impl std::fmt::Display for Program {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut val = "".to_string();
-        for item in self.statements.iter() {
-            val.push_str(&item.to_string());
-            val.push_str("\n");
-        }
-        write!(f, "{}", val)
+#[derive(Debug)]
+pub enum Statement {
+    LetStatement(LetStatement),
+    ReturnStatement(ReturnStatement),
+    ExpressionStatement(ExpressionStatement),
+}
+
+#[derive(Debug)]
+pub enum Expression {
+    Null,
+    Identifier(Identifier),
+    IntegerLiteral(IntegerLiteral),
+    PrefixExpression(PrefixExpression),
+    InfixExpression(InfixExpression),
+}
+
+#[derive(Debug)]
+pub struct LetStatement {
+    pub token: Token,
+    pub name: Identifier,
+    pub value: Rc<Expression>,
+}
+
+#[derive(Debug)]
+pub struct ReturnStatement {
+    pub token: Token,
+    pub return_value: Rc<Expression>,
+}
+
+#[derive(Debug)]
+pub struct ExpressionStatement {
+    pub token: Token,
+    pub expression: Rc<Expression>,
+}
+
+#[derive(Debug)]
+pub struct Identifier {
+    pub token: Token,
+}
+
+impl Identifier {
+    pub fn value(&self) -> &str {
+        self.token.literal.as_str()
     }
+}
+
+#[derive(Debug)]
+pub struct IntegerLiteral {
+    pub token: Token,
+    pub value: i64,
+}
+
+#[derive(Debug)]
+pub struct PrefixExpression {
+    pub token: Token,
+    pub operator: String,
+    pub right: Rc<Expression>,
+}
+
+#[derive(Debug)]
+pub struct InfixExpression {
+    pub token: Token,
+    pub left: Rc<Expression>,
+    pub operator: String,
+    pub right: Rc<Expression>,
 }

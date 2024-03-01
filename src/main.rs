@@ -1,12 +1,3 @@
-mod ast;
-mod lexer;
-mod parser;
-mod tests;
-mod token;
-mod interpreter;
-mod gb_type;
-mod scope;
-
 use anyhow::Result;
 
 fn main() -> Result<()> {
@@ -19,11 +10,20 @@ fn main() -> Result<()> {
     // dbg!(parser.lexer.lexeme_stream);
     // dbg!(parser.lexer.point_stream);
     // dbg!(ast);
-    
-    let mut interpreter = interpreter::Interpreter::open_file("file.gb");
-    let res = interpreter.interpret_inner();
-    
-    dbg!(res);
+    //
+    // let res = interpreter.interpret_inner();
+    //
+    // dbg!(res);
+
+    // let x = Node::new(
+    //     NodeKind::Program,
+    //     NodeChildren::Many(vec![Node::new(
+    //         NodeKind::Program,
+    //         NodeChildren::Many(vec![]),
+    //     )]),
+    // );
+    //
+    // println!("{:#?}", x);
 
     Ok(())
 }
