@@ -117,18 +117,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "gb_lang_macros",
  "lazy_static",
  "regex",
  "thiserror",
-]
-
-[[package]]
-name = "gb_lang_macros"
-version = "0.1.0"
-dependencies = [
- "quote",
- "syn",
 ]
 
 [[package]]

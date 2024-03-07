@@ -11,7 +11,6 @@ clap = { version = "4.1.4", features = ["derive"] }
 lazy_static = "1.4.0"
 regex = "1.7.1"
 thiserror = "1.0.50"
-gb_lang_macros = { path = "gb_lang_macros/" }
 
 [workspace]
 resolver = "2"
