@@ -47,14 +47,13 @@ impl Token {
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum TokenKind {
-    // Literals
     IntLiteral,
     FloatLiteral,
     StringLiteral,
     Identifier,
-    Boolean,
+    True,
+    False,
 
-    // Keywords
     If,
     For,
     While,
@@ -63,20 +62,18 @@ pub enum TokenKind {
     Fn,
     Return,
 
-    // Operators
-    OpAdd,
-    OpSub,
-    OpMul,
-    OpDiv,
-    OpExp,
-    OpAssign,
-    OpEq,
-    OpNotEq,
-    OpGt,
-    OpLt,
-    OpBang,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Exponentiate,
+    Assign,
+    Equals,
+    NotEquals,
+    GreaterThan,
+    LessThan,
+    Bang,
 
-    // Delimiters
     LParen,
     RParen,
     LBrace,
@@ -84,7 +81,6 @@ pub enum TokenKind {
     LBracket,
     RBracket,
 
-    // Punctuation
     Comma,
     Semicolon,
     Eol,
@@ -107,8 +103,10 @@ impl From<&String> for TokenKind {
             return TokenKind::Fn;
         } else if val == "return" {
             return TokenKind::Return;
-        } else if val == "!" {
-            return TokenKind::OpBang;
+        } else if val == "false" {
+            return TokenKind::False;
+        } else if val == "true" {
+            return TokenKind::True;
         } else {
             return TokenKind::Identifier;
         }
@@ -136,10 +134,7 @@ pub trait HasKind {
 
 impl HasKind for Option<Token> {
     fn has_kind(&self, kind: TokenKind) -> bool {
-        match self {
-            Some(v) => v.kind == kind,
-            None => false,
-        }
+        self.as_ref().is_some_and(|t| t.kind == kind)
     }
 }
 

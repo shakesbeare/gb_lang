@@ -45,8 +45,8 @@ pub struct Lexer<T: Read> {
     pub col: usize,
 }
 
-impl From<&'static [u8]> for Lexer<&[u8]> {
-    fn from(value: &'static [u8]) -> Self {
+impl<'a> From<&'a [u8]> for Lexer<&'a [u8]> {
+    fn from(value: &'a [u8]) -> Self {
         Lexer {
             next_token: None,
             token_stream: vec![],
@@ -215,11 +215,11 @@ impl<T: Read> Lexer<T> {
                 };
             } // end R bracket
             '=' => {
-                if let Some(status) = self.lex_peek(char_read, '=', TokenKind::OpEq) {
+                if let Some(status) = self.lex_peek(char_read, '=', TokenKind::Equals) {
                     return status;
                 }
                 let token =
-                    Token::new(char_read, TokenKind::OpAssign, (self.line, self.col));
+                    Token::new(char_read, TokenKind::Assign, (self.line, self.col));
                 self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
@@ -227,7 +227,7 @@ impl<T: Read> Lexer<T> {
             }
             '+' => {
                 let token =
-                    Token::new(char_read, TokenKind::OpAdd, (self.line, self.col));
+                    Token::new(char_read, TokenKind::Add, (self.line, self.col));
                 self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
@@ -235,18 +235,18 @@ impl<T: Read> Lexer<T> {
             } // end +
             '-' => {
                 let token =
-                    Token::new(char_read, TokenKind::OpSub, (self.line, self.col));
+                    Token::new(char_read, TokenKind::Subtract, (self.line, self.col));
                 self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                 };
             } // end -
             '*' => {
-                if let Some(status) = self.lex_peek(char_read, '*', TokenKind::OpExp) {
+                if let Some(status) = self.lex_peek(char_read, '*', TokenKind::Exponentiate) {
                     return status;
                 }
                 let token =
-                    Token::new(char_read, TokenKind::OpMul, (self.line, self.col));
+                    Token::new(char_read, TokenKind::Multiply, (self.line, self.col));
                 self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
@@ -262,7 +262,7 @@ impl<T: Read> Lexer<T> {
                     return self.lex();
                 } else {
                     let token =
-                        Token::new(char_read, TokenKind::OpDiv, (self.line, self.col));
+                        Token::new(char_read, TokenKind::Divide, (self.line, self.col));
                     self.next_token = Some(token);
                     return LexStatus::Reading {
                         token: self.next_token.clone().unwrap(),
@@ -271,7 +271,7 @@ impl<T: Read> Lexer<T> {
             } // end /
             '>' => {
                 let token =
-                    Token::new(char_read, TokenKind::OpGt, (self.line, self.col));
+                    Token::new(char_read, TokenKind::GreaterThan, (self.line, self.col));
                 self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
@@ -279,20 +279,20 @@ impl<T: Read> Lexer<T> {
             }
             '<' => {
                 let token =
-                    Token::new(char_read, TokenKind::OpLt, (self.line, self.col));
+                    Token::new(char_read, TokenKind::LessThan, (self.line, self.col));
                 self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                 };
             }
             '!' => {
-                if let Some(status) = self.lex_peek(char_read, '=', TokenKind::OpNotEq)
+                if let Some(status) = self.lex_peek(char_read, '=', TokenKind::NotEquals)
                 {
                     return status;
                 }
 
                 let token =
-                    Token::new(char_read, TokenKind::OpBang, (self.line, self.col));
+                    Token::new(char_read, TokenKind::Bang, (self.line, self.col));
                 self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
@@ -452,19 +452,9 @@ impl<T: Read> Lexer<T> {
             }
         }
         if KEYWORDS.contains(&lexeme.as_str()) {
-            match &lexeme {
-                _ if ["true", "false"].contains(&lexeme.as_str()) => {
-                    let token =
-                        Token::new(lexeme, TokenKind::Boolean, (self.line, self.col));
-
-                    self.next_token = Some(token)
-                }
-                l => {
-                    let token_kind: TokenKind = l.into();
-                    self.next_token =
-                        Some(Token::new(lexeme, token_kind, (self.line, self.col)));
-                }
-            }
+            let token_kind: TokenKind = (&lexeme).into();
+            self.next_token =
+                Some(Token::new(lexeme, token_kind, (self.line, self.col)));
         } else {
             self.next_token = Some(Token::new(
                 lexeme,
