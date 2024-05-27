@@ -6,9 +6,10 @@ works within its extremely constrained scope.
 
 # Does it work?
 
-Probably not. This is a personal project and I'm largely using Git as a means of cloud
-storage in addition to version control. So, very frequently, the main branches will be
-broken. 
+The main branch *should* always be at least minimally functional at all times, but 
+I won't guarantee, at this time, that the project will be useful. Specifically,
+the Gb interpreter is currently not built at all. There are versions in the history
+with a working interpreter, but the main branch doesn't have one, at the moment.
 
 # Why not use a parser generator?
 
@@ -21,31 +22,22 @@ up.
 
 # The Process
 
-Building anything resembling a programming language is a hard task. The gap between the
-theory and exercises presented in classes and building an entire system from scratch is
-pretty large! With that in mind, there are a handful of compromises I made in building
-the current version of Gb to enable myself to learn the most possible and still come out
-the other end with something that might resemble a functional program. 
+Gb has been built and rebuilt a few different times. The current iteration is based on
+Thorsten Ball's book [Writing an Interpreter in Go](https://thorstenball.com/books/),
+which ended up being quite a convenient resource because the syntax for Monkey was nearly
+identical to what I had planned for Gb. But the initial versions were built entirely on
+my own. 
 
-First of all, I chose to use Rust. Not only is Rust extremely fun to use, but it
-presents unique advantages for this sort of exploration project that other languages in
-it's class don't have. Namely, its memory safety. While I may have to fight with Rust
-itself a lot more, I feel that this choice generally allows me to focus on the details
-of the project I'm building more than debugging inane issues that might distract from
-the project at large. 
+In specific, [this](https://github.com/shakesbeare/gb_lang/tree/FromTheGroundUp)
+branch represents the work I was able to put in with a parser generator. As mentioned above,
+I ended up being pretty unhappy with this approach. I especially disliked how difficult it
+was to hook into the Pest error system to emit useful error messages from Gb. 
 
-Building off of that, I chose not to worry about writing perfectly idiomatic or even
-very well optimized code since, again, that wasn't the objective of the project. I
-wanted to leverage Rust's compiler to help guard me against mistakes without feeling
-particularly slowed down by it or the general style-paradigms standard in the language. 
+It's also worth checking out [this](https://github.com/shakesbeare/gb_lang/tree/Rewrite) branch,
+which was the version I had before I began to use the *Writing an Interpreter in Go* version. 
+I learned the most from this version and ultimately decided to rewrite it again only because I
+wanted to switch to a fancier Pratt-parser rather than my grammar-based parser of this version. 
 
-A word on style: this project contains a few very large functions, especially noticable
-in the parser code. This is by design. I felt that making a monolithic parsing function,
-while more difficult to manage while coding, made the "state machine" foundations of the
-code more clear and helped me reason about it theoretically. As (~~if~~) the project grows, it
-will certainly be refactored into something more easily readable and maintainable. But,
-as it stands, I like the theoretical benefits the linearly visible state machine
-provides.
 
 # The future of Gb
 
