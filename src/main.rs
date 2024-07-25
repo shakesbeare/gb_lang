@@ -1,4 +1,5 @@
 use anyhow::Result;
+use gb_lang::*;
 
 fn main() -> Result<()> {
     // let lexer = lexer::Lexer::open_file("file.gb")?;
@@ -24,6 +25,11 @@ fn main() -> Result<()> {
     // );
     //
     // println!("{:#?}", x);
-
+    let input = "hello {";
+    let mut p = parser::Parser::new(lexer::Lexer::from(input.as_bytes()), error::ErrorHandler { input }, false);
+    p.parse();
+    let input = "{";
+    let mut p = parser::Parser::new(lexer::Lexer::from(input.as_bytes()), error::ErrorHandler { input }, false);
+    p.parse();
     Ok(())
 }

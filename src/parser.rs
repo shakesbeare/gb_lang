@@ -1,15 +1,16 @@
 use crate::{
     ast::*,
+    error::ErrorHandler,
     lexer::LexStatus,
     token::{HasKind, TokenKind},
 };
-use std::rc::Rc;
+use std::{ops::Deref, rc::Rc};
 use std::{collections::HashMap, io::Read};
 
 use crate::{lexer::Lexer, token::Token};
 
-type PrefixParseFn<R> = fn(&mut Parser<R>) -> Expression;
-type InfixParseFn<R> = fn(&mut Parser<R>, Expression) -> Expression;
+type PrefixParseFn<'a, R> = fn(&mut Parser<'a, R>) -> Expression;
+type InfixParseFn<'a, R> = fn(&mut Parser<'a, R>, Expression) -> Expression;
 
 #[allow(dead_code)]
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone, Copy)]
@@ -24,22 +25,27 @@ enum Precedence {
     Call,
 }
 
-pub struct Parser<R: Read> {
+pub struct Parser<'a, R: Read> {
     /// If true, the parser will print debug information
     pub verbose: bool,
     pub lexer: Lexer<R>,
     cur_token: Rc<Token>,
     peek_token: Rc<Token>,
-    errors: Vec<String>,
+    error_handler: ErrorHandler<'a>,
+    pub errors: Vec<String>,
 
-    prefix_parse_fns: HashMap<TokenKind, PrefixParseFn<R>>,
-    infix_parse_fns: HashMap<TokenKind, InfixParseFn<R>>,
+    prefix_parse_fns: HashMap<TokenKind, PrefixParseFn<'a, R>>,
+    infix_parse_fns: HashMap<TokenKind, InfixParseFn<'a, R>>,
 
     precedences: HashMap<TokenKind, Precedence>,
 }
 
-impl<R: Read> Parser<R> {
-    pub fn new(mut lexer: Lexer<R>, verbose: bool) -> Self {
+impl<'a, R: Read> Parser<'a, R> {
+    pub fn new(
+        mut lexer: Lexer<R>,
+        error_handler: ErrorHandler<'a>,
+        verbose: bool,
+    ) -> Self {
         let LexStatus::Reading { token } = lexer.lex() else {
             panic!("Failed to read first token");
         };
@@ -56,6 +62,7 @@ impl<R: Read> Parser<R> {
             cur_token: Rc::new(first),
             peek_token: Rc::new(second),
             errors: Vec::new(),
+            error_handler,
             prefix_parse_fns: HashMap::new(),
             infix_parse_fns: HashMap::new(),
             precedences: HashMap::new(),
@@ -149,16 +156,7 @@ impl<R: Read> Parser<R> {
     }
 
     fn syntax_error(&mut self, token: Token) {
-        let e_string = format!(
-            "Encountered a syntax error at {}, {}: Unexpected {:?}",
-            self.lexer.line, self.lexer.col, token
-        );
-        eprintln!("{}", e_string);
-        self.errors.push(e_string);
-    }
-
-    fn no_prefix_parse_function_error(&mut self, kind: TokenKind) {
-        let e_string = format!("No prefix parse function for {:?} found", kind);
+        let e_string = self.error_handler.syntax_error(token);
         eprintln!("{}", e_string);
         self.errors.push(e_string);
     }
@@ -168,15 +166,14 @@ impl<R: Read> Parser<R> {
             return;
         }
 
-        let errs = self.errors.join("\n");
-        panic!("Parser encountered errors:\n{}", errs);
+        panic!("Parser encountered errors\n");
     }
 
-    fn register_prefix(&mut self, kind: TokenKind, func: PrefixParseFn<R>) {
+    fn register_prefix(&mut self, kind: TokenKind, func: PrefixParseFn<'a, R>) {
         self.prefix_parse_fns.insert(kind, func);
     }
 
-    fn register_infix(&mut self, kind: TokenKind, func: InfixParseFn<R>) {
+    fn register_infix(&mut self, kind: TokenKind, func: InfixParseFn<'a, R>) {
         self.infix_parse_fns.insert(kind, func);
     }
 
@@ -264,7 +261,7 @@ impl<R: Read> Parser<R> {
 
     fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
         let Some(prefix) = self.prefix_parse_fns.get(&self.cur_token.kind) else {
-            self.no_prefix_parse_function_error(self.cur_token.kind);
+            self.syntax_error(self.cur_token.deref().clone());
             return None;
         };
         let mut left_exp = prefix(self);
@@ -546,6 +543,7 @@ mod tests {
     use super::Expression;
     use crate::{
         ast::{IntoExpression, Node, Statement},
+        error::ErrorHandler,
         lexer::Lexer,
         parser::Parser,
         token::TokenKind,
@@ -636,7 +634,11 @@ mod tests {
         ];
 
         for (inp, expected_identifier, expected_value) in input {
-            let mut parser = Parser::new(Lexer::from(inp.as_bytes()), false);
+            let mut parser = Parser::new(
+                Lexer::from(inp.as_bytes()),
+                ErrorHandler { input: inp },
+                false,
+            );
             let ast = parser.parse();
             parser.check_parser_errors();
 
@@ -666,7 +668,11 @@ mod tests {
         ];
 
         for (inp, expected) in input {
-            let mut parser = Parser::new(Lexer::from(inp.as_bytes()), false);
+            let mut parser = Parser::new(
+                Lexer::from(inp.as_bytes()),
+                ErrorHandler { input: inp },
+                false,
+            );
             let ast = parser.parse();
             parser.check_parser_errors();
 
@@ -687,7 +693,13 @@ mod tests {
     #[test]
     fn identifier_expression() {
         let input = "foobar;".as_bytes();
-        let mut parser = Parser::new(Lexer::from(input), false);
+        let mut parser = Parser::new(
+            Lexer::from(input),
+            ErrorHandler {
+                input: std::str::from_utf8(input).unwrap(),
+            },
+            false,
+        );
         let ast = parser.parse();
         parser.check_parser_errors();
 
@@ -705,7 +717,13 @@ mod tests {
     #[test]
     fn integer_literal_expression() {
         let input = "5;".as_bytes();
-        let mut parser = Parser::new(Lexer::from(input), false);
+        let mut parser = Parser::new(
+            Lexer::from(input),
+            ErrorHandler {
+                input: std::str::from_utf8(input).unwrap(),
+            },
+            false,
+        );
         let ast = parser.parse();
         parser.check_parser_errors();
 
@@ -724,7 +742,11 @@ mod tests {
         let input: Vec<(&str, f64)> = vec![("5.0;", 5.0), ("5.;", 5.0), ("0.5;", 0.5)];
         for (inp, expected) in input {
             dbg!(&inp);
-            let mut parser = Parser::new(Lexer::from(inp.as_bytes()), false);
+            let mut parser = Parser::new(
+                Lexer::from(inp.as_bytes()),
+                ErrorHandler { input: inp },
+                false,
+            );
             let ast = parser.parse();
             parser.check_parser_errors();
 
@@ -744,7 +766,11 @@ mod tests {
         let input: Vec<(&str, &str, i64)> = vec![("!5;", "!", 5), ("-15;", "-", 15)];
 
         for (inp, op, int) in input {
-            let mut parser = Parser::new(Lexer::from(inp.as_bytes()), false);
+            let mut parser = Parser::new(
+                Lexer::from(inp.as_bytes()),
+                ErrorHandler { input: inp },
+                false,
+            );
             let ast = parser.parse();
             let children = ast.into_program().statements;
             parser.check_parser_errors();
@@ -767,7 +793,11 @@ mod tests {
             vec![("!true;", "!", true), ("!false", "!", false)];
 
         for (inp, op, boolean) in input {
-            let mut parser = Parser::new(Lexer::from(inp.as_bytes()), false);
+            let mut parser = Parser::new(
+                Lexer::from(inp.as_bytes()),
+                ErrorHandler { input: inp },
+                false,
+            );
             let ast = parser.parse();
             let children = ast.into_program().statements;
             parser.check_parser_errors();
@@ -799,7 +829,11 @@ mod tests {
         ];
 
         for (inp, left, op, right) in input {
-            let mut parser = Parser::new(Lexer::from(inp.as_bytes()), false);
+            let mut parser = Parser::new(
+                Lexer::from(inp.as_bytes()),
+                ErrorHandler { input: inp },
+                false,
+            );
             let ast = parser.parse();
             let children = ast.into_program().statements;
             parser.check_parser_errors();
@@ -822,7 +856,11 @@ mod tests {
         ];
 
         for (inp, left, op, right) in input {
-            let mut parser = Parser::new(Lexer::from(inp.as_bytes()), false);
+            let mut parser = Parser::new(
+                Lexer::from(inp.as_bytes()),
+                ErrorHandler { input: inp },
+                false,
+            );
             let ast = parser.parse();
             let children = ast.into_program().statements;
             parser.check_parser_errors();
@@ -851,7 +889,11 @@ mod tests {
         ];
 
         for (inp, left, op, right) in input {
-            let mut parser = Parser::new(Lexer::from(inp.as_bytes()), false);
+            let mut parser = Parser::new(
+                Lexer::from(inp.as_bytes()),
+                ErrorHandler { input: inp },
+                false,
+            );
             let ast = parser.parse();
             let children = ast.into_program().statements;
             parser.check_parser_errors();
@@ -906,7 +948,11 @@ mod tests {
         ];
 
         for (inp, expected) in input {
-            let mut parser = Parser::new(Lexer::from(inp.as_bytes()), false);
+            let mut parser = Parser::new(
+                Lexer::from(inp.as_bytes()),
+                ErrorHandler { input: inp },
+                false,
+            );
             let ast = parser.parse();
             parser.check_parser_errors();
             let actual = ast.to_string();
@@ -917,7 +963,13 @@ mod tests {
     #[test]
     fn boolean_expression() {
         let input = "true;".as_bytes();
-        let mut parser = Parser::new(Lexer::from(input), false);
+        let mut parser = Parser::new(
+            Lexer::from(input),
+            ErrorHandler {
+                input: std::str::from_utf8(input).unwrap(),
+            },
+            false,
+        );
         let ast = parser.parse();
         parser.check_parser_errors();
 
@@ -934,7 +986,8 @@ mod tests {
     #[test]
     fn if_expression() {
         let input = "if x < y { x }";
-        let mut parser = Parser::new(Lexer::from(input.as_bytes()), false);
+        let mut parser =
+            Parser::new(Lexer::from(input.as_bytes()), ErrorHandler { input }, false);
         let ast = parser.parse();
         parser.check_parser_errors();
 
@@ -971,7 +1024,8 @@ mod tests {
     #[test]
     fn if_else_expression() {
         let input = "if x < y { x } else { y }";
-        let mut parser = Parser::new(Lexer::from(input.as_bytes()), false);
+        let mut parser =
+            Parser::new(Lexer::from(input.as_bytes()), ErrorHandler { input }, false);
         let ast = parser.parse();
         parser.check_parser_errors();
 
@@ -1016,7 +1070,8 @@ mod tests {
     fn function_literal() {
         let input = "fn(x, y) { x + y; }";
 
-        let mut parser = Parser::new(Lexer::from(input.as_bytes()), false);
+        let mut parser =
+            Parser::new(Lexer::from(input.as_bytes()), ErrorHandler { input }, false);
         let ast = parser.parse();
         parser.check_parser_errors();
 
@@ -1061,7 +1116,11 @@ mod tests {
         ];
 
         for (inp, expected) in input {
-            let mut parser = Parser::new(Lexer::from(inp.as_bytes()), false);
+            let mut parser = Parser::new(
+                Lexer::from(inp.as_bytes()),
+                ErrorHandler { input: inp },
+                false,
+            );
             let ast = parser.parse();
             parser.check_parser_errors();
 
@@ -1095,7 +1154,8 @@ mod tests {
     fn call_expression() {
         let input = "add(1, 2 * 3, 4 + 5);";
 
-        let mut parser = Parser::new(Lexer::from(input.as_bytes()), false);
+        let mut parser =
+            Parser::new(Lexer::from(input.as_bytes()), ErrorHandler { input }, false);
         let ast = parser.parse();
         parser.check_parser_errors();
 
@@ -1126,7 +1186,8 @@ mod tests {
     #[test]
     fn function_literal_statement() {
         let input = "fn main(x, y) { x + y; }";
-        let mut parser = Parser::new(Lexer::from(input.as_bytes()), false);
+        let mut parser =
+            Parser::new(Lexer::from(input.as_bytes()), ErrorHandler { input }, false);
         let ast = parser.parse();
         parser.check_parser_errors();
 

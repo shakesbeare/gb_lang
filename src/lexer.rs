@@ -54,8 +54,8 @@ impl<'a> From<&'a [u8]> for Lexer<&'a [u8]> {
             reader: BufReader::with_capacity(1, value),
             buf: [0],
 
-            line: 0,
-            col: 0,
+            line: 1,
+            col: 1,
         }
     }
 }
@@ -69,8 +69,8 @@ impl From<File> for Lexer<File> {
             reader: BufReader::with_capacity(1, file),
             buf: [0],
 
-            line: 0,
-            col: 0,
+            line: 1,
+            col: 1,
         }
     }
 }
@@ -321,7 +321,7 @@ impl<T: Read> Lexer<T> {
                 };
             }
             '\n' => {
-                self.col = 0;
+                self.col = 1;
                 self.line += 1;
                 let token =
                     Token::new(char_read, TokenKind::Eol, (self.line, self.col));

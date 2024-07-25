@@ -115,8 +115,8 @@ impl From<&String> for TokenKind {
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub struct Point {
-    line: usize,
-    col: usize,
+    pub line: usize,
+    pub col: usize,
 }
 
 impl From<(usize, usize)> for Point {
