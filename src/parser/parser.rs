@@ -1,16 +1,18 @@
 use crate::{
     ast::*,
-    error::ErrorHandler,
     lexer::LexStatus,
     token::{HasKind, TokenKind},
 };
-use std::{ops::Deref, rc::Rc};
 use std::{collections::HashMap, io::Read};
+use std::{ops::Deref, rc::Rc};
 
 use crate::{lexer::Lexer, token::Token};
 
-type PrefixParseFn<'a, R> = fn(&mut Parser<'a, R>) -> Expression;
-type InfixParseFn<'a, R> = fn(&mut Parser<'a, R>, Expression) -> Expression;
+use super::error::{ErrorHandler, ParserError};
+
+type PrefixParseFn<'a, R> = fn(&mut Parser<'a, R>) -> Result<Expression, ParserError>;
+type InfixParseFn<'a, R> =
+    fn(&mut Parser<'a, R>, Expression) -> Result<Expression, ParserError>;
 
 #[allow(dead_code)]
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone, Copy)]
@@ -31,7 +33,7 @@ pub struct Parser<'a, R: Read> {
     pub lexer: Lexer<R>,
     cur_token: Rc<Token>,
     peek_token: Rc<Token>,
-    error_handler: ErrorHandler<'a>,
+    error_handler: Box<dyn ErrorHandler<'a>>,
     pub errors: Vec<String>,
 
     prefix_parse_fns: HashMap<TokenKind, PrefixParseFn<'a, R>>,
@@ -43,7 +45,7 @@ pub struct Parser<'a, R: Read> {
 impl<'a, R: Read> Parser<'a, R> {
     pub fn new(
         mut lexer: Lexer<R>,
-        error_handler: ErrorHandler<'a>,
+        error_handler: Box<dyn ErrorHandler<'a>>,
         verbose: bool,
     ) -> Self {
         let LexStatus::Reading { token } = lexer.lex() else {
@@ -145,20 +147,19 @@ impl<'a, R: Read> Parser<'a, R> {
     }
 
     /// Advances to the next token if the peek token has the expected kind
-    fn expect_peek(&mut self, kind: TokenKind) -> bool {
+    fn expect_peek(&mut self, kind: TokenKind) -> Result<(), ParserError> {
         if self.peek_token.has_kind(kind) {
             self.next_token();
-            return true;
+            Ok(())
         } else {
-            self.syntax_error(self.peek_token.as_ref().clone());
-            return false;
+            Err(self.syntax_error(self.peek_token.as_ref().clone()))
         }
     }
 
-    fn syntax_error(&mut self, token: Token) {
+    fn syntax_error(&mut self, token: Token) -> ParserError {
         let e_string = self.error_handler.syntax_error(token);
-        eprintln!("{}", e_string);
-        self.errors.push(e_string);
+        self.errors.push(e_string.clone());
+        ParserError::SyntaxError(e_string)
     }
 
     pub fn check_parser_errors(&self) {
@@ -179,7 +180,7 @@ impl<'a, R: Read> Parser<'a, R> {
 
     /// Parses the entire program and returns the abstract syntax tree
     /// This also saturates the fields of the internal lexer.
-    pub fn parse(&mut self) -> Node {
+    pub fn parse(&mut self) -> Result<Node, ParserError> {
         self.print("start program");
         let mut program = Program {
             statements: Vec::new(),
@@ -187,33 +188,38 @@ impl<'a, R: Read> Parser<'a, R> {
 
         while !self.cur_token.has_kind(TokenKind::Eof) {
             if let Some(stmt) = self.parse_statement() {
-                program.statements.push(Node::Statement(stmt));
+                if let Ok(stmt) = stmt {
+                    program.statements.push(Node::Statement(stmt));
+                } else {
+                    let err = stmt.unwrap_err();
+                    eprintln!("{}", err);
+                }
             }
 
             self.next_token();
         }
 
         self.print("end program");
-        return Node::Program(program);
+        return Ok(Node::Program(program));
     }
 
-    fn parse_statement(&mut self) -> Option<Statement> {
+    fn parse_statement(&mut self) -> Option<Result<Statement, ParserError>> {
         match self.cur_token.kind {
-            TokenKind::Let => self.parse_let_statement(),
-            TokenKind::Fn => self.parse_function_literal_statement(),
-            TokenKind::Return => self.parse_return_statement(),
+            TokenKind::Let => Some(self.parse_let_statement()),
+            TokenKind::Fn => Some(self.parse_function_literal_statement()),
+            TokenKind::Return => Some(self.parse_return_statement()),
             TokenKind::Eol => None,
-            _ => self.parse_expression_statement(),
+            _ => Some(self.parse_expression_statement()),
         }
     }
 
-    fn parse_let_statement(&mut self) -> Option<Statement> {
+    fn parse_let_statement(&mut self) -> Result<Statement, ParserError> {
         let token = self.cur_token.as_ref().clone();
-        self.expect_peek(TokenKind::Identifier);
+        self.expect_peek(TokenKind::Identifier)?;
         let name = Identifier {
             token: self.cur_token.as_ref().clone(),
         };
-        self.expect_peek(TokenKind::Assign);
+        self.expect_peek(TokenKind::Assign)?;
         self.next_token();
         let value = self
             .parse_expression(Precedence::Lowest)
@@ -223,14 +229,14 @@ impl<'a, R: Read> Parser<'a, R> {
             self.next_token();
         }
 
-        Some(Statement::LetStatement(LetStatement {
+        Ok(Statement::LetStatement(LetStatement {
             token,
             name,
             value: value.into(),
         }))
     }
 
-    fn parse_return_statement(&mut self) -> Option<Statement> {
+    fn parse_return_statement(&mut self) -> Result<Statement, ParserError> {
         let token = self.cur_token.as_ref().clone();
         self.next_token();
         let value = self
@@ -241,29 +247,32 @@ impl<'a, R: Read> Parser<'a, R> {
             self.next_token();
         }
 
-        Some(Statement::ReturnStatement(ReturnStatement {
+        Ok(Statement::ReturnStatement(ReturnStatement {
             token,
             return_value: value.into(),
         }))
     }
 
-    fn parse_expression_statement(&mut self) -> Option<Statement> {
+    fn parse_expression_statement(&mut self) -> Result<Statement, ParserError> {
         let token = self.cur_token.as_ref().clone();
         let expression = self.parse_expression(Precedence::Lowest);
         if self.peek_token.has_kind(TokenKind::Semicolon) {
             self.next_token();
         }
-        Some(Statement::ExpressionStatement(ExpressionStatement {
+        Ok(Statement::ExpressionStatement(ExpressionStatement {
             token,
             expression: Rc::new(expression?),
         }))
     }
 
-    fn parse_expression(&mut self, precedence: Precedence) -> Option<Expression> {
+    fn parse_expression(
+        &mut self,
+        precedence: Precedence,
+    ) -> Result<Expression, ParserError> {
         let Some(prefix) = self.prefix_parse_fns.get(&self.cur_token.kind) else {
-            self.syntax_error(self.cur_token.deref().clone());
-            return None;
+            return Err(self.syntax_error(self.cur_token.deref().clone()));
         };
+
         let mut left_exp = prefix(self);
 
         while !self.peek_token.has_kind(TokenKind::Semicolon)
@@ -277,116 +286,104 @@ impl<'a, R: Read> Parser<'a, R> {
                 &mut *(self as *mut Parser<R>)
             };
             let Some(infix) = self.infix_parse_fns.get(&self.peek_token.kind) else {
-                return Some(left_exp);
+                return left_exp;
             };
             p_self.next_token();
 
-            left_exp = infix(self, left_exp);
+            left_exp = infix(self, left_exp?);
         }
 
-        return Some(left_exp);
+        left_exp
     }
 
-    fn parse_identifier(&mut self) -> Expression {
-        Expression::Identifier(Identifier {
+    fn parse_identifier(&mut self) -> Result<Expression, ParserError> {
+        Ok(Expression::Identifier(Identifier {
             token: self.cur_token.as_ref().clone(),
-        })
+        }))
     }
 
-    fn parse_integer_literal(&mut self) -> Expression {
-        Expression::IntegerLiteral(IntegerLiteral {
-            token: self.cur_token.as_ref().clone(),
-            value: self.cur_token.literal.parse().unwrap(),
-        })
-    }
-
-    fn parse_float_literal(&mut self) -> Expression {
-        Expression::FloatLiteral(FloatLiteral {
+    fn parse_integer_literal(&mut self) -> Result<Expression, ParserError> {
+        Ok(Expression::IntegerLiteral(IntegerLiteral {
             token: self.cur_token.as_ref().clone(),
             value: self.cur_token.literal.parse().unwrap(),
-        })
+        }))
     }
 
-    fn parse_prefix_expression(&mut self) -> Expression {
+    fn parse_float_literal(&mut self) -> Result<Expression, ParserError> {
+        Ok(Expression::FloatLiteral(FloatLiteral {
+            token: self.cur_token.as_ref().clone(),
+            value: self.cur_token.literal.parse().unwrap(),
+        }))
+    }
+
+    fn parse_prefix_expression(&mut self) -> Result<Expression, ParserError> {
         let token = self.cur_token.as_ref().clone();
         let op = token.literal.clone();
         self.next_token();
-        let Some(right) = self.parse_expression(Precedence::Prefix) else {
-            return Expression::Null;
-        };
-        Expression::PrefixExpression(PrefixExpression {
+        let right = self.parse_expression(Precedence::Prefix)?;
+        Ok(Expression::PrefixExpression(PrefixExpression {
             token,
             operator: op,
             right: Rc::new(right),
-        })
+        }))
     }
 
-    fn parse_infix_expression(&mut self, left: Expression) -> Expression {
+    fn parse_infix_expression(
+        &mut self,
+        left: Expression,
+    ) -> Result<Expression, ParserError> {
         let token = self.cur_token.as_ref().clone();
         let op = token.literal.clone();
         let precedence = self.cur_precedence();
         self.next_token();
-        let Some(right) = self.parse_expression(precedence) else {
-            return Expression::Null;
-        };
-        Expression::InfixExpression(InfixExpression {
+        let right = self.parse_expression(precedence)?;
+        Ok(Expression::InfixExpression(InfixExpression {
             token,
             operator: op,
             left: Rc::new(left),
             right: Rc::new(right),
-        })
+        }))
     }
 
-    fn parse_boolean(&mut self) -> Expression {
-        Expression::BooleanLiteral(BooleanLiteral {
+    fn parse_boolean(&mut self) -> Result<Expression, ParserError> {
+        Ok(Expression::BooleanLiteral(BooleanLiteral {
             token: self.cur_token.as_ref().clone(),
             value: self.cur_token.has_kind(TokenKind::True),
-        })
+        }))
     }
 
-    fn parse_grouped_expression(&mut self) -> Expression {
+    fn parse_grouped_expression(&mut self) -> Result<Expression, ParserError> {
         self.next_token();
         let exp = self.parse_expression(Precedence::Lowest);
-        if !self.expect_peek(TokenKind::RParen) {
-            return Expression::Null;
-        }
+        self.expect_peek(TokenKind::RParen)?;
 
-        return exp.unwrap_or(Expression::Null);
+        exp
     }
 
-    fn parse_if_expression(&mut self) -> Expression {
+    fn parse_if_expression(&mut self) -> Result<Expression, ParserError> {
         let token = self.cur_token.as_ref().clone();
         self.next_token();
-        let Some(cond) = self.parse_expression(Precedence::Lowest) else {
-            return Expression::Null;
-        };
-
-        if !self.expect_peek(TokenKind::LBrace) {
-            return Expression::Null;
-        }
-
-        let consequence = self.parse_block_statement();
+        let cond = self.parse_expression(Precedence::Lowest)?;
+        self.expect_peek(TokenKind::LBrace)?;
+        let consequence = self.parse_block_statement()?;
         let mut alternative: Option<BlockStatement> = None;
 
         if self.peek_token.has_kind(TokenKind::Else) {
             self.next_token();
 
-            if !self.expect_peek(TokenKind::LBrace) {
-                return Expression::Null;
-            }
-
-            alternative = Some(self.parse_block_statement());
+            self.expect_peek(TokenKind::LBrace)?;
+            alternative = Some(self.parse_block_statement()?);
         }
 
-        return Expression::IfExpression(IfExpression {
+        Ok(Expression::IfExpression(IfExpression {
             token,
             condition: Rc::new(cond),
             consequence,
             alternative,
-        });
+        }))
     }
 
-    fn parse_block_statement(&mut self) -> BlockStatement {
+    fn parse_block_statement(&mut self) -> Result<BlockStatement, ParserError> {
         let token = self.cur_token.as_ref().clone();
         let mut statements = Vec::new();
         self.next_token();
@@ -395,37 +392,30 @@ impl<'a, R: Read> Parser<'a, R> {
             && !self.cur_token.has_kind(TokenKind::Eof)
         {
             if let Some(stmt) = self.parse_statement() {
-                statements.push(Rc::new(stmt));
+                statements.push(Rc::new(stmt?));
             }
             self.next_token();
         }
 
-        return BlockStatement { token, statements };
+        Ok(BlockStatement { token, statements })
     }
 
-    fn parse_function_literal(&mut self) -> Expression {
+    fn parse_function_literal(&mut self) -> Result<Expression, ParserError> {
         let token = self.cur_token.as_ref().clone();
 
-        if !self.expect_peek(TokenKind::LParen) {
-            return Expression::Null;
-        }
+        self.expect_peek(TokenKind::LParen)?;
+        let parameters = self.parse_function_parameters()?;
+        self.expect_peek(TokenKind::LBrace)?;
+        let body = self.parse_block_statement()?;
 
-        let parameters = self.parse_function_parameters();
-
-        if !self.expect_peek(TokenKind::LBrace) {
-            return Expression::Null;
-        }
-
-        let body = self.parse_block_statement();
-
-        return Expression::FunctionLiteral(FunctionLiteral {
+        Ok(Expression::FunctionLiteral(FunctionLiteral {
             token,
             parameters,
             body,
-        });
+        }))
     }
 
-    fn parse_function_literal_statement(&mut self) -> Option<Statement> {
+    fn parse_function_literal_statement(&mut self) -> Result<Statement, ParserError> {
         // check if this is a fn() {}, otherwise fn main() {}
         if !self.peek_token.has_kind(TokenKind::Identifier) {
             return self.parse_expression_statement();
@@ -434,41 +424,29 @@ impl<'a, R: Read> Parser<'a, R> {
         let token = self.cur_token.as_ref().clone();
         self.next_token();
 
-        let Expression::Identifier(identifier) = self.parse_identifier() else {
+        let Expression::Identifier(identifier) = self.parse_identifier()? else {
             unreachable!()
         };
-        // self.next_token();
 
-        if !self.expect_peek(TokenKind::LParen) {
-            self.syntax_error(self.peek_token.as_ref().clone());
-            return None;
+        self.expect_peek(TokenKind::LParen)?;
+        let parameters = self.parse_function_parameters()?;
+        self.expect_peek(TokenKind::LBrace)?;
+        let body = self.parse_block_statement()?;
+
+        return Ok(FunctionLiteralStatement {
+            token,
+            identifier,
+            parameters,
+            body,
         }
-
-        let parameters = self.parse_function_parameters();
-
-        if !self.expect_peek(TokenKind::LBrace) {
-            self.syntax_error(self.peek_token.as_ref().clone());
-            return None;
-        }
-
-        let body = self.parse_block_statement();
-
-        return Some(
-            FunctionLiteralStatement {
-                token,
-                identifier,
-                parameters,
-                body,
-            }
-            .into_statement(),
-        );
+        .into_statement());
     }
 
-    fn parse_function_parameters(&mut self) -> Vec<Identifier> {
+    fn parse_function_parameters(&mut self) -> Result<Vec<Identifier>, ParserError> {
         let mut identifiers = Vec::new();
         if self.peek_token.has_kind(TokenKind::RParen) {
             self.next_token();
-            return identifiers;
+            return Ok(identifiers);
         }
 
         self.next_token();
@@ -488,29 +466,29 @@ impl<'a, R: Read> Parser<'a, R> {
             identifiers.push(ident);
         }
 
-        if !self.expect_peek(TokenKind::RParen) {
-            return Vec::new();
-        }
-
-        return identifiers;
+        self.expect_peek(TokenKind::RParen);
+        Ok(identifiers)
     }
 
-    fn parse_call_expression(&mut self, function: Expression) -> Expression {
+    fn parse_call_expression(
+        &mut self,
+        function: Expression,
+    ) -> Result<Expression, ParserError> {
         let token = self.cur_token.as_ref().clone();
-        let arguments = self.parse_call_arguments();
-        return Expression::CallExpression(CallExpression {
+        let arguments = self.parse_call_arguments()?;
+        Ok(Expression::CallExpression(CallExpression {
             token,
             function: Rc::new(function),
             arguments,
-        });
+        }))
     }
 
-    fn parse_call_arguments(&mut self) -> Vec<Expression> {
+    fn parse_call_arguments(&mut self) -> Result<Vec<Expression>, ParserError> {
         let mut args = vec![];
 
         if self.peek_token.has_kind(TokenKind::RParen) {
             self.next_token();
-            return args;
+            return Ok(args);
         }
 
         self.next_token();
@@ -528,12 +506,8 @@ impl<'a, R: Read> Parser<'a, R> {
             );
         }
 
-        if !self.expect_peek(TokenKind::RParen) {
-            self.syntax_error(self.peek_token.as_ref().clone());
-            return vec![];
-        }
-
-        return args;
+        self.expect_peek(TokenKind::RParen)?;
+        Ok(args)
     }
 }
 
@@ -543,8 +517,8 @@ mod tests {
     use super::Expression;
     use crate::{
         ast::{IntoExpression, Node, Statement},
-        error::ErrorHandler,
         lexer::Lexer,
+        parser::error::DefaultErrorHandler,
         parser::Parser,
         token::TokenKind,
     };
@@ -636,10 +610,10 @@ mod tests {
         for (inp, expected_identifier, expected_value) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                ErrorHandler { input: inp },
+                Box::new(DefaultErrorHandler { input: inp }),
                 false,
             );
-            let ast = parser.parse();
+            let ast = parser.parse().unwrap();
             parser.check_parser_errors();
 
             let children = ast.into_program().statements;
@@ -670,10 +644,10 @@ mod tests {
         for (inp, expected) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                ErrorHandler { input: inp },
+                Box::new(DefaultErrorHandler { input: inp }),
                 false,
             );
-            let ast = parser.parse();
+            let ast = parser.parse().unwrap();
             parser.check_parser_errors();
 
             let children = ast.into_program().statements;
@@ -695,12 +669,12 @@ mod tests {
         let input = "foobar;".as_bytes();
         let mut parser = Parser::new(
             Lexer::from(input),
-            ErrorHandler {
+            Box::new(DefaultErrorHandler {
                 input: std::str::from_utf8(input).unwrap(),
-            },
+            }),
             false,
         );
-        let ast = parser.parse();
+        let ast = parser.parse().unwrap();
         parser.check_parser_errors();
 
         let children = ast.into_program().statements;
@@ -719,12 +693,12 @@ mod tests {
         let input = "5;".as_bytes();
         let mut parser = Parser::new(
             Lexer::from(input),
-            ErrorHandler {
+            Box::new(DefaultErrorHandler {
                 input: std::str::from_utf8(input).unwrap(),
-            },
+            }),
             false,
         );
-        let ast = parser.parse();
+        let ast = parser.parse().unwrap();
         parser.check_parser_errors();
 
         let children = ast.into_program().statements;
@@ -744,10 +718,10 @@ mod tests {
             dbg!(&inp);
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                ErrorHandler { input: inp },
+                Box::new(DefaultErrorHandler { input: inp }),
                 false,
             );
-            let ast = parser.parse();
+            let ast = parser.parse().unwrap();
             parser.check_parser_errors();
 
             let children = ast.into_program().statements;
@@ -768,10 +742,10 @@ mod tests {
         for (inp, op, int) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                ErrorHandler { input: inp },
+                Box::new(DefaultErrorHandler { input: inp }),
                 false,
             );
-            let ast = parser.parse();
+            let ast = parser.parse().unwrap();
             let children = ast.into_program().statements;
             parser.check_parser_errors();
             assert_eq!(children.len(), 1);
@@ -795,10 +769,10 @@ mod tests {
         for (inp, op, boolean) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                ErrorHandler { input: inp },
+                Box::new(DefaultErrorHandler { input: inp }),
                 false,
             );
-            let ast = parser.parse();
+            let ast = parser.parse().unwrap();
             let children = ast.into_program().statements;
             parser.check_parser_errors();
             assert_eq!(children.len(), 1);
@@ -831,10 +805,10 @@ mod tests {
         for (inp, left, op, right) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                ErrorHandler { input: inp },
+                Box::new(DefaultErrorHandler { input: inp }),
                 false,
             );
-            let ast = parser.parse();
+            let ast = parser.parse().unwrap();
             let children = ast.into_program().statements;
             parser.check_parser_errors();
             assert_eq!(children.len(), 1);
@@ -858,10 +832,10 @@ mod tests {
         for (inp, left, op, right) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                ErrorHandler { input: inp },
+                Box::new(DefaultErrorHandler { input: inp }),
                 false,
             );
-            let ast = parser.parse();
+            let ast = parser.parse().unwrap();
             let children = ast.into_program().statements;
             parser.check_parser_errors();
             assert_eq!(children.len(), 1);
@@ -891,10 +865,10 @@ mod tests {
         for (inp, left, op, right) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                ErrorHandler { input: inp },
+                Box::new(DefaultErrorHandler { input: inp }),
                 false,
             );
-            let ast = parser.parse();
+            let ast = parser.parse().unwrap();
             let children = ast.into_program().statements;
             parser.check_parser_errors();
             assert_eq!(children.len(), 1);
@@ -950,10 +924,10 @@ mod tests {
         for (inp, expected) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                ErrorHandler { input: inp },
+                Box::new(DefaultErrorHandler { input: inp }),
                 false,
             );
-            let ast = parser.parse();
+            let ast = parser.parse().unwrap();
             parser.check_parser_errors();
             let actual = ast.to_string();
             assert_eq!(actual, expected);
@@ -965,12 +939,12 @@ mod tests {
         let input = "true;".as_bytes();
         let mut parser = Parser::new(
             Lexer::from(input),
-            ErrorHandler {
+            Box::new(DefaultErrorHandler {
                 input: std::str::from_utf8(input).unwrap(),
-            },
+            }),
             false,
         );
-        let ast = parser.parse();
+        let ast = parser.parse().unwrap();
         parser.check_parser_errors();
 
         let children = ast.into_program().statements;
@@ -986,9 +960,12 @@ mod tests {
     #[test]
     fn if_expression() {
         let input = "if x < y { x }";
-        let mut parser =
-            Parser::new(Lexer::from(input.as_bytes()), ErrorHandler { input }, false);
-        let ast = parser.parse();
+        let mut parser = Parser::new(
+            Lexer::from(input.as_bytes()),
+            Box::new(DefaultErrorHandler { input }),
+            false,
+        );
+        let ast = parser.parse().unwrap();
         parser.check_parser_errors();
 
         let children = ast.into_program().statements;
@@ -1024,9 +1001,12 @@ mod tests {
     #[test]
     fn if_else_expression() {
         let input = "if x < y { x } else { y }";
-        let mut parser =
-            Parser::new(Lexer::from(input.as_bytes()), ErrorHandler { input }, false);
-        let ast = parser.parse();
+        let mut parser = Parser::new(
+            Lexer::from(input.as_bytes()),
+            Box::new(DefaultErrorHandler { input }),
+            false,
+        );
+        let ast = parser.parse().unwrap();
         parser.check_parser_errors();
 
         let children = ast.into_program().statements;
@@ -1070,9 +1050,12 @@ mod tests {
     fn function_literal() {
         let input = "fn(x, y) { x + y; }";
 
-        let mut parser =
-            Parser::new(Lexer::from(input.as_bytes()), ErrorHandler { input }, false);
-        let ast = parser.parse();
+        let mut parser = Parser::new(
+            Lexer::from(input.as_bytes()),
+            Box::new(DefaultErrorHandler { input }),
+            false,
+        );
+        let ast = parser.parse().unwrap();
         parser.check_parser_errors();
 
         let children = ast.into_program().statements;
@@ -1118,10 +1101,10 @@ mod tests {
         for (inp, expected) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                ErrorHandler { input: inp },
+                Box::new(DefaultErrorHandler { input: inp }),
                 false,
             );
-            let ast = parser.parse();
+            let ast = parser.parse().unwrap();
             parser.check_parser_errors();
 
             let children = ast.into_program().statements;
@@ -1154,9 +1137,12 @@ mod tests {
     fn call_expression() {
         let input = "add(1, 2 * 3, 4 + 5);";
 
-        let mut parser =
-            Parser::new(Lexer::from(input.as_bytes()), ErrorHandler { input }, false);
-        let ast = parser.parse();
+        let mut parser = Parser::new(
+            Lexer::from(input.as_bytes()),
+            Box::new(DefaultErrorHandler { input }),
+            false,
+        );
+        let ast = parser.parse().unwrap();
         parser.check_parser_errors();
 
         let children = ast.into_program().statements;
@@ -1186,9 +1172,12 @@ mod tests {
     #[test]
     fn function_literal_statement() {
         let input = "fn main(x, y) { x + y; }";
-        let mut parser =
-            Parser::new(Lexer::from(input.as_bytes()), ErrorHandler { input }, false);
-        let ast = parser.parse();
+        let mut parser = Parser::new(
+            Lexer::from(input.as_bytes()),
+            Box::new(DefaultErrorHandler { input }),
+            false,
+        );
+        let ast = parser.parse().unwrap();
         parser.check_parser_errors();
 
         let children = ast.into_program().statements;
