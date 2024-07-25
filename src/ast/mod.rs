@@ -2,12 +2,15 @@ mod node;
 
 pub use node::*;
 
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Node {
     Program(Program),
     Statement(Statement),
     Expression(Expression),
+}
+
+pub trait IntoNode {
+    fn into_node(self) -> Node;
 }
 
 impl Node {
@@ -34,14 +37,22 @@ impl std::fmt::Display for Program {
     }
 }
 
-
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     LetStatement(LetStatement),
     ReturnStatement(ReturnStatement),
     ExpressionStatement(ExpressionStatement),
     BlockStatement(BlockStatement),
+}
+
+impl IntoNode for Statement {
+    fn into_node(self) -> Node {
+        Node::Statement(self)
+    }
+}
+
+pub trait IntoStatement {
+    fn into_statement(self) -> Statement;
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -54,10 +65,20 @@ pub enum Expression {
     FloatLiteral(FloatLiteral),
     PrefixExpression(PrefixExpression),
     InfixExpression(InfixExpression),
-    Boolean(BooleanLiteral),
+    BooleanLiteral(BooleanLiteral),
     IfExpression(IfExpression),
     FunctionLiteral(FunctionLiteral),
     CallExpression(CallExpression),
+}
+
+impl IntoNode for Expression {
+    fn into_node(self) -> Node {
+        Node::Expression(self)
+    }
+}
+
+pub trait IntoExpression {
+    fn into_expression(self) -> Expression;
 }
 
 impl std::fmt::Display for Node {
@@ -91,7 +112,7 @@ impl std::fmt::Display for Expression {
             Expression::FloatLiteral(fl) => write!(f, "{}", fl),
             Expression::PrefixExpression(p) => write!(f, "{}", p),
             Expression::InfixExpression(i) => write!(f, "{}", i),
-            Expression::Boolean(b) => write!(f, "{}", b),
+            Expression::BooleanLiteral(b) => write!(f, "{}", b),
             Expression::IfExpression(i) => write!(f, "{}", i),
             Expression::FunctionLiteral(f_) => write!(f, "{}", f_),
             Expression::CallExpression(c) => write!(f, "{}", c),

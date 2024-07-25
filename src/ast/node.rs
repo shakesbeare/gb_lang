@@ -1,8 +1,13 @@
 use crate::token::Token;
 use std::rc::Rc;
 
-use crate::ast::Expression;
-use crate::ast::Statement;
+use super::Node;
+use super::Expression;
+use super::Statement;
+
+use super::IntoNode;
+use super::IntoStatement;
+use super::IntoExpression;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct LetStatement {
@@ -17,10 +22,34 @@ impl std::fmt::Display for LetStatement {
     }
 }
 
+impl IntoNode for LetStatement { 
+    fn into_node(self) -> Node {
+        Node::Statement(self.into_statement())
+    }
+}
+
+impl IntoStatement for LetStatement {
+    fn into_statement(self) -> Statement {
+        Statement::LetStatement(self)
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct ReturnStatement {
     pub token: Token,
     pub return_value: Rc<Expression>,
+}
+
+impl IntoStatement for ReturnStatement {
+    fn into_statement(self) -> Statement { 
+        Statement::ReturnStatement(self)
+    }
+}
+
+impl IntoNode for ReturnStatement {
+    fn into_node(self) -> Node {
+        Node::Statement(self.into_statement())
+    }
 }
 
 impl std::fmt::Display for ReturnStatement {
@@ -35,6 +64,18 @@ pub struct ExpressionStatement {
     pub expression: Rc<Expression>,
 }
 
+impl IntoStatement for ExpressionStatement {
+    fn into_statement(self) -> Statement {
+        Statement::ExpressionStatement(self)
+    }
+}
+
+impl IntoNode for ExpressionStatement {
+    fn into_node(self) -> Node {
+        Node::Statement(self.into_statement())
+    }
+}
+
 impl std::fmt::Display for ExpressionStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.expression)
@@ -42,8 +83,48 @@ impl std::fmt::Display for ExpressionStatement {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct BlockStatement {
+    pub token: Token,
+    pub statements: Vec<Rc<Statement>>,
+}
+
+impl IntoStatement for BlockStatement {
+    fn into_statement(self) -> Statement {
+        Statement::BlockStatement(self)
+    }
+}
+
+impl IntoNode for BlockStatement {
+    fn into_node(self) -> Node {
+        Node::Statement(self.into_statement())
+    }
+}
+
+impl std::fmt::Display for BlockStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{ ")?;
+        for statement in &self.statements {
+            write!(f, "{}", statement)?;
+        }
+        write!(f, " }}")
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct Identifier {
     pub token: Token,
+}
+
+impl IntoExpression for Identifier {
+    fn into_expression(self) -> Expression {
+        Expression::Identifier(self)
+    }
+}
+
+impl IntoNode for Identifier {
+    fn into_node(self) -> Node {
+        Node::Expression(self.into_expression())
+    }
 }
 
 impl std::fmt::Display for Identifier {
@@ -64,6 +145,18 @@ pub struct IntegerLiteral {
     pub value: i64,
 }
 
+impl IntoExpression for IntegerLiteral {
+    fn into_expression(self) -> Expression {
+        Expression::IntegerLiteral(self)
+    }
+}
+
+impl IntoNode for IntegerLiteral {
+    fn into_node(self) -> Node {
+        Node::Expression(self.into_expression())
+    }
+}
+
 impl std::fmt::Display for IntegerLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.token.literal)
@@ -74,6 +167,18 @@ impl std::fmt::Display for IntegerLiteral {
 pub struct FloatLiteral {
     pub token: Token,
     pub value: f64,
+}
+
+impl IntoExpression for FloatLiteral {
+    fn into_expression(self) -> Expression {
+        Expression::FloatLiteral(self)
+    }
+}
+
+impl IntoNode for FloatLiteral {
+    fn into_node(self) -> Node {
+        Node::Expression(self.into_expression())
+    }
 }
 
 impl std::fmt::Display for FloatLiteral {
@@ -87,6 +192,18 @@ pub struct PrefixExpression {
     pub token: Token,
     pub operator: String,
     pub right: Rc<Expression>,
+}
+
+impl IntoExpression for PrefixExpression {
+    fn into_expression(self) -> Expression {
+        Expression::PrefixExpression(self)
+    }
+}
+
+impl IntoNode for PrefixExpression {
+    fn into_node(self) -> Node {
+        Node::Expression(self.into_expression())
+    }
 }
 
 impl std::fmt::Display for PrefixExpression {
@@ -103,6 +220,18 @@ pub struct InfixExpression {
     pub right: Rc<Expression>,
 }
 
+impl IntoExpression for InfixExpression {
+    fn into_expression(self) -> Expression {
+        Expression::InfixExpression(self)
+    }
+}
+
+impl IntoNode for InfixExpression {
+    fn into_node(self) -> Node {
+        Node::Expression(self.into_expression())
+    }
+}
+
 impl std::fmt::Display for InfixExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({} {} {})", self.left, self.operator, self.right)
@@ -113,6 +242,18 @@ impl std::fmt::Display for InfixExpression {
 pub struct BooleanLiteral {
     pub token: Token,
     pub value: bool,
+}
+
+impl IntoExpression for BooleanLiteral {
+    fn into_expression(self) -> Expression {
+        Expression::BooleanLiteral(self)
+    }
+}
+
+impl IntoNode for BooleanLiteral {
+    fn into_node(self) -> Node {
+        Node::Expression(self.into_expression())
+    }
 }
 
 impl std::fmt::Display for BooleanLiteral {
@@ -127,6 +268,18 @@ pub struct IfExpression {
     pub condition: Rc<Expression>,
     pub consequence: BlockStatement,
     pub alternative: Option<BlockStatement>,
+}
+
+impl IntoExpression for IfExpression {
+    fn into_expression(self) -> Expression {
+        Expression::IfExpression(self)
+    }
+}
+
+impl IntoNode for IfExpression {
+    fn into_node(self) -> Node {
+        Node::Expression(self.into_expression())
+    }
 }
 
 impl std::fmt::Display for IfExpression {
@@ -146,26 +299,22 @@ impl std::fmt::Display for IfExpression {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct BlockStatement {
-    pub token: Token,
-    pub statements: Vec<Rc<Statement>>,
-}
-
-impl std::fmt::Display for BlockStatement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{ ")?;
-        for statement in &self.statements {
-            write!(f, "{}", statement)?;
-        }
-        write!(f, " }}")
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionLiteral {
     pub token: Token,
     pub parameters: Vec<Identifier>,
     pub body: BlockStatement,
+}
+
+impl IntoExpression for FunctionLiteral {
+    fn into_expression(self) -> Expression {
+        Expression::FunctionLiteral(self)
+    }
+}
+
+impl IntoNode for FunctionLiteral {
+    fn into_node(self) -> Node {
+        Node::Expression(self.into_expression())
+    }
 }
 
 impl std::fmt::Display for FunctionLiteral {
@@ -189,6 +338,18 @@ pub struct CallExpression {
     pub token: Token,
     pub function: Rc<Expression>,
     pub arguments: Vec<Expression>,
+}
+
+impl IntoExpression for CallExpression {
+    fn into_expression(self) -> Expression {
+        Expression::CallExpression(self)
+    }
+}
+
+impl IntoNode for CallExpression {
+    fn into_node(self) -> Node {
+        Node::Expression(self.into_expression())
+    }
 }
 impl std::fmt::Display for CallExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -340,7 +340,7 @@ impl<R: Read> Parser<R> {
     }
 
     fn parse_boolean(&mut self) -> Expression {
-        Expression::Boolean(BooleanLiteral {
+        Expression::BooleanLiteral(BooleanLiteral {
             token: self.cur_token.as_ref().clone(),
             value: self.cur_token.has_kind(TokenKind::True),
         })
@@ -528,7 +528,7 @@ mod tests {
 
     #[cfg(test)]
     fn test_boolean_literal(exp: Expression, expected: bool) {
-        if let Expression::Boolean(ref lit) = exp {
+        if let Expression::BooleanLiteral(ref lit) = exp {
             assert_eq!(lit.value, expected);
             assert_eq!(lit.token.literal, expected.to_string());
         } else {
@@ -560,7 +560,7 @@ mod tests {
             let left = match *infix.left {
                 Expression::IntegerLiteral(ref lit) => lit.value.to_string(),
                 Expression::Identifier(ref ident) => ident.value().to_string(),
-                Expression::Boolean(ref lit) => lit.value.to_string(),
+                Expression::BooleanLiteral(ref lit) => lit.value.to_string(),
                 _ => panic!(
                     "Expected IntegerLiteral or Identifier, got {:?}",
                     infix.left
@@ -570,7 +570,7 @@ mod tests {
             let right = match *infix.right {
                 Expression::IntegerLiteral(ref lit) => lit.value.to_string(),
                 Expression::Identifier(ref ident) => ident.value().to_string(),
-                Expression::Boolean(ref lit) => lit.value.to_string(),
+                Expression::BooleanLiteral(ref lit) => lit.value.to_string(),
                 _ => panic!(
                     "Expected IntegerLiteral or Identifier, got {:?}",
                     infix.right
