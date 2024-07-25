@@ -31,7 +31,8 @@ Syntax Error on line {} at col {}
 {DIVIDER}
  {line}
 {padding}{UP_ARROWHEAD}
-Unexpected {:?}",
+Unexpected {:?}
+{DIVIDER}",
             token.location.line, token.location.col, token.literal,
         )
     }
