@@ -178,6 +178,62 @@ impl<'a, R: Read> Parser<'a, R> {
         self.infix_parse_fns.insert(kind, func);
     }
 
+    fn recover(&mut self) {
+        // try to find the end of the current erroneous section
+        // this is probably a ; or a closing delimiter
+        //    but need to pay attention to inner sets of delimiters
+        // Example:
+        // https://github.com/rust-lang/rust/blob/master/compiler/rustc_parse/src/parser/diagnostics.rs#L2078
+
+        let mut brace_depth = 0;
+        let mut bracket_depth = 0;
+        let mut in_block = false;
+        loop {
+            match self.cur_token.kind {
+                TokenKind::Semicolon => {
+                    self.next_token();
+                    if brace_depth == 0 && bracket_depth == 0 {
+                        break;
+                    }
+                }
+                TokenKind::LBrace => {
+                    brace_depth += 1;
+                    self.next_token();
+                    if brace_depth == 1 && bracket_depth == 0 {
+                        in_block = true;
+                    }
+                }
+                TokenKind::LBracket => {
+                    bracket_depth += 1;
+                    self.next_token();
+                }
+                TokenKind::RBrace => {
+                    brace_depth -= 1;
+                    if brace_depth < 0 {
+                        brace_depth = 0;
+                    }
+                    self.next_token();
+                    if in_block && bracket_depth == 0 && brace_depth == 0 {
+                        break;
+                    }
+                }
+                TokenKind::RBracket => {
+                    bracket_depth -= 1;
+                    if bracket_depth < 0 {
+                        bracket_depth = 0;
+                    }
+                    self.next_token();
+                }
+                TokenKind::Eof => {
+                    break;
+                }
+                _ => {
+                    self.next_token();
+                }
+            }
+        }
+    }
+
     /// Parses the entire program and returns the abstract syntax tree
     /// This also saturates the fields of the internal lexer.
     pub fn parse(&mut self) -> Result<Node, ParserError> {
@@ -193,6 +249,7 @@ impl<'a, R: Read> Parser<'a, R> {
                 } else {
                     let err = stmt.unwrap_err();
                     eprintln!("{}", err);
+                    self.recover();
                 }
             }
 
@@ -221,9 +278,7 @@ impl<'a, R: Read> Parser<'a, R> {
         };
         self.expect_peek(TokenKind::Assign)?;
         self.next_token();
-        let value = self
-            .parse_expression(Precedence::Lowest)
-            .unwrap_or(Expression::Null);
+        let value = self.parse_expression(Precedence::Lowest)?;
 
         if self.peek_token.has_kind(TokenKind::Semicolon) {
             self.next_token();
@@ -239,9 +294,7 @@ impl<'a, R: Read> Parser<'a, R> {
     fn parse_return_statement(&mut self) -> Result<Statement, ParserError> {
         let token = self.cur_token.as_ref().clone();
         self.next_token();
-        let value = self
-            .parse_expression(Precedence::Lowest)
-            .unwrap_or(Expression::Null);
+        let value = self.parse_expression(Precedence::Lowest)?;
 
         if self.peek_token.has_kind(TokenKind::Semicolon) {
             self.next_token();
@@ -466,7 +519,7 @@ impl<'a, R: Read> Parser<'a, R> {
             identifiers.push(ident);
         }
 
-        self.expect_peek(TokenKind::RParen);
+        self.expect_peek(TokenKind::RParen)?;
         Ok(identifiers)
     }
 
@@ -492,18 +545,12 @@ impl<'a, R: Read> Parser<'a, R> {
         }
 
         self.next_token();
-        args.push(
-            self.parse_expression(Precedence::Lowest)
-                .unwrap_or(Expression::Null),
-        );
+        args.push(self.parse_expression(Precedence::Lowest)?);
 
         while self.peek_token.has_kind(TokenKind::Comma) {
             self.next_token(); // cur_token is now comma
             self.next_token(); // cur_token is now expression
-            args.push(
-                self.parse_expression(Precedence::Lowest)
-                    .unwrap_or(Expression::Null),
-            );
+            args.push(self.parse_expression(Precedence::Lowest)?);
         }
 
         self.expect_peek(TokenKind::RParen)?;
