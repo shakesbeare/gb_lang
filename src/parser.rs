@@ -203,6 +203,7 @@ impl<R: Read> Parser<R> {
     fn parse_statement(&mut self) -> Option<Statement> {
         match self.cur_token.kind {
             TokenKind::Let => self.parse_let_statement(),
+            TokenKind::Fn => self.parse_function_literal_statement(),
             TokenKind::Return => self.parse_return_statement(),
             TokenKind::Eol => None,
             _ => self.parse_expression_statement(),
@@ -427,6 +428,45 @@ impl<R: Read> Parser<R> {
         });
     }
 
+    fn parse_function_literal_statement(&mut self) -> Option<Statement> {
+        // check if this is a fn() {}, otherwise fn main() {}
+        if !self.peek_token.has_kind(TokenKind::Identifier) {
+            return self.parse_expression_statement();
+        }
+
+        let token = self.cur_token.as_ref().clone();
+        self.next_token();
+
+        let Expression::Identifier(identifier) = self.parse_identifier() else {
+            unreachable!()
+        };
+        // self.next_token();
+
+        if !self.expect_peek(TokenKind::LParen) {
+            self.syntax_error(self.peek_token.as_ref().clone());
+            return None;
+        }
+
+        let parameters = self.parse_function_parameters();
+
+        if !self.expect_peek(TokenKind::LBrace) {
+            self.syntax_error(self.peek_token.as_ref().clone());
+            return None;
+        }
+
+        let body = self.parse_block_statement();
+
+        return Some(
+            FunctionLiteralStatement {
+                token,
+                identifier,
+                parameters,
+                body,
+            }
+            .into_statement(),
+        );
+    }
+
     fn parse_function_parameters(&mut self) -> Vec<Identifier> {
         let mut identifiers = Vec::new();
         if self.peek_token.has_kind(TokenKind::RParen) {
@@ -504,11 +544,15 @@ mod tests {
     #![allow(unused_imports)]
 
     use super::Expression;
-    use crate::{ast::{Node, Statement}, lexer::Lexer, parser::Parser, token::TokenKind};
+    use crate::{
+        ast::{IntoExpression, Node, Statement},
+        lexer::Lexer,
+        parser::Parser,
+        token::TokenKind,
+    };
 
     #[cfg(test)]
     fn test_integer_literal(exp: Expression, expected: i64) {
-
         if let Expression::IntegerLiteral(ref lit) = exp {
             assert_eq!(lit.value, expected);
             assert_eq!(lit.token.literal, expected.to_string());
@@ -1077,5 +1121,43 @@ mod tests {
         for (i, arg) in call.arguments.iter().enumerate() {
             assert_eq!(arg.to_string(), expected_args[i]);
         }
+    }
+
+    #[test]
+    fn function_literal_statement() {
+        let input = "fn main(x, y) { x + y; }";
+        let mut parser = Parser::new(Lexer::from(input.as_bytes()), false);
+        let ast = parser.parse();
+        parser.check_parser_errors();
+
+        let children = ast.into_program().statements;
+        assert_eq!(children.len(), 1);
+
+        let Node::Statement(Statement::FunctionLiteralStatement(ref func)) =
+            children[0]
+        else {
+            panic!("Expected ExpressionStatement, got {:?}", children[0]);
+        };
+
+        test_identifier(func.identifier.clone().into_expression(), "main");
+
+        if func.parameters.len() != 2 {
+            panic!("Expected 2 parameters, got {:?}", func.parameters);
+        }
+
+        let expected_params = ["x", "y"];
+        for (i, param) in func.parameters.iter().enumerate() {
+            assert_eq!(param.value(), expected_params[i]);
+        }
+
+        let Statement::ExpressionStatement(ref expr_stmt) = *func.body.statements[0]
+        else {
+            panic!(
+                "Expected ExpressionStatement, got {:?}",
+                func.body.statements[0]
+            );
+        };
+
+        test_infix_expression((*expr_stmt.expression).clone(), "x", "+", "y");
     }
 }

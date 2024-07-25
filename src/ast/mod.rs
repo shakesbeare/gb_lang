@@ -43,6 +43,7 @@ pub enum Statement {
     ReturnStatement(ReturnStatement),
     ExpressionStatement(ExpressionStatement),
     BlockStatement(BlockStatement),
+    FunctionLiteralStatement(FunctionLiteralStatement),
 }
 
 impl IntoNode for Statement {
@@ -98,6 +99,7 @@ impl std::fmt::Display for Statement {
             Statement::ReturnStatement(s) => write!(f, "{}", s),
             Statement::ExpressionStatement(s) => write!(f, "{}", s),
             Statement::BlockStatement(s) => write!(f, "{}", s),
+            Statement::FunctionLiteralStatement(s) => write!(f, "{}", s),
         }
     }
 }

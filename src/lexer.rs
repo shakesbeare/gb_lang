@@ -534,9 +534,11 @@ impl<T: Read> Lexer<T> {
 mod test {
     #![allow(unused_imports)]
 
+    use crate::{
+        lexer::{LexStatus, Lexer},
+        token::TokenKind,
+    };
     use std::collections::HashMap;
-    use crate::{lexer::{LexStatus, Lexer}, token::TokenKind};
-
 
     #[test]
     fn lex_identifier() {

@@ -1,13 +1,13 @@
 use crate::token::Token;
 use std::rc::Rc;
 
-use super::Node;
 use super::Expression;
+use super::Node;
 use super::Statement;
 
+use super::IntoExpression;
 use super::IntoNode;
 use super::IntoStatement;
-use super::IntoExpression;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct LetStatement {
@@ -22,7 +22,7 @@ impl std::fmt::Display for LetStatement {
     }
 }
 
-impl IntoNode for LetStatement { 
+impl IntoNode for LetStatement {
     fn into_node(self) -> Node {
         Node::Statement(self.into_statement())
     }
@@ -41,7 +41,7 @@ pub struct ReturnStatement {
 }
 
 impl IntoStatement for ReturnStatement {
-    fn into_statement(self) -> Statement { 
+    fn into_statement(self) -> Statement {
         Statement::ReturnStatement(self)
     }
 }
@@ -107,6 +107,43 @@ impl std::fmt::Display for BlockStatement {
             write!(f, "{}", statement)?;
         }
         write!(f, " }}")
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct FunctionLiteralStatement {
+    pub token: Token,
+    pub identifier: Identifier,
+    pub parameters: Vec<Identifier>,
+    pub body: BlockStatement,
+}
+
+impl std::fmt::Display for FunctionLiteralStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{}({}) {}",
+            self.token.literal,
+            self.identifier,
+            self.parameters
+                .iter()
+                .map(|p| p.value())
+                .collect::<Vec<&str>>()
+                .join(", "),
+            self.body
+        )
+    }
+}
+
+impl IntoStatement for FunctionLiteralStatement {
+    fn into_statement(self) -> Statement {
+        Statement::FunctionLiteralStatement(self)
+    }
+}
+
+impl IntoNode for FunctionLiteralStatement {
+    fn into_node(self) -> Node {
+        Node::Statement(self.into_statement())
     }
 }
 
