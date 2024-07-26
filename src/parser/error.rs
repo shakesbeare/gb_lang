@@ -12,15 +12,15 @@ pub enum ParserError {
 const UP_ARROWHEAD: &str = "⌃";
 const DIVIDER: &str = "--------------------------------";
 
-pub trait ErrorHandler<'a> {
+pub trait ErrorHandler {
     fn syntax_error(&self, token: Token) -> String;
 }
 
-pub struct DefaultErrorHandler<'a> {
-    pub input: &'a str,
+pub struct DefaultErrorHandler {
+    pub input: String,
 }
 
-impl<'a> ErrorHandler<'a> for DefaultErrorHandler<'a> {
+impl ErrorHandler for DefaultErrorHandler {
     fn syntax_error(&self, token: Token) -> String {
         let line = self.input.split('\n').nth(token.location.line - 1).unwrap();
         let padding = " ".repeat(token.location.col - 1);

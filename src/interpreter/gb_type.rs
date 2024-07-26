@@ -1,5 +1,16 @@
 use std::{fmt, ops::Not};
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum GbType {
+    Empty,
+    Error,
+    None,
+    Integer(i64),
+    Float(f64),
+    Boolean(bool),
+    String(String),
+}
+
 pub fn variant_eq<T>(a: &T, b: &T) -> bool {
     std::mem::discriminant(a) == std::mem::discriminant(b)
 }
@@ -66,17 +77,6 @@ pub fn gb_type_of(x: GbType) -> String {
         GbType::Boolean(_) => "Boolean",
         GbType::String(_) => "String",
     }.into()
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum GbType {
-    Empty,
-    Error,
-    None,
-    Integer(i64),
-    Float(f64),
-    Boolean(bool),
-    String(String),
 }
 
 impl Not for GbType {

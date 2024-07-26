@@ -31,8 +31,6 @@ pub enum LexStatus {
     Eof,
 }
 
-#[allow(dead_code)]
-
 pub struct Lexer<T: Read> {
     pub next_token: Option<Token>,
 

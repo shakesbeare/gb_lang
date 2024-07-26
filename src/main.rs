@@ -6,7 +6,7 @@ fn main() -> Result<()> {
 let x = 7;";
     let mut p = parser::Parser::new(
         lexer::Lexer::from(input.as_bytes()),
-        Box::new(parser::error::DefaultErrorHandler { input }),
+        Box::new(parser::error::DefaultErrorHandler { input: input.to_string() }),
         false,
     );
     let ast = p.parse().unwrap();
