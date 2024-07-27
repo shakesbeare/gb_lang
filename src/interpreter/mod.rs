@@ -186,11 +186,7 @@ impl TreeWalking {
     }
 
     fn evaluate_identifier(&mut self, input: &Identifier) -> GbType {
-        if let Some(out) = self.top_env().get(input.value()) {
-            out.clone()
-        } else {
-            GbType::None
-        }
+        self.lookup(input.value().into()).clone()
     }
 
     fn evaluate_prefix_expression(&mut self, expr: &PrefixExpression) -> GbType {
