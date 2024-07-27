@@ -17,7 +17,7 @@ impl GbFunc for FunctionLiteral {
         for (param, arg) in self.parameters.iter().zip(args) {
             new_env.insert(param.value(), arg.clone());
         }
-        strategy.evaluate(self.body.clone().into_node().borrow())
+        strategy.evaluate(self.body.clone().into_node().borrow(), true)
     }
 }
 

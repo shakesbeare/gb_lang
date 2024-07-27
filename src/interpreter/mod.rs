@@ -17,7 +17,7 @@ use gb_type::{gb_pow, GbFunc, GbType};
 use gxhash::{HashMap, HashMapExt};
 
 pub trait InterpreterStrategy {
-    fn evaluate(&mut self, input: &Node) -> GbType;
+    fn evaluate(&mut self, input: &Node, function_context: bool) -> GbType;
     fn new_env(&mut self);
     fn global_env(&mut self) -> &mut Environment;
     fn top_env(&mut self) -> &mut Environment;
@@ -42,7 +42,7 @@ impl<T: InterpreterStrategy> Interpreter<T> {
     }
 
     pub fn evaluate(&mut self) -> GbType {
-        self.strategy.evaluate(&self.ast)
+        self.strategy.evaluate(&self.ast, false)
     }
 
     pub fn new_input(&mut self, input: String) -> Result<(), ParserError> {
@@ -64,10 +64,12 @@ pub struct TreeWalking {
 }
 
 impl InterpreterStrategy for TreeWalking {
-    fn evaluate(&mut self, input: &Node) -> GbType {
+    fn evaluate(&mut self, input: &Node, function_context: bool) -> GbType {
         match input {
-            Node::Program(p) => self.evaluate_program(p.statements.as_slice()),
-            Node::Statement(s) => self.evaluate_statement(s),
+            Node::Program(p) => {
+                self.evaluate_program(p.statements.as_slice(), function_context)
+            }
+            Node::Statement(s) => self.evaluate_statement(s, function_context),
             Node::Expression(e) => self.evaluate_expression(e),
         }
     }
@@ -121,13 +123,13 @@ impl TreeWalking {
         out
     }
 
-    fn evaluate_program(&mut self, input: &[Node]) -> GbType {
+    fn evaluate_program(&mut self, input: &[Node], function_context: bool) -> GbType {
         let mut last_result = GbType::None;
         for node in input {
             match node {
                 Node::Program(_) => unreachable!(),
                 Node::Statement(statement) => {
-                    last_result = self.evaluate_statement(statement)
+                    last_result = self.evaluate_statement(statement, function_context)
                 }
                 Node::Expression(_) => unreachable!(),
             };
@@ -136,24 +138,42 @@ impl TreeWalking {
         last_result
     }
 
-    fn evaluate_statement(&mut self, input: &Statement) -> GbType {
+    fn evaluate_statement(
+        &mut self,
+        input: &Statement,
+        function_context: bool,
+    ) -> GbType {
         match input {
             Statement::LetStatement(ls) => self.evaluate_let_statement(ls),
-            Statement::ReturnStatement(_) => todo!(),
+            Statement::ReturnStatement(rs) => {
+                if !function_context {
+                    panic!("Return is only allowed in function context");
+                }
+                self.evaluate_expression(&rs.return_value)
+            }
             Statement::ExpressionStatement(es) => {
                 self.evaluate_expression_statement(es)
             }
-            Statement::BlockStatement(bs) => self.evaluate_block_statement(bs),
+            Statement::BlockStatement(bs) => {
+                self.evaluate_block_statement(bs, function_context)
+            }
             Statement::FunctionLiteralStatement(fls) => {
                 self.evaluate_function_literal_statement(fls)
             }
         }
     }
 
-    fn evaluate_block_statement(&mut self, input: &BlockStatement) -> GbType {
+    fn evaluate_block_statement(
+        &mut self,
+        input: &BlockStatement,
+        function_context: bool,
+    ) -> GbType {
         let mut last = GbType::None;
         for stmt in input.statements.iter() {
-            last = self.evaluate_statement(stmt);
+            last = self.evaluate_statement(stmt, function_context);
+            if stmt.is_return_statement() && function_context {
+                return last;
+            }
         }
         last
     }
@@ -250,11 +270,13 @@ impl TreeWalking {
         };
 
         if cond {
-            self.evaluate_block_statement(&input.consequence)
+            self.evaluate_block_statement(&input.consequence, false)
         } else {
             match &input.alternative {
                 Alternative::IfExpression(ie) => self.evaluate_expression(ie),
-                Alternative::BlockStatement(bs) => self.evaluate_block_statement(bs),
+                Alternative::BlockStatement(bs) => {
+                    self.evaluate_block_statement(bs, false)
+                }
                 Alternative::None => GbType::None,
             }
         }

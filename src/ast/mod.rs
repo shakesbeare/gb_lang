@@ -54,6 +54,15 @@ impl IntoNode for Statement {
     }
 }
 
+impl Statement {
+    pub fn is_return_statement(&self) -> bool {
+        match self {
+            Statement::ReturnStatement(_) => true, 
+            _ => false,
+        }
+    }
+}
+
 pub trait IntoStatement {
     fn into_statement(self) -> Statement;
 }
