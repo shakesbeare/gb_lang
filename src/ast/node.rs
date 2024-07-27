@@ -324,11 +324,32 @@ impl std::fmt::Display for BooleanLiteral {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum Alternative {
+    Condition(Rc<Expression>),
+    Termination(BlockStatement),
+    None,
+}
+
+impl Alternative {
+    pub fn is_some(&self) -> bool {
+        match self {
+            Alternative::Condition(_) => true,
+            Alternative::Termination(_) => true,
+            Alternative::None => false,
+        }
+    }
+
+    pub fn is_none(&self) -> bool {
+        !self.is_some()
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfExpression {
     pub token: Token,
     pub condition: Rc<Expression>,
     pub consequence: BlockStatement,
-    pub alternative: Option<BlockStatement>,
+    pub alternative: Alternative,
 }
 
 impl IntoExpression for IfExpression {
@@ -345,16 +366,28 @@ impl IntoNode for IfExpression {
 
 impl std::fmt::Display for IfExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.alternative.is_some() {
-            write!(
-                f,
-                "if {} {} else {}",
-                self.condition,
-                self.consequence,
-                self.alternative.as_ref().unwrap()
-            )
-        } else {
-            write!(f, "if {} {}", self.condition, self.consequence)
+        match &self.alternative {
+            Alternative::Condition(c) => {
+                write!(
+                    f,
+                    "if {} {} else {}",
+                    self.condition,
+                    self.consequence,
+                    c,
+                )
+            }
+            Alternative::Termination(t) => {
+                write!(
+                    f,
+                    "if {} {} else {}",
+                    self.condition,
+                    self.consequence,
+                    t,
+                )
+            }
+            Alternative::None => {
+                write!(f, "if {} {}", self.condition, self.consequence)
+            }
         }
     }
 }

@@ -6,8 +6,7 @@ use std::rc::Rc;
 use self::environment::Environment;
 use crate::{
     ast::{
-        BlockStatement, Expression, ExpressionStatement, Identifier, IfExpression,
-        InfixExpression, LetStatement, Node, PrefixExpression, Statement,
+        Alternative, BlockStatement, Expression, ExpressionStatement, Identifier, IfExpression, InfixExpression, LetStatement, Node, PrefixExpression, Statement
     },
     parser::error::ParserError,
 };
@@ -228,10 +227,12 @@ impl TreeWalking {
 
         if cond {
             self.evaluate_block_statement(&input.consequence)
-        } else if let Some(alternative) = &input.alternative {
-            self.evaluate_block_statement(alternative)
-        } else {
-            GbType::None
+        } else  {
+            match &input.alternative {
+                Alternative::Condition(ie) => self.evaluate_expression(ie),
+                Alternative::Termination(bs) => self.evaluate_block_statement(bs),
+                Alternative::None => GbType::None,
+            }
         }
     }
 }

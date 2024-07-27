@@ -427,13 +427,20 @@ impl<'a, R: Read> Parser<'a, R> {
         let cond = self.parse_expression(Precedence::Lowest)?;
         self.expect_peek(TokenKind::LBrace)?;
         let consequence = self.parse_block_statement()?;
-        let mut alternative: Option<BlockStatement> = None;
+        let mut alternative = Alternative::None;
 
         if self.peek_token.has_kind(TokenKind::Else) {
             self.next_token();
 
-            self.expect_peek(TokenKind::LBrace)?;
-            alternative = Some(self.parse_block_statement()?);
+            alternative = if self.peek_token.has_kind(TokenKind::LBrace) {
+                self.next_token();
+                Alternative::Termination(self.parse_block_statement()?)
+            } else if self.peek_token.has_kind(TokenKind::If) {
+                self.next_token();
+                Alternative::Condition(self.parse_if_expression()?.into())
+            } else {
+                return Err(self.syntax_error(self.peek_token.as_ref().clone()));
+            };
         }
 
         Ok(Expression::IfExpression(IfExpression {
@@ -571,10 +578,9 @@ mod tests {
 
     use super::Expression;
     use crate::{
-        ast::{IntoExpression, Node, Statement},
+        ast::{Alternative, IntoExpression, Node, Statement},
         lexer::Lexer,
-        parser::error::DefaultErrorHandler,
-        parser::Parser,
+        parser::{error::DefaultErrorHandler, Parser},
         token::TokenKind,
     };
 
@@ -674,7 +680,9 @@ mod tests {
         for (inp, expected_identifier, expected_value) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                Box::new(DefaultErrorHandler { input: inp.to_string() }),
+                Box::new(DefaultErrorHandler {
+                    input: inp.to_string(),
+                }),
                 false,
             );
             let ast = parser.parse().unwrap();
@@ -708,7 +716,9 @@ mod tests {
         for (inp, expected) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                Box::new(DefaultErrorHandler { input: inp.to_string() }),
+                Box::new(DefaultErrorHandler {
+                    input: inp.to_string(),
+                }),
                 false,
             );
             let ast = parser.parse().unwrap();
@@ -782,7 +792,9 @@ mod tests {
             dbg!(&inp);
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                Box::new(DefaultErrorHandler { input: inp.to_string() }),
+                Box::new(DefaultErrorHandler {
+                    input: inp.to_string(),
+                }),
                 false,
             );
             let ast = parser.parse().unwrap();
@@ -801,11 +813,14 @@ mod tests {
 
     #[test]
     fn string_literal_expression() {
-        let input: Vec<(&str, &str)> = vec![("'hello';", "hello"), ("\"hello\";", "hello")];
+        let input: Vec<(&str, &str)> =
+            vec![("'hello';", "hello"), ("\"hello\";", "hello")];
         for (inp, expected) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                Box::new(DefaultErrorHandler { input: inp.to_string() }),
+                Box::new(DefaultErrorHandler {
+                    input: inp.to_string(),
+                }),
                 false,
             );
             let ast = parser.parse().unwrap();
@@ -828,7 +843,9 @@ mod tests {
         for (inp, op, int) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                Box::new(DefaultErrorHandler { input: inp.to_string() }),
+                Box::new(DefaultErrorHandler {
+                    input: inp.to_string(),
+                }),
                 false,
             );
             let ast = parser.parse().unwrap();
@@ -855,7 +872,9 @@ mod tests {
         for (inp, op, boolean) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                Box::new(DefaultErrorHandler { input: inp.to_string() }),
+                Box::new(DefaultErrorHandler {
+                    input: inp.to_string(),
+                }),
                 false,
             );
             let ast = parser.parse().unwrap();
@@ -891,7 +910,9 @@ mod tests {
         for (inp, left, op, right) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                Box::new(DefaultErrorHandler { input: inp.to_string() }),
+                Box::new(DefaultErrorHandler {
+                    input: inp.to_string(),
+                }),
                 false,
             );
             let ast = parser.parse().unwrap();
@@ -918,7 +939,9 @@ mod tests {
         for (inp, left, op, right) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                Box::new(DefaultErrorHandler { input: inp.to_string() }),
+                Box::new(DefaultErrorHandler {
+                    input: inp.to_string(),
+                }),
                 false,
             );
             let ast = parser.parse().unwrap();
@@ -951,7 +974,9 @@ mod tests {
         for (inp, left, op, right) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                Box::new(DefaultErrorHandler { input: inp.to_string() }),
+                Box::new(DefaultErrorHandler {
+                    input: inp.to_string(),
+                }),
                 false,
             );
             let ast = parser.parse().unwrap();
@@ -1010,7 +1035,9 @@ mod tests {
         for (inp, expected) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                Box::new(DefaultErrorHandler { input: inp.to_string() }),
+                Box::new(DefaultErrorHandler {
+                    input: inp.to_string(),
+                }),
                 false,
             );
             let ast = parser.parse().unwrap();
@@ -1048,7 +1075,9 @@ mod tests {
         let input = "if x < y { x }";
         let mut parser = Parser::new(
             Lexer::from(input.as_bytes()),
-            Box::new(DefaultErrorHandler { input: input.to_string() }),
+            Box::new(DefaultErrorHandler {
+                input: input.to_string(),
+            }),
             false,
         );
         let ast = parser.parse().unwrap();
@@ -1089,7 +1118,9 @@ mod tests {
         let input = "if x < y { x } else { y }";
         let mut parser = Parser::new(
             Lexer::from(input.as_bytes()),
-            Box::new(DefaultErrorHandler { input: input.to_string() }),
+            Box::new(DefaultErrorHandler {
+                input: input.to_string(),
+            }),
             false,
         );
         let ast = parser.parse().unwrap();
@@ -1119,14 +1150,67 @@ mod tests {
         };
 
         test_identifier((*expr_stmt.expression).clone(), "x");
+        let Alternative::Termination(ref bs) = if_expr.alternative else {
+            panic!("Expected block statement, got {:?}", if_expr.alternative)
+        };
+
+        let Statement::ExpressionStatement(ref expr_stmt) = *bs.statements[0] else {
+            panic!("Expected ExpressionStatement, got {:?}", *bs.statements[0]);
+        };
+
+        test_identifier((*expr_stmt.expression).clone(), "y");
+    }
+
+    #[test]
+    fn if_else_continuation() {
+        let input = "if x < y { x } else if x < y { y }";
+        let mut parser = Parser::new(
+            Lexer::from(input.as_bytes()),
+            Box::new(DefaultErrorHandler {
+                input: input.to_string(),
+            }),
+            false,
+        );
+        let ast = parser.parse().unwrap();
+        parser.check_parser_errors();
+
+        let children = ast.into_program().statements;
+        assert_eq!(children.len(), 1);
+
+        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0]
+        else {
+            panic!("Expected ExpressionStatement, got {:?}", children[0]);
+        };
+
+        let Expression::IfExpression(ref if_expr) = *stmt.expression else {
+            panic!("Expected IfExpression, got {:?}", stmt.expression);
+        };
+
+        test_infix_expression((*if_expr.condition).clone(), "x", "<", "y");
 
         let Statement::ExpressionStatement(ref expr_stmt) =
-            *if_expr.alternative.as_ref().unwrap().statements[0]
+            *if_expr.consequence.statements[0]
         else {
             panic!(
                 "Expected ExpressionStatement, got {:?}",
-                if_expr.alternative.as_ref().unwrap().statements[0]
+                if_expr.consequence.statements[0]
             );
+        };
+
+        test_identifier((*expr_stmt.expression).clone(), "x");
+        let Alternative::Condition(ref second_cond) = if_expr.alternative else {
+            panic!(
+                "Expected continuation condition, got {:?}",
+                if_expr.alternative
+            )
+        };
+
+        let Expression::IfExpression(ref ie) = **second_cond else {
+            panic!("Expected if expression, got {:?}", second_cond)
+        };
+
+        let Statement::ExpressionStatement(ref expr_stmt) = *ie.consequence.statements[0] else {
+            panic!("Expected ExpressionStatement, got {:?}", *ie.consequence.statements[0]);
         };
 
         test_identifier((*expr_stmt.expression).clone(), "y");
@@ -1138,7 +1222,9 @@ mod tests {
 
         let mut parser = Parser::new(
             Lexer::from(input.as_bytes()),
-            Box::new(DefaultErrorHandler { input: input.to_string() }),
+            Box::new(DefaultErrorHandler {
+                input: input.to_string(),
+            }),
             false,
         );
         let ast = parser.parse().unwrap();
@@ -1187,7 +1273,9 @@ mod tests {
         for (inp, expected) in input {
             let mut parser = Parser::new(
                 Lexer::from(inp.as_bytes()),
-                Box::new(DefaultErrorHandler { input: inp.to_string() }),
+                Box::new(DefaultErrorHandler {
+                    input: inp.to_string(),
+                }),
                 false,
             );
             let ast = parser.parse().unwrap();
@@ -1225,7 +1313,9 @@ mod tests {
 
         let mut parser = Parser::new(
             Lexer::from(input.as_bytes()),
-            Box::new(DefaultErrorHandler { input: input.to_string() }),
+            Box::new(DefaultErrorHandler {
+                input: input.to_string(),
+            }),
             false,
         );
         let ast = parser.parse().unwrap();
@@ -1260,7 +1350,9 @@ mod tests {
         let input = "fn main(x, y) { x + y; }";
         let mut parser = Parser::new(
             Lexer::from(input.as_bytes()),
-            Box::new(DefaultErrorHandler { input: input.to_string() }),
+            Box::new(DefaultErrorHandler {
+                input: input.to_string(),
+            }),
             false,
         );
         let ast = parser.parse().unwrap();
