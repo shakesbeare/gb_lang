@@ -784,19 +784,19 @@ fn function_literal_statement() {
 
     test_identifier(func.identifier.clone().into_expression(), "main");
 
-    if func.parameters.len() != 2 {
-        panic!("Expected 2 parameters, got {:?}", func.parameters);
+    if func.literal.parameters.len() != 2 {
+        panic!("Expected 2 parameters, got {:?}", func.literal.parameters);
     }
 
     let expected_params = ["x", "y"];
-    for (i, param) in func.parameters.iter().enumerate() {
+    for (i, param) in func.literal.parameters.iter().enumerate() {
         assert_eq!(param.value(), expected_params[i]);
     }
 
-    let Statement::ExpressionStatement(ref expr_stmt) = *func.body.statements[0] else {
+    let Statement::ExpressionStatement(ref expr_stmt) = *func.literal.body.statements[0] else {
         panic!(
             "Expected ExpressionStatement, got {:?}",
-            func.body.statements[0]
+            func.literal.body.statements[0]
         );
     };
 

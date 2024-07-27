@@ -1,18 +1,23 @@
 use std::{borrow::Borrow, fmt, ops::Not, rc::Rc};
 
-use crate::ast::{BlockStatement, IntoNode, Node};
+use crate::ast::{BlockStatement, FunctionLiteral, IntoNode, Node};
 
 use super::InterpreterStrategy;
 
 pub trait GbFunc: std::fmt::Debug {
-    fn execute(&self, strategy: &mut dyn InterpreterStrategy) -> GbType;
+    fn execute(&self, strategy: &mut dyn InterpreterStrategy, args: &[GbType]) -> GbType;
 }
 
-impl GbFunc for BlockStatement {
+impl GbFunc for FunctionLiteral {
     // TODD: this really should execute on a pointer to the block
     //       rather than cloning the block...
-    fn execute(&self, strategy: &mut dyn InterpreterStrategy) -> GbType {
-        strategy.evaluate(self.clone().into_node().borrow())
+    fn execute(&self, strategy: &mut dyn InterpreterStrategy, args: &[GbType]) -> GbType {
+        strategy.new_env();
+        let new_env = strategy.top_env();
+        for (param, arg) in self.parameters.iter().zip(args) {
+            new_env.insert(param.value(), arg.clone());
+        }
+        strategy.evaluate(self.body.clone().into_node().borrow())
     }
 }
 

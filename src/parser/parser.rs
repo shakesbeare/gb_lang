@@ -501,11 +501,16 @@ impl<'a, R: Read> Parser<'a, R> {
         self.expect_peek(TokenKind::LBrace)?;
         let body = self.parse_block_statement()?;
 
+        let function_literal = FunctionLiteral {
+            token: token.clone(),
+            parameters,
+            body
+        };
+
         return Ok(FunctionLiteralStatement {
             token,
             identifier,
-            parameters,
-            body,
+            literal: function_literal,
         }
         .into_statement());
     }

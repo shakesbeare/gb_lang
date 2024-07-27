@@ -7,16 +7,20 @@ use std::rc::Rc;
 use self::environment::Environment;
 use crate::{
     ast::{
-        Alternative, BlockStatement, Expression, ExpressionStatement,
+        Alternative, BlockStatement, Expression, ExpressionStatement, FunctionLiteral,
         FunctionLiteralStatement, Identifier, IfExpression, InfixExpression,
         LetStatement, Node, PrefixExpression, Statement,
     },
     parser::error::ParserError,
 };
 use gb_type::{gb_pow, GbType};
+use gxhash::{HashMap, HashMapExt};
 
 pub trait InterpreterStrategy {
     fn evaluate(&mut self, input: &Node) -> GbType;
+    fn new_env(&mut self);
+    fn global_env(&mut self) -> &mut Environment;
+    fn top_env(&mut self) -> &mut Environment;
 }
 
 pub struct Interpreter<T: InterpreterStrategy> {
@@ -67,18 +71,9 @@ impl InterpreterStrategy for TreeWalking {
             Node::Expression(e) => self.evaluate_expression(e),
         }
     }
-}
 
-impl Default for TreeWalking {
-    fn default() -> Self {
-        let stack = vec![Environment::new()];
-        Self::new(stack)
-    }
-}
-
-impl TreeWalking {
-    fn new(stack: Vec<Environment>) -> Self {
-        Self { stack }
+    fn new_env(&mut self) {
+        self.stack.push(Environment::new(HashMap::new()))
     }
 
     fn global_env(&mut self) -> &mut Environment {
@@ -87,6 +82,20 @@ impl TreeWalking {
 
     fn top_env(&mut self) -> &mut Environment {
         self.stack.last_mut().unwrap()
+    }
+
+}
+
+impl Default for TreeWalking {
+    fn default() -> Self {
+        let stack = vec![Environment::default()];
+        Self::new(stack)
+    }
+}
+
+impl TreeWalking {
+    fn new(stack: Vec<Environment>) -> Self {
+        Self { stack }
     }
 
     fn inspect(&self) -> Vec<Vec<(Rc<str>, &GbType)>> {
@@ -157,7 +166,7 @@ impl TreeWalking {
             Expression::InfixExpression(ie) => self.evaluate_infix_expression(ie),
             Expression::BooleanLiteral(b) => GbType::Boolean(b.value),
             Expression::IfExpression(ie) => self.evaluate_if_expression(ie),
-            Expression::FunctionLiteral(_) => todo!(),
+            Expression::FunctionLiteral(fl) => self.evaluate_function_literal(fl),
             Expression::CallExpression(_) => todo!(),
         }
     }
@@ -246,8 +255,12 @@ impl TreeWalking {
         input: &FunctionLiteralStatement,
     ) -> GbType {
         let key: Rc<str> = input.identifier.value().into();
-        let value = GbType::Function(Rc::new(input.body.clone()));
+        let value = GbType::Function(Rc::new(input.literal.clone()));
         self.top_env().insert(key, value);
         GbType::None
+    }
+
+    fn evaluate_function_literal(&mut self, input: &FunctionLiteral) -> GbType {
+        GbType::Function(Rc::new(input.clone()))
     }
 }

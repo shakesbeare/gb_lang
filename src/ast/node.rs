@@ -114,23 +114,16 @@ impl std::fmt::Display for BlockStatement {
 pub struct FunctionLiteralStatement {
     pub token: Token,
     pub identifier: Identifier,
-    pub parameters: Vec<Identifier>,
-    pub body: BlockStatement,
+    pub literal: FunctionLiteral,
 }
 
 impl std::fmt::Display for FunctionLiteralStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}{}({}) {}",
-            self.token.literal,
+            "{} -> {}",
             self.identifier,
-            self.parameters
-                .iter()
-                .map(|p| p.value())
-                .collect::<Vec<&str>>()
-                .join(", "),
-            self.body
+            self.literal
         )
     }
 }

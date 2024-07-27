@@ -7,10 +7,7 @@ pub(super) struct Environment {
 }
 
 impl Environment {
-    pub fn new() -> Self {
-        let mut stable = HashMap::new();
-        stable.insert("None".into(), GbType::None);
-
+    pub fn new(stable: HashMap<Rc<str>, GbType>) -> Self {
         Environment {
             symbol_table: stable,
         }
@@ -47,6 +44,8 @@ impl Environment {
 
 impl Default for Environment {
     fn default() -> Self {
-        Self::new()
+        let mut stable = HashMap::new();
+        stable.insert("None".into(), GbType::None);
+        Self::new(stable)
     }
 }

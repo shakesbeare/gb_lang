@@ -18,11 +18,13 @@ pub trait AsAny {
     fn as_any(&self) -> &dyn std::any::Any;
 }
 
-impl AsAny for Rc<dyn GbFunc> {
+impl AsAny for BlockStatement {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
 }
+
+
 
 #[test]
 fn integer() {
@@ -153,21 +155,27 @@ fn if_expression() {
     }
 }
 
-// #[test]
-// fn function_literal_statement() {
-//     let input = "fn main() { 7 }";
-//     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
-//     let res = i.evaluate();
-//     let GbType::Function(ptr) = res else {
-//         panic!("Expected GbType::Function, got {:?}", res);
-//     };
-//     let map = &i.strategy.stack[0];
-//     assert!(map.get("main").is_some());
-//     let bs  = match ptr.as_any().downcast_ref::<BlockStatement>() {
-//         Some(bs) => bs,
-//         None => panic!("Inner function type was not a block statement node"),
-//     };
-//
-//     let actual = i.strategy.evaluate_block_statement(bs);
-//     assert_eq!(actual, GbType::Integer(7));
-// }
+#[test]
+fn function_literal_statement() {
+    let input = "fn main(x, y) { x + y }";
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let res = i.evaluate();
+    let map = &i.strategy.stack[0];
+    let GbType::Function(ptr) = map.get("main").unwrap().clone() else {
+        panic!("Expected GbType::Function, got {:?}", res);
+    };
+    let actual = ptr.execute(&mut i.strategy, &[GbType::Integer(3), GbType::Integer(4)]);
+    assert_eq!(actual, GbType::Integer(7));
+}
+
+#[test]
+fn function_literal() {
+    let input = "fn (x, y) { x + y }";
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let res = i.evaluate();
+    let GbType::Function(ptr) = res else {
+        panic!("Expected GbType::Function, got {:?}", res);
+    };
+    let actual = ptr.execute(&mut i.strategy, &[GbType::Integer(3), GbType::Integer(4)]);
+    assert_eq!(actual, GbType::Integer(7));
+}
