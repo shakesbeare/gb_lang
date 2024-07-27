@@ -5,13 +5,16 @@ use std::rc::Rc;
 
 use self::environment::Environment;
 use crate::{
-    ast::{Expression, LetStatement, Node, Statement},
+    ast::{
+        BlockStatement, Expression, ExpressionStatement, Identifier, IfExpression,
+        InfixExpression, LetStatement, Node, PrefixExpression, Statement,
+    },
     parser::error::ParserError,
 };
-use gb_type::GbType;
+use gb_type::{gb_pow, GbType};
 
 pub trait InterpreterStrategy {
-    fn evaluate(&mut self, input: &Node) -> &GbType;
+    fn evaluate(&mut self, input: &Node) -> GbType;
 }
 
 pub struct Interpreter<T: InterpreterStrategy> {
@@ -32,8 +35,21 @@ impl<T: InterpreterStrategy> Interpreter<T> {
         Ok(Self { strategy, ast })
     }
 
-    fn evaluate(&mut self) {
-        self.strategy.evaluate(&self.ast);
+    fn evaluate(&mut self) -> GbType {
+        self.strategy.evaluate(&self.ast)
+    }
+
+    pub fn new_input(&mut self, input: String) -> Result<(), ParserError> {
+        let mut p = crate::parser::Parser::new(
+            crate::lexer::Lexer::from(input.as_bytes()),
+            Box::new(crate::parser::error::DefaultErrorHandler {
+                input: input.to_string(),
+            }),
+            false,
+        );
+        let ast = p.parse()?;
+        self.ast = ast;
+        Ok(())
     }
 }
 
@@ -42,7 +58,7 @@ pub struct TreeWalking {
 }
 
 impl InterpreterStrategy for TreeWalking {
-    fn evaluate(&mut self, input: &Node) -> &GbType {
+    fn evaluate(&mut self, input: &Node) -> GbType {
         match input {
             Node::Program(p) => self.evaluate_program(p.statements.as_slice()),
             Node::Statement(_) => todo!(),
@@ -80,54 +96,152 @@ impl TreeWalking {
         out
     }
 
-    fn evaluate_program(&mut self, input: &[Node]) -> &GbType {
+    fn evaluate_program(&mut self, input: &[Node]) -> GbType {
+        let mut last_result = GbType::None;
         for node in input {
             match node {
                 Node::Program(_) => unreachable!(),
-                Node::Statement(statement) => self.evaluate_statement(statement),
+                Node::Statement(statement) => {
+                    last_result = self.evaluate_statement(statement)
+                }
                 Node::Expression(_) => unreachable!(),
             };
         }
 
-        self.global_env().none()
+        last_result
     }
 
-    fn evaluate_statement(&mut self, input: &Statement) -> &GbType {
+    fn evaluate_statement(&mut self, input: &Statement) -> GbType {
         match input {
             Statement::LetStatement(ls) => self.evaluate_let_statement(ls),
             Statement::ReturnStatement(_) => todo!(),
-            Statement::ExpressionStatement(_) => todo!(),
-            Statement::BlockStatement(_) => todo!(),
+            Statement::ExpressionStatement(es) => {
+                self.evaluate_expression_statement(es)
+            }
+            Statement::BlockStatement(bs) => self.evaluate_block_statement(bs),
             Statement::FunctionLiteralStatement(_) => todo!(),
         }
     }
 
-    fn evaluate_let_statement(&mut self, input: &LetStatement) -> &GbType {
+    fn evaluate_block_statement(&mut self, input: &BlockStatement) -> GbType {
+        let mut last = GbType::None;
+        for stmt in input.statements.iter() {
+            last = self.evaluate_statement(stmt);
+        }
+        last
+    }
+
+    fn evaluate_expression_statement(&mut self, input: &ExpressionStatement) -> GbType {
+        // this function exists in case an expression statement should
+        // evaluate to something other than the result of its expression
+        self.evaluate_expression(&input.expression)
+    }
+
+    fn evaluate_let_statement(&mut self, input: &LetStatement) -> GbType {
         let value = self.evaluate_expression(&input.value);
         self.top_env().insert(input.name.value(), value);
-        self.global_env().none()
+        GbType::Name(input.name.value().to_string())
     }
 
     fn evaluate_expression(&mut self, input: &Expression) -> GbType {
         match input {
-            Expression::Null => todo!(),
-            Expression::Identifier(_) => todo!(),
+            Expression::Identifier(id) => self.evaluate_identifier(id),
             Expression::IntegerLiteral(i) => GbType::Integer(i.value),
-            Expression::FloatLiteral(_) => todo!(),
-            Expression::PrefixExpression(_) => todo!(),
-            Expression::InfixExpression(_) => todo!(),
-            Expression::BooleanLiteral(_) => todo!(),
-            Expression::IfExpression(_) => todo!(),
+            Expression::FloatLiteral(f) => GbType::Float(f.value),
+            Expression::StringLiteral(st) => GbType::String(st.value.clone()),
+            Expression::PrefixExpression(pe) => self.evaluate_prefix_expression(pe),
+            Expression::InfixExpression(ie) => self.evaluate_infix_expression(ie),
+            Expression::BooleanLiteral(b) => GbType::Boolean(b.value),
+            Expression::IfExpression(ie) => self.evaluate_if_expression(ie),
             Expression::FunctionLiteral(_) => todo!(),
             Expression::CallExpression(_) => todo!(),
+        }
+    }
+
+    fn evaluate_identifier(&mut self, input: &Identifier) -> GbType {
+        if let Some(out) = self.top_env().get(input.value()) {
+            out.clone()
+        } else {
+            GbType::None
+        }
+    }
+
+    fn evaluate_prefix_expression(&mut self, expr: &PrefixExpression) -> GbType {
+        match expr.operator.as_str() {
+            "-" => GbType::Integer(-1) * self.evaluate_expression(&expr.right),
+            "!" => !self.evaluate_expression(&expr.right),
+            _ => unreachable!(),
+        }
+    }
+
+    fn evaluate_infix_expression(&mut self, expr: &InfixExpression) -> GbType {
+        match expr.operator.as_str() {
+            "+" => {
+                self.evaluate_expression(&expr.left)
+                    + self.evaluate_expression(&expr.right)
+            }
+            "*" => {
+                self.evaluate_expression(&expr.left)
+                    * self.evaluate_expression(&expr.right)
+            }
+            "-" => {
+                self.evaluate_expression(&expr.left)
+                    - self.evaluate_expression(&expr.right)
+            }
+            "/" => {
+                self.evaluate_expression(&expr.left)
+                    / self.evaluate_expression(&expr.right)
+            }
+            ">" => GbType::Boolean(
+                self.evaluate_expression(&expr.left)
+                    > self.evaluate_expression(&expr.right),
+            ),
+            "<" => GbType::Boolean(
+                self.evaluate_expression(&expr.left)
+                    < self.evaluate_expression(&expr.right),
+            ),
+            "==" => GbType::Boolean(
+                self.evaluate_expression(&expr.left)
+                    == self.evaluate_expression(&expr.right),
+            ),
+            "!=" => GbType::Boolean(
+                self.evaluate_expression(&expr.left)
+                    != self.evaluate_expression(&expr.right),
+            ),
+            "**" => gb_pow(
+                self.evaluate_expression(&expr.left),
+                self.evaluate_expression(&expr.right),
+            ),
+            _ => unreachable!(),
+        }
+    }
+
+    fn evaluate_if_expression(&mut self, input: &IfExpression) -> GbType {
+        // pub token: Token,
+        // pub condition: Rc<Expression>,
+        // pub consequence: BlockStatement,
+        // pub alternative: Option<BlockStatement>,
+
+        let GbType::Boolean(cond) = self.evaluate_expression(&input.condition) else {
+            return GbType::Error;
+        };
+
+        if cond {
+            self.evaluate_block_statement(&input.consequence)
+        } else if let Some(alternative) = &input.alternative {
+            self.evaluate_block_statement(alternative)
+        } else {
+            GbType::None
         }
     }
 }
 
 mod tests {
     #![allow(unused_imports)]
+    use std::rc::Rc;
+
     use crate::{
-        ast::{Expression, IntegerLiteral},
+        ast::{BooleanLiteral, Expression, FloatLiteral, IntegerLiteral},
         interpreter::gb_type::GbType,
         lexer::Lexer,
         parser::{error::DefaultErrorHandler, Parser},
@@ -137,21 +251,52 @@ mod tests {
     use super::{Interpreter, InterpreterStrategy, TreeWalking};
 
     #[test]
-    fn test_integer() {
-        let input = Expression::IntegerLiteral(IntegerLiteral {
-            token: Token {
-                kind: TokenKind::IntLiteral,
-                literal: "7".to_string(),
-                location: Point { line: 1, col: 1 },
-            },
-            value: 7,
-        });
-        let res = TreeWalking::default().evaluate_expression(&input);
+    fn integer() {
+        let input = "7;";
+        let mut i =
+            Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+        let res = i.evaluate();
         assert_eq!(res, GbType::Integer(7));
     }
 
     #[test]
-    fn eval_let_statement() {
+    fn float() {
+        let input = "7.0;";
+        let mut i =
+            Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+        let res = i.evaluate();
+        assert_eq!(res, GbType::Float(7.0));
+    }
+
+    #[test]
+    fn boolean() {
+        let input = "true;";
+        let mut i =
+            Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+        let res = i.evaluate();
+        assert_eq!(res, GbType::Boolean(true));
+        i.new_input("false;".to_string()).unwrap();
+        let res = i.evaluate();
+        assert_eq!(res, GbType::Boolean(false));
+    }
+
+    #[test]
+    fn string() {
+        let input = [
+            ("'hello'", GbType::String("hello".to_string())),
+            ("\"hello\"", GbType::String("hello".to_string())),
+        ];
+
+        for (input, expected) in input {
+            let mut i =
+                Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+            let actual = i.evaluate();
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn let_statement() {
         let input = "let x = 7;";
         let mut interpreter =
             Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
@@ -167,6 +312,74 @@ mod tests {
             } else {
                 panic!("Unexpected key: {}", k);
             }
+        }
+    }
+
+    #[test]
+    fn identifer() {
+        let input = "let x = 7; x;";
+        let mut i =
+            Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+        let res = i.evaluate();
+        assert_eq!(res, GbType::Integer(7));
+    }
+
+    #[test]
+    fn prefix_expression() {
+        let inputs = [
+            ("-7;", GbType::Integer(-7)),
+            ("!true;", GbType::Boolean(false)),
+        ];
+
+        for (input, expected) in inputs {
+            let mut i =
+                Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+            let actual = i.evaluate();
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn infix_expression() {
+        let input = [
+            ("5 + 5;", GbType::Integer(10)),
+            ("5 - 5;", GbType::Integer(0)),
+            ("5 * 5;", GbType::Integer(25)),
+            ("5 / 5;", GbType::Integer(1)),
+            ("5 > 5;", GbType::Boolean(false)),
+            ("5 < 5;", GbType::Boolean(false)),
+            ("5 == 5;", GbType::Boolean(true)),
+            ("5 != 5;", GbType::Boolean(false)),
+            ("5 ** 5;", GbType::Integer(3125)),
+            ("true == true", GbType::Boolean(true)),
+            ("true != false", GbType::Boolean(true)),
+            ("true == false", GbType::Boolean(false)),
+            ("false == false", GbType::Boolean(true)),
+            ("let x = 7; let y = 7; x == y;", GbType::Boolean(true)),
+        ];
+
+        for (input, expected) in input {
+            let mut i =
+                Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+            let actual = i.evaluate();
+            dbg!(input);
+            dbg!(&actual, &expected);
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn if_expression() {
+        let input = [
+            ("if 3 < 5 { 7 } else { 7 }", GbType::Integer(7)),
+            ("if 5 < 3 { 7 } else { 8 }", GbType::Integer(8)),
+        ];
+
+        for (input, expected) in input {
+            let mut i =
+                Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+            let actual = i.evaluate();
+            assert_eq!(actual, expected);
         }
     }
 }

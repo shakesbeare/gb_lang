@@ -5,6 +5,8 @@ pub enum GbType {
     Empty,
     Error,
     None,
+    /// Represents the name of an object
+    Name(String),
     Integer(i64),
     Float(f64),
     Boolean(bool),
@@ -17,19 +19,15 @@ pub fn variant_eq<T>(a: &T, b: &T) -> bool {
 
 pub fn gb_pow(left: GbType, right: GbType) -> GbType {
     match left {
-        GbType::Integer(x) => {
-            match right {
-                GbType::Integer(y) => GbType::Integer(i64::pow(x, y as u32)),
-                GbType::Float(y) => GbType::Float(f64::powf(x as f64, y )),
-                _ => GbType::Error
-            }
-        }
-        GbType::Float(x) => {
-            match right {
-                GbType::Integer(y) => GbType::Float(f64::powf(x, y as f64)),
-                GbType::Float(y) => GbType::Float(f64::powf(x, y)),
-                _ => GbType::Error
-            }
+        GbType::Integer(x) => match right {
+            GbType::Integer(y) => GbType::Integer(i64::pow(x, y as u32)),
+            GbType::Float(y) => GbType::Float(f64::powf(x as f64, y)),
+            _ => GbType::Error,
+        },
+        GbType::Float(x) => match right {
+            GbType::Integer(y) => GbType::Float(f64::powf(x, y as f64)),
+            GbType::Float(y) => GbType::Float(f64::powf(x, y)),
+            _ => GbType::Error,
         },
         _ => GbType::Error,
     }
@@ -45,14 +43,14 @@ pub fn gb_bool(x: GbType) -> GbType {
             } else {
                 GbType::Boolean(true)
             }
-        },
+        }
         GbType::Float(x) => {
             if x == 0.0 {
                 GbType::Boolean(false)
             } else {
                 GbType::Boolean(true)
             }
-        } ,
+        }
         GbType::Boolean(x) => GbType::Boolean(x),
         GbType::String(x) => {
             if x == *"" {
@@ -60,7 +58,7 @@ pub fn gb_bool(x: GbType) -> GbType {
             } else {
                 GbType::Boolean(true)
             }
-        },
+        }
         GbType::None => GbType::Boolean(false),
         _ => unreachable!(),
     }
@@ -76,7 +74,9 @@ pub fn gb_type_of(x: GbType) -> String {
         GbType::Float(_) => "Float",
         GbType::Boolean(_) => "Boolean",
         GbType::String(_) => "String",
-    }.into()
+        GbType::Name(_) => "Name",
+    }
+    .into()
 }
 
 impl Not for GbType {
@@ -97,24 +97,22 @@ impl PartialOrd for GbType {
             return None;
         }
 
-        let is_less = match *self {
-            GbType::Integer(x) => match *other {
-                GbType::Integer(y) => x < y,
-                GbType::Float(y) => (x as f64) < y,
-                _ => todo!(),
-            },
-            GbType::Float(x) => match *other {
-                GbType::Float(y) => x < y,
-                GbType::Integer(y) => x < y as f64,
-                _ => todo!(),
-            },
-            _ => todo!(),
-        };
-
-        if is_less {
-            return Some(std::cmp::Ordering::Less);
-        } else {
-            return Some(std::cmp::Ordering::Greater);
+        match (self, other) {
+            (GbType::Integer(x), GbType::Integer(y)) => {
+                x.partial_cmp(y)
+            }
+            (GbType::Integer(x), GbType::Float(y)) => {
+                let x = *x as f64;
+                x.partial_cmp(y)
+            }
+            (GbType::Float(x), GbType::Float(y)) => {
+                x.partial_cmp(y)
+            }
+            (GbType::Float(x), GbType::Integer(y)) => {
+                let y = *y as f64;
+                x.partial_cmp(&y)
+            }
+            _ => todo!()
         }
     }
 }
@@ -209,7 +207,7 @@ impl std::fmt::Display for GbType {
                 GbType::Float(x) => x.to_string(),
                 GbType::String(x) => format!("\" {} \"", x).to_string(),
                 GbType::Boolean(x) => x.to_string(),
-                _ => todo!()
+                _ => todo!(),
             }
         )
     }
