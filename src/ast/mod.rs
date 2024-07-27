@@ -74,6 +74,7 @@ pub enum Expression {
     IfExpression(IfExpression),
     FunctionLiteral(FunctionLiteral),
     CallExpression(CallExpression),
+    WhileExpression(WhileExpression),
 }
 
 impl IntoNode for Expression {
@@ -121,6 +122,7 @@ impl std::fmt::Display for Expression {
             Expression::IfExpression(i) => write!(f, "{}", i),
             Expression::FunctionLiteral(f_) => write!(f, "{}", f_),
             Expression::CallExpression(c) => write!(f, "{}", c),
+            Expression::WhileExpression(we) => write!(f, "{}", we),
         }
     }
 }

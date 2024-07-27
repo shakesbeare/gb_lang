@@ -99,6 +99,7 @@ impl<'a, R: Read> Parser<'a, R> {
         p.register_prefix(TokenKind::LParen, Parser::parse_grouped_expression);
         p.register_prefix(TokenKind::If, Parser::parse_if_expression);
         p.register_prefix(TokenKind::Fn, Parser::parse_function_literal);
+        p.register_prefix(TokenKind::While, Parser::parse_while_expression);
 
         p.register_infix(TokenKind::Add, Parser::parse_infix_expression);
         p.register_infix(TokenKind::Subtract, Parser::parse_infix_expression);
@@ -579,5 +580,19 @@ impl<'a, R: Read> Parser<'a, R> {
 
         self.expect_peek(TokenKind::RParen)?;
         Ok(args)
+    }
+
+    fn parse_while_expression(&mut self) -> Result<Expression, ParserError> {
+        let token = self.cur_token.as_ref().clone();
+        self.next_token();
+        let condition = Rc::new(self.parse_expression(Precedence::Lowest)?);
+        self.expect_peek(TokenKind::LBrace)?;
+        let body = Rc::new(self.parse_block_statement()?);
+
+        Ok(Expression::WhileExpression(WhileExpression {
+            token,
+            condition,
+            body,
+        }))
     }
 }

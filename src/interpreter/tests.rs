@@ -213,3 +213,10 @@ fn bad_assignment() {
     i.evaluate();
 }
 
+#[test]
+fn while_expression() {
+    let input = "let x = 0; while x < 10 { x = x + 1 }; x ";
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let res = i.evaluate();
+    assert_eq!(res, GbType::Integer(10));
+}

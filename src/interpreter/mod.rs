@@ -358,4 +358,12 @@ impl TreeWalking {
         let gb_func = unsafe { &*(&**gb_func as *const dyn GbFunc) };
         gb_func.execute(self, &args)
     }
+
+    fn evaluate_while_expression(&mut self, input: &WhileExpression) -> GbType {
+        while self.evaluate_expression(&input.condition) == GbType::Boolean(true) {
+            self.evaluate_block_statement(&input.body, false);
+        }
+
+        GbType::None
+    }
 }

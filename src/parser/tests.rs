@@ -807,6 +807,41 @@ fn function_literal_statement() {
     test_infix_expression((*expr_stmt.expression).clone(), "x", "+", "y");
 }
 
+#[test]
+fn while_loop() {
+    let input = "while x < y { z }";
+    let mut parser = Parser::new(
+        Lexer::from(input.as_bytes()),
+        Box::new(DefaultErrorHandler {
+            input: input.to_string(),
+        }),
+        false,
+    );
+    let ast = parser.parse().unwrap();
+    parser.check_parser_errors();
+
+    let children = ast.into_program().statements;
+    assert_eq!(children.len(), 1);
+
+    let Node::Statement(Statement::ExpressionStatement(ref expr_stmt)) = children[0] else {
+        panic!("Expected ExpressionStatement, got {:#?}", children[0]);
+    };
+
+    let Expression::WhileExpression(ref expr) = *expr_stmt.expression  else {
+        panic!("Expected WhileExpression, got {:#?}", expr_stmt.expression);
+    };
+
+    test_infix_expression(expr.condition.deref().clone(), "x", "<", "y");
+
+    let Statement::ExpressionStatement(ref expr) = *expr.body.statements[0] else {
+        panic!(
+            "Expected ExpressionStatement, got {:?}",
+            *expr.body.statements[0]
+        );
+    };
+
+    test_identifier(expr.expression.deref().clone(), "z");
+}
  #[test]
 fn assignment() {
     let input = "x = 7;";

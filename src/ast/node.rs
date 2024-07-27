@@ -441,3 +441,34 @@ impl std::fmt::Display for CallExpression {
         )
     }
 }
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct WhileExpression {
+    pub token: Token,
+    pub condition: Rc<Expression>,
+    pub body: Rc<BlockStatement>,
+}
+
+impl IntoExpression for WhileExpression {
+    fn into_expression(self) -> Expression {
+        Expression::WhileExpression(self)
+    }
+}
+
+impl IntoNode for WhileExpression { 
+    fn into_node(self) -> Node {
+        Node::Expression(self.into_expression())
+    }
+}
+
+impl std::fmt::Display for WhileExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {} {}",
+            self.token.literal,
+            self.condition,
+            self.body,
+        )
+    }
+}
