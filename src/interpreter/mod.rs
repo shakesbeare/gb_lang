@@ -97,6 +97,21 @@ impl TreeWalking {
         Self { stack }
     }
 
+    fn lookup(&mut self, key: Rc<str>) -> &GbType {
+        let mut idx = self.stack.len() - 1;
+        loop {
+            let env = self.stack.get(idx).unwrap();
+            let value = env.get(key.clone());
+            if let Some(value) = value {
+                return value;
+            } else if idx > 0 {
+                idx -= 1;
+            } else {
+                return &GbType::None;
+            }
+        }
+    }
+
     fn inspect(&self) -> Vec<Vec<(Rc<str>, &GbType)>> {
         let mut out = vec![];
         for env in self.stack.iter() {
@@ -274,16 +289,16 @@ impl TreeWalking {
             args.push(self.evaluate_expression(arg));
         }
 
-        let GbType::Function(gb_func) = self.top_env().get(key.value()).unwrap() else {
+        let GbType::Function(gb_func) = self.lookup(key.value().into()) else {
             // TODO error handling
             panic!(
                 "Expected GbType::Function, got {:?}",
-                self.top_env().get(key.value())
+                self.lookup(key.value().into())
             );
         };
         // SAFETY:
         // functions will not be able to access their own entry in the symbol table
-        let gb_func = unsafe { &*(& **gb_func as *const dyn GbFunc)};
-gb_func.execute(self, &args)
+        let gb_func = unsafe { &*(&**gb_func as *const dyn GbFunc) };
+        gb_func.execute(self, &args)
     }
 }
