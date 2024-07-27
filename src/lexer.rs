@@ -369,7 +369,9 @@ impl<T: Read> Lexer<T> {
                 _ if next_char == '\\' => {
                     // escaped characters
                     // TODO: handle escape sequences
-                    self.get_char();
+                    if let ReadCharStatus::Reading(c) = self.get_char() {
+                        lexeme.push(c);
+                    }
                     self.get_char();
                 }
                 c => {
@@ -379,15 +381,6 @@ impl<T: Read> Lexer<T> {
                 }
             }
         }
-        if !lexeme.ends_with(char_read)
-        // string literal was not closed
-        {
-            LexStatus::SyntaxError {
-                failed_lexeme: lexeme.clone(),
-                location: Point::from((self.line, self.col)),
-                unexpected_char: lexeme.chars().last().unwrap(),
-            }
-        } else {
             self.next_token = Some(Token::new(
                 lexeme,
                 TokenKind::StringLiteral,
@@ -397,7 +390,6 @@ impl<T: Read> Lexer<T> {
             LexStatus::Reading {
                 token: self.next_token.clone().unwrap(),
             }
-        }
     }
 
     fn lex_number(&mut self, char_read: char) -> LexStatus {
