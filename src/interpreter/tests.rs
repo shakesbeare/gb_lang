@@ -14,18 +14,6 @@ use crate::{
 
 use super::{gb_type::GbFunc, Interpreter, InterpreterStrategy, TreeWalking};
 
-pub trait AsAny {
-    fn as_any(&self) -> &dyn std::any::Any;
-}
-
-impl AsAny for BlockStatement {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
-
-
-
 #[test]
 fn integer() {
     let input = "7;";
@@ -196,7 +184,6 @@ fn return_statement() {
     assert_eq!(res, GbType::Integer(8));
 
     let input = "fn foo() { 7; return 8; 9; } fn bar() { 1; return foo(); 3; } fn main() { 4; return bar(); 5;} main();";
-    let input = "fn main() { 7; return 8; 9; } main()";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate();
     assert_eq!(res, GbType::Integer(8));
@@ -209,3 +196,20 @@ fn invalid_return_statements() {
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     i.evaluate();
 }
+
+#[test]
+fn assignment() {
+    let input = "let x = 7; x = 8; x";
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let res = i.evaluate();
+    assert_eq!(res, GbType::Integer(8));
+}
+
+#[test]
+#[should_panic]
+fn bad_assignment() {
+    let input = "x = 7;";
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    i.evaluate();
+}
+

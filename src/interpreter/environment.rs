@@ -2,7 +2,7 @@ use crate::interpreter::gb_type::GbType;
 use gxhash::{HashMap, HashMapExt};
 use std::rc::Rc;
 
-pub(super) struct Environment {
+pub struct Environment {
     symbol_table: HashMap<Rc<str>, GbType>,
 }
 
@@ -11,10 +11,6 @@ impl Environment {
         Environment {
             symbol_table: stable,
         }
-    }
-
-    pub fn none(&self) -> &GbType {
-        self.get("None").expect("None key should never be empty")
     }
 
     pub fn insert<T: Into<Rc<str>>>(&mut self, key: T, value: GbType) -> Rc<str> {
@@ -33,6 +29,7 @@ impl Environment {
         self.symbol_table.get_mut(&key)
     }
 
+    #[cfg(test)]
     pub fn inspect(&self) -> Vec<(Rc<str>, &GbType)> {
         let mut out = Vec::new();
         for (k, v) in self.symbol_table.iter() {

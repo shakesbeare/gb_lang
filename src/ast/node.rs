@@ -426,6 +426,7 @@ impl IntoNode for CallExpression {
         Node::Expression(self.into_expression())
     }
 }
+
 impl std::fmt::Display for CallExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

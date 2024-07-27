@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, fmt, ops::Not, rc::Rc};
 
-use crate::ast::{BlockStatement, FunctionLiteral, IntoNode, Node};
+use crate::ast::{FunctionLiteral, IntoNode};
 
 use super::InterpreterStrategy;
 

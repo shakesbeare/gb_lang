@@ -9,7 +9,7 @@ use crate::{
     ast::{
         Alternative, BlockStatement, CallExpression, Expression, ExpressionStatement,
         FunctionLiteral, FunctionLiteralStatement, Identifier, IfExpression,
-        InfixExpression, LetStatement, Node, PrefixExpression, Statement,
+        InfixExpression, LetStatement, Node, PrefixExpression, Statement, WhileExpression,
     },
     parser::error::ParserError,
 };
@@ -99,21 +99,40 @@ impl TreeWalking {
         Self { stack }
     }
 
-    fn lookup(&mut self, key: Rc<str>) -> &GbType {
+    fn lookup<T: Into<Rc<str>>>(&mut self, key: T) -> Option<&GbType> {
+        let key = key.into();
         let mut idx = self.stack.len() - 1;
         loop {
             let env = self.stack.get(idx).unwrap();
             let value = env.get(key.clone());
             if let Some(value) = value {
-                return value;
+                return Some(value);
             } else if idx > 0 {
                 idx -= 1;
             } else {
-                return &GbType::None;
+                return None;
             }
         }
     }
 
+    fn lookup_name_location<T: Into<Rc<str>>>(&mut self, key: T) -> Option<usize> {
+        let key = key.into();
+        let mut idx = self.stack.len() - 1;
+        loop {
+            let env = self.stack.get(idx).unwrap();
+            let value = env.get(key.clone());
+            if value.is_some() {
+                return Some(idx);
+            } else if idx > 0 {
+                idx -= 1;
+            } else {
+                return None;
+            }
+        }
+
+    }
+
+    #[cfg(test)]
     fn inspect(&self) -> Vec<Vec<(Rc<str>, &GbType)>> {
         let mut out = vec![];
         for env in self.stack.iter() {
@@ -202,11 +221,17 @@ impl TreeWalking {
             Expression::IfExpression(ie) => self.evaluate_if_expression(ie),
             Expression::FunctionLiteral(fl) => self.evaluate_function_literal(fl),
             Expression::CallExpression(fc) => self.evaluate_function_call(fc),
+            Expression::WhileExpression(we) => self.evaluate_while_expression(we),
         }
     }
 
     fn evaluate_identifier(&mut self, input: &Identifier) -> GbType {
-        self.lookup(input.value().into()).clone()
+        if let Some(val) = self.lookup(input.value()) {
+            val.clone()
+        } else {
+            panic!("Variable used before it was declared");
+
+        }
     }
 
     fn evaluate_prefix_expression(&mut self, expr: &PrefixExpression) -> GbType {
@@ -255,6 +280,20 @@ impl TreeWalking {
                 self.evaluate_expression(&expr.left),
                 self.evaluate_expression(&expr.right),
             ),
+            "=" => {
+                let Expression::Identifier(ref key) = *expr.left else {
+                    panic!("Cannot assign to {:?}", expr.left);
+                };
+
+                let Some(env_location) = self.lookup_name_location(key.value()) else {
+                    panic!("Variable assigned to before it was declared");
+                };
+
+                let value = self.evaluate_expression(&expr.right);
+                self.stack[env_location].insert(key.value(), value);
+
+                GbType::None
+            }
             _ => unreachable!(),
         }
     }
@@ -307,11 +346,11 @@ impl TreeWalking {
             args.push(self.evaluate_expression(arg));
         }
 
-        let GbType::Function(gb_func) = self.lookup(key.value().into()) else {
+        let Some(GbType::Function(gb_func)) = self.lookup(key.value()) else {
             // TODO error handling
             panic!(
                 "Expected GbType::Function, got {:?}",
-                self.lookup(key.value().into())
+                self.lookup(key.value())
             );
         };
         // SAFETY:

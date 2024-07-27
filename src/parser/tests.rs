@@ -1,5 +1,7 @@
 #![allow(unused_imports)]
 
+use std::ops::Deref;
+
 use crate::{
     ast::{Alternative, Expression, IntoExpression, Node, Statement},
     lexer::Lexer,
@@ -793,7 +795,9 @@ fn function_literal_statement() {
         assert_eq!(param.value(), expected_params[i]);
     }
 
-    let Statement::ExpressionStatement(ref expr_stmt) = *func.literal.body.statements[0] else {
+    let Statement::ExpressionStatement(ref expr_stmt) =
+        *func.literal.body.statements[0]
+    else {
         panic!(
             "Expected ExpressionStatement, got {:?}",
             func.literal.body.statements[0]
@@ -801,4 +805,37 @@ fn function_literal_statement() {
     };
 
     test_infix_expression((*expr_stmt.expression).clone(), "x", "+", "y");
+}
+
+ #[test]
+fn assignment() {
+    let input = "x = 7;";
+    let mut parser = Parser::new(
+        Lexer::from(input.as_bytes()),
+        Box::new(DefaultErrorHandler {
+            input: input.to_string(),
+        }),
+        false,
+    );
+    let ast = parser.parse().unwrap();
+    parser.check_parser_errors();
+
+
+    let children = ast.into_program().statements;
+    assert_eq!(children.len(), 1);
+
+    let Node::Statement(Statement::ExpressionStatement(ref expr_stmt)) = children[0] else {
+        panic!("Expected ExpressionStatement, got {:#?}", children[0]);
+    };
+
+    let Expression::InfixExpression(ref assign) = *expr_stmt.expression else { 
+        panic!("Expected InfixExpression, got {:?}", expr_stmt);
+    };
+
+    test_identifier(assign.left.deref().clone(), "x");
+
+    let Expression::IntegerLiteral(ref int) = *assign.right else {
+        panic!("Expected IntegerLiteral, got {:?}", assign.right);
+    };
+    assert_eq!(int.value, 7);
 }

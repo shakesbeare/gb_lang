@@ -18,6 +18,7 @@ type InfixParseFn<'a, R> =
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone, Copy)]
 enum Precedence {
     Lowest,
+    Assign,
     Equals,
     LessGreater,
     Sum,
@@ -70,6 +71,7 @@ impl<'a, R: Read> Parser<'a, R> {
             precedences: HashMap::new(),
         };
 
+        p.precedences.insert(TokenKind::Assign, Precedence::Assign);
         p.precedences.insert(TokenKind::Equals, Precedence::Equals);
         p.precedences
             .insert(TokenKind::NotEquals, Precedence::Equals);
@@ -108,6 +110,7 @@ impl<'a, R: Read> Parser<'a, R> {
         p.register_infix(TokenKind::GreaterThan, Parser::parse_infix_expression);
         p.register_infix(TokenKind::LParen, Parser::parse_call_expression);
         p.register_infix(TokenKind::Exponentiate, Parser::parse_infix_expression);
+        p.register_infix(TokenKind::Assign, Parser::parse_infix_expression);
 
         return p;
     }
@@ -323,6 +326,7 @@ impl<'a, R: Read> Parser<'a, R> {
         &mut self,
         precedence: Precedence,
     ) -> Result<Expression, ParserError> {
+
         let Some(prefix) = self.prefix_parse_fns.get(&self.cur_token.kind) else {
             return Err(self.syntax_error(self.cur_token.deref().clone()));
         };

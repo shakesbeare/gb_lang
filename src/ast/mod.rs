@@ -1,7 +1,5 @@
 mod node;
 
-use std::any::Any;
-
 pub use node::*;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -56,10 +54,7 @@ impl IntoNode for Statement {
 
 impl Statement {
     pub fn is_return_statement(&self) -> bool {
-        match self {
-            Statement::ReturnStatement(_) => true, 
-            _ => false,
-        }
+        matches!(self, Statement::ReturnStatement(_))
     }
 }
 
