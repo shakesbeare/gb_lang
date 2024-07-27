@@ -434,10 +434,10 @@ impl<'a, R: Read> Parser<'a, R> {
 
             alternative = if self.peek_token.has_kind(TokenKind::LBrace) {
                 self.next_token();
-                Alternative::Termination(self.parse_block_statement()?)
+                Alternative::BlockStatement(self.parse_block_statement()?)
             } else if self.peek_token.has_kind(TokenKind::If) {
                 self.next_token();
-                Alternative::Condition(self.parse_if_expression()?.into())
+                Alternative::IfExpression(self.parse_if_expression()?.into())
             } else {
                 return Err(self.syntax_error(self.peek_token.as_ref().clone()));
             };

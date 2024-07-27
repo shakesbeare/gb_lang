@@ -1,5 +1,7 @@
 mod node;
 
+use std::any::Any;
+
 pub use node::*;
 
 #[derive(Debug, PartialEq, Clone)]

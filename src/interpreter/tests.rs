@@ -2,14 +2,27 @@
 use std::rc::Rc;
 
 use crate::{
-    ast::{BooleanLiteral, Expression, FloatLiteral, IntegerLiteral},
+    ast::{
+        BlockStatement, BooleanLiteral, Expression, FloatLiteral, IntegerLiteral,
+        Statement,
+    },
     interpreter::gb_type::GbType,
     lexer::Lexer,
     parser::{error::DefaultErrorHandler, Parser},
     token::{Point, Token, TokenKind},
 };
 
-use super::{Interpreter, InterpreterStrategy, TreeWalking};
+use super::{gb_type::GbFunc, Interpreter, InterpreterStrategy, TreeWalking};
+
+pub trait AsAny {
+    fn as_any(&self) -> &dyn std::any::Any;
+}
+
+impl AsAny for Rc<dyn GbFunc> {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
 
 #[test]
 fn integer() {
@@ -139,3 +152,22 @@ fn if_expression() {
         assert_eq!(actual, expected);
     }
 }
+
+// #[test]
+// fn function_literal_statement() {
+//     let input = "fn main() { 7 }";
+//     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+//     let res = i.evaluate();
+//     let GbType::Function(ptr) = res else {
+//         panic!("Expected GbType::Function, got {:?}", res);
+//     };
+//     let map = &i.strategy.stack[0];
+//     assert!(map.get("main").is_some());
+//     let bs  = match ptr.as_any().downcast_ref::<BlockStatement>() {
+//         Some(bs) => bs,
+//         None => panic!("Inner function type was not a block statement node"),
+//     };
+//
+//     let actual = i.strategy.evaluate_block_statement(bs);
+//     assert_eq!(actual, GbType::Integer(7));
+// }

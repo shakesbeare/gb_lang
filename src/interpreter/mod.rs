@@ -7,8 +7,9 @@ use std::rc::Rc;
 use self::environment::Environment;
 use crate::{
     ast::{
-        Alternative, BlockStatement, Expression, ExpressionStatement, Identifier,
-        IfExpression, InfixExpression, LetStatement, Node, PrefixExpression, Statement,
+        Alternative, BlockStatement, Expression, ExpressionStatement,
+        FunctionLiteralStatement, Identifier, IfExpression, InfixExpression,
+        LetStatement, Node, PrefixExpression, Statement,
     },
     parser::error::ParserError,
 };
@@ -62,8 +63,8 @@ impl InterpreterStrategy for TreeWalking {
     fn evaluate(&mut self, input: &Node) -> GbType {
         match input {
             Node::Program(p) => self.evaluate_program(p.statements.as_slice()),
-            Node::Statement(_) => todo!(),
-            Node::Expression(_) => todo!(),
+            Node::Statement(s) => self.evaluate_statement(s),
+            Node::Expression(e) => self.evaluate_expression(e),
         }
     }
 }
@@ -120,7 +121,9 @@ impl TreeWalking {
                 self.evaluate_expression_statement(es)
             }
             Statement::BlockStatement(bs) => self.evaluate_block_statement(bs),
-            Statement::FunctionLiteralStatement(_) => todo!(),
+            Statement::FunctionLiteralStatement(fls) => {
+                self.evaluate_function_literal_statement(fls)
+            }
         }
     }
 
@@ -231,11 +234,20 @@ impl TreeWalking {
             self.evaluate_block_statement(&input.consequence)
         } else {
             match &input.alternative {
-                Alternative::Condition(ie) => self.evaluate_expression(ie),
-                Alternative::Termination(bs) => self.evaluate_block_statement(bs),
+                Alternative::IfExpression(ie) => self.evaluate_expression(ie),
+                Alternative::BlockStatement(bs) => self.evaluate_block_statement(bs),
                 Alternative::None => GbType::None,
             }
         }
     }
-}
 
+    fn evaluate_function_literal_statement(
+        &mut self,
+        input: &FunctionLiteralStatement,
+    ) -> GbType {
+        let key: Rc<str> = input.identifier.value().into();
+        let value = GbType::Function(Rc::new(input.body.clone()));
+        self.top_env().insert(key, value);
+        GbType::None
+    }
+}

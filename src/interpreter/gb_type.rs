@@ -1,6 +1,22 @@
-use std::{fmt, ops::Not};
+use std::{borrow::Borrow, fmt, ops::Not, rc::Rc};
 
-#[derive(Debug, Clone, PartialEq)]
+use crate::ast::{BlockStatement, IntoNode, Node};
+
+use super::InterpreterStrategy;
+
+pub trait GbFunc: std::fmt::Debug {
+    fn execute(&self, strategy: &mut dyn InterpreterStrategy) -> GbType;
+}
+
+impl GbFunc for BlockStatement {
+    // TODD: this really should execute on a pointer to the block
+    //       rather than cloning the block...
+    fn execute(&self, strategy: &mut dyn InterpreterStrategy) -> GbType {
+        strategy.evaluate(self.clone().into_node().borrow())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum GbType {
     Empty,
     Error,
@@ -11,6 +27,26 @@ pub enum GbType {
     Float(f64),
     Boolean(bool),
     String(String),
+    Function(Rc<dyn GbFunc>),
+}
+
+impl PartialEq for GbType {
+    fn eq(&self, other: &Self) -> bool {
+        // function types should never evaluate as equal to each other
+        match (self, other) {
+            (_, GbType::Function(_)) => false,
+            (GbType::Function(_), _) => false,
+            (GbType::Integer(l), GbType::Integer(r)) => l.eq(r),
+            (GbType::Name(l), GbType::Name(r)) => l.eq(r),
+            (GbType::Float(l), GbType::Float(r)) => l.eq(r),
+            (GbType::String(l), GbType::String(r)) => l.eq(r),
+            (GbType::Boolean(l), GbType::Boolean(r)) => l.eq(r),
+            (GbType::None, GbType::None) => true,
+            (GbType::Empty, GbType::Empty) => true,
+            (GbType::Error, GbType::Error) => true,
+            _ => false,
+        }
+    }
 }
 
 pub fn variant_eq<T>(a: &T, b: &T) -> bool {
@@ -75,6 +111,7 @@ pub fn gb_type_of(x: GbType) -> String {
         GbType::Boolean(_) => "Boolean",
         GbType::String(_) => "String",
         GbType::Name(_) => "Name",
+        GbType::Function(_) => "Function",
     }
     .into()
 }

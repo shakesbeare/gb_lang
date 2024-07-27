@@ -566,7 +566,7 @@ fn if_else_expression() {
     };
 
     test_identifier((*expr_stmt.expression).clone(), "x");
-    let Alternative::Termination(ref bs) = if_expr.alternative else {
+    let Alternative::BlockStatement(ref bs) = if_expr.alternative else {
         panic!("Expected block statement, got {:?}", if_expr.alternative)
     };
 
@@ -613,7 +613,7 @@ fn if_else_continuation() {
     };
 
     test_identifier((*expr_stmt.expression).clone(), "x");
-    let Alternative::Condition(ref second_cond) = if_expr.alternative else {
+    let Alternative::IfExpression(ref second_cond) = if_expr.alternative else {
         panic!(
             "Expected continuation condition, got {:?}",
             if_expr.alternative

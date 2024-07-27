@@ -325,16 +325,16 @@ impl std::fmt::Display for BooleanLiteral {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Alternative {
-    Condition(Rc<Expression>),
-    Termination(BlockStatement),
+    IfExpression(Rc<Expression>),
+    BlockStatement(BlockStatement),
     None,
 }
 
 impl Alternative {
     pub fn is_some(&self) -> bool {
         match self {
-            Alternative::Condition(_) => true,
-            Alternative::Termination(_) => true,
+            Alternative::IfExpression(_) => true,
+            Alternative::BlockStatement(_) => true,
             Alternative::None => false,
         }
     }
@@ -367,10 +367,10 @@ impl IntoNode for IfExpression {
 impl std::fmt::Display for IfExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.alternative {
-            Alternative::Condition(c) => {
+            Alternative::IfExpression(c) => {
                 write!(f, "if {} {} else {}", self.condition, self.consequence, c,)
             }
-            Alternative::Termination(t) => {
+            Alternative::BlockStatement(t) => {
                 write!(f, "if {} {} else {}", self.condition, self.consequence, t,)
             }
             Alternative::None => {
