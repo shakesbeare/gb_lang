@@ -89,6 +89,7 @@ impl<'a, R: Read> Parser<'a, R> {
         p.register_prefix(TokenKind::Identifier, Parser::parse_identifier);
         p.register_prefix(TokenKind::IntLiteral, Parser::parse_integer_literal);
         p.register_prefix(TokenKind::FloatLiteral, Parser::parse_float_literal);
+        p.register_prefix(TokenKind::StringLiteral, Parser::parse_string_literal);
         p.register_prefix(TokenKind::Bang, Parser::parse_prefix_expression);
         p.register_prefix(TokenKind::Subtract, Parser::parse_prefix_expression);
         p.register_prefix(TokenKind::True, Parser::parse_boolean);
@@ -369,6 +370,13 @@ impl<'a, R: Read> Parser<'a, R> {
         }))
     }
 
+    fn parse_string_literal(&mut self) -> Result<Expression, ParserError> {
+        Ok(Expression::StringLiteral(StringLiteral {
+            token: self.cur_token.as_ref().clone(),
+            value: self.cur_token.literal.parse().unwrap(),
+        }))
+    }
+
     fn parse_prefix_expression(&mut self) -> Result<Expression, ParserError> {
         let token = self.cur_token.as_ref().clone();
         let op = token.literal.clone();
@@ -590,6 +598,15 @@ mod tests {
     }
 
     #[cfg(test)]
+    fn test_string_literal(exp: Expression, expected: &str) {
+        if let Expression::StringLiteral(ref lit) = exp {
+            assert_eq!(lit.value, expected);
+        } else {
+            panic!("Expected IntegerLiteral, got {:?}", exp);
+        }
+    }
+
+    #[cfg(test)]
     fn test_boolean_literal(exp: Expression, expected: bool) {
         if let Expression::BooleanLiteral(ref lit) = exp {
             assert_eq!(lit.value, expected);
@@ -782,6 +799,28 @@ mod tests {
         }
     }
 
+    #[test]
+    fn string_literal_expression() {
+        let input: Vec<(&str, &str)> = vec![("'hello';", "hello"), ("\"hello\";", "hello")];
+        for (inp, expected) in input {
+            let mut parser = Parser::new(
+                Lexer::from(inp.as_bytes()),
+                Box::new(DefaultErrorHandler { input: inp.to_string() }),
+                false,
+            );
+            let ast = parser.parse().unwrap();
+            parser.check_parser_errors();
+
+            let children = ast.into_program().statements;
+            assert_eq!(children.len(), 1);
+
+            let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0]
+            else {
+                panic!("Expected ExpressionStatement, got {:?}", children[0]);
+            };
+            test_string_literal((*stmt.expression).clone(), expected);
+        }
+    }
     #[test]
     fn prefix_expression_1() {
         let input: Vec<(&str, &str, i64)> = vec![("!5;", "!", 5), ("-15;", "-", 15)];

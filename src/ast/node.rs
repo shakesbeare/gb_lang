@@ -225,6 +225,30 @@ impl std::fmt::Display for FloatLiteral {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct StringLiteral {
+    pub token: Token,
+    pub value: String,
+}
+
+impl IntoExpression for StringLiteral {
+    fn into_expression(self) -> Expression {
+        Expression::StringLiteral(self)
+    }
+}
+
+impl IntoNode for StringLiteral {
+    fn into_node(self) -> Node {
+        Node::Expression(self.into_expression())
+    }
+}
+
+impl std::fmt::Display for StringLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token.literal)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct PrefixExpression {
     pub token: Token,
     pub operator: String,

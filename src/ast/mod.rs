@@ -58,12 +58,10 @@ pub trait IntoStatement {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
-    // #[deprecated = "Expression::Null"]
-    // uncomment the above line to get warnings for all Null usages
-    Null, // probably shouldn't actually use this
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
     FloatLiteral(FloatLiteral),
+    StringLiteral(StringLiteral),
     PrefixExpression(PrefixExpression),
     InfixExpression(InfixExpression),
     BooleanLiteral(BooleanLiteral),
@@ -107,11 +105,10 @@ impl std::fmt::Display for Statement {
 impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            #[allow(deprecated)]
-            Expression::Null => write!(f, "null"),
             Expression::Identifier(i) => write!(f, "{}", i),
             Expression::IntegerLiteral(i) => write!(f, "{}", i),
             Expression::FloatLiteral(fl) => write!(f, "{}", fl),
+            Expression::StringLiteral(sl) => write!(f, "{}", sl),
             Expression::PrefixExpression(p) => write!(f, "{}", p),
             Expression::InfixExpression(i) => write!(f, "{}", i),
             Expression::BooleanLiteral(b) => write!(f, "{}", b),

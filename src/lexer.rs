@@ -357,14 +357,13 @@ impl<T: Read> Lexer<T> {
         &mut self,
         char_read /* delimiter, " or ' */: char,
     ) -> LexStatus {
-        let mut lexeme = String::from(char_read);
+        let mut lexeme = String::new();
         while self.peek() != '\0' {
             let next_char = self.peek();
             match next_char {
-                c if next_char == char_read => {
+                _ if next_char == char_read => {
                     // found the matching " or '
                     self.get_char();
-                    lexeme.push(c);
                     break;
                 }
                 _ if next_char == '\\' => {
