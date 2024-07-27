@@ -368,22 +368,10 @@ impl std::fmt::Display for IfExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.alternative {
             Alternative::Condition(c) => {
-                write!(
-                    f,
-                    "if {} {} else {}",
-                    self.condition,
-                    self.consequence,
-                    c,
-                )
+                write!(f, "if {} {} else {}", self.condition, self.consequence, c,)
             }
             Alternative::Termination(t) => {
-                write!(
-                    f,
-                    "if {} {} else {}",
-                    self.condition,
-                    self.consequence,
-                    t,
-                )
+                write!(f, "if {} {} else {}", self.condition, self.consequence, t,)
             }
             Alternative::None => {
                 write!(f, "if {} {}", self.condition, self.consequence)

@@ -381,15 +381,15 @@ impl<T: Read> Lexer<T> {
                 }
             }
         }
-            self.next_token = Some(Token::new(
-                lexeme,
-                TokenKind::StringLiteral,
-                (self.line, self.col),
-            ));
+        self.next_token = Some(Token::new(
+            lexeme,
+            TokenKind::StringLiteral,
+            (self.line, self.col),
+        ));
 
-            LexStatus::Reading {
-                token: self.next_token.clone().unwrap(),
-            }
+        LexStatus::Reading {
+            token: self.next_token.clone().unwrap(),
+        }
     }
 
     fn lex_number(&mut self, char_read: char) -> LexStatus {

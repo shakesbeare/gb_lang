@@ -98,21 +98,17 @@ impl PartialOrd for GbType {
         }
 
         match (self, other) {
-            (GbType::Integer(x), GbType::Integer(y)) => {
-                x.partial_cmp(y)
-            }
+            (GbType::Integer(x), GbType::Integer(y)) => x.partial_cmp(y),
             (GbType::Integer(x), GbType::Float(y)) => {
                 let x = *x as f64;
                 x.partial_cmp(y)
             }
-            (GbType::Float(x), GbType::Float(y)) => {
-                x.partial_cmp(y)
-            }
+            (GbType::Float(x), GbType::Float(y)) => x.partial_cmp(y),
             (GbType::Float(x), GbType::Integer(y)) => {
                 let y = *y as f64;
                 x.partial_cmp(&y)
             }
-            _ => todo!()
+            _ => todo!(),
         }
     }
 }

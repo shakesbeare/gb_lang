@@ -1209,8 +1209,13 @@ mod tests {
             panic!("Expected if expression, got {:?}", second_cond)
         };
 
-        let Statement::ExpressionStatement(ref expr_stmt) = *ie.consequence.statements[0] else {
-            panic!("Expected ExpressionStatement, got {:?}", *ie.consequence.statements[0]);
+        let Statement::ExpressionStatement(ref expr_stmt) =
+            *ie.consequence.statements[0]
+        else {
+            panic!(
+                "Expected ExpressionStatement, got {:?}",
+                *ie.consequence.statements[0]
+            );
         };
 
         test_identifier((*expr_stmt.expression).clone(), "y");

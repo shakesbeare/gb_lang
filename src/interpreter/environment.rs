@@ -35,10 +35,10 @@ impl Environment {
         let key: Rc<str> = key.into();
         self.symbol_table.get_mut(&key)
     }
-    
+
     pub fn inspect(&self) -> Vec<(Rc<str>, &GbType)> {
         let mut out = Vec::new();
-        for (k, v) in self.symbol_table.iter() { 
+        for (k, v) in self.symbol_table.iter() {
             out.push((k.clone(), v));
         }
         out
