@@ -245,6 +245,7 @@ impl std::fmt::Display for GbType {
                 GbType::Float(x) => x.to_string(),
                 GbType::String(x) => format!("\" {} \"", x).to_string(),
                 GbType::Boolean(x) => x.to_string(),
+                GbType::None => "None".to_string(),
                 _ => todo!(),
             }
         )

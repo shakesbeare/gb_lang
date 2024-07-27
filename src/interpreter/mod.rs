@@ -154,6 +154,15 @@ impl TreeWalking {
             };
         }
 
+        // SAFETY
+        //     Function objects cannot be mutated
+        let s = unsafe { &mut *(self as *mut Self)};
+        if let Some(GbType::Function(main)) = self.global_env().get("main") {
+            // TODO: 
+            //     auto parse cli args as main args
+            last_result = main.execute(s, &[]);
+        }
+
         last_result
     }
 
@@ -288,6 +297,10 @@ impl TreeWalking {
                 let Some(env_location) = self.lookup_name_location(key.value()) else {
                     panic!("Variable assigned to before it was declared");
                 };
+                let current_value = self.lookup(key.value()).unwrap();
+                if let GbType::Function(_) = current_value {
+                    panic!("Function types cannot be mutated");
+                }
 
                 let value = self.evaluate_expression(&expr.right);
                 self.stack[env_location].insert(key.value(), value);

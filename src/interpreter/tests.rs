@@ -145,11 +145,11 @@ fn if_expression() {
 
 #[test]
 fn function_literal_statement() {
-    let input = "fn main(x, y) { x + y }";
+    let input = "fn foo(x, y) { x + y }";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate();
     let map = &i.strategy.stack[0];
-    let GbType::Function(ptr) = map.get("main").unwrap().clone() else {
+    let GbType::Function(ptr) = map.get("foo").unwrap().clone() else {
         panic!("Expected GbType::Function, got {:?}", res);
     };
     let actual = ptr.execute(&mut i.strategy, &[GbType::Integer(3), GbType::Integer(4)]);
@@ -214,9 +214,33 @@ fn bad_assignment() {
 }
 
 #[test]
+#[should_panic]
+fn variable_use_before_declaration() {
+    let input = "x";
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    i.evaluate();
+}
+
+#[test]
 fn while_expression() {
     let input = "let x = 0; while x < 10 { x = x + 1 }; x ";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate();
     assert_eq!(res, GbType::Integer(10));
+}
+
+#[test]
+#[should_panic]
+fn disallow_mutating_functions() {
+    let input = "fn foo() {} foo = 7;";
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    i.evaluate();
+}
+
+#[test]
+fn auto_exec_global_main() {
+    let input = "fn main() { 7 }";
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let res = i.evaluate();
+    assert_eq!(res, GbType::Integer(7));
 }
