@@ -179,3 +179,11 @@ fn function_literal() {
     let actual = ptr.execute(&mut i.strategy, &[GbType::Integer(3), GbType::Integer(4)]);
     assert_eq!(actual, GbType::Integer(7));
 }
+
+#[test]
+fn function_call() {
+    let input = "fn main(x, y) { x + y } main(3, 4)";
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let res = i.evaluate();
+    assert_eq!(res, GbType::Integer(7));
+}

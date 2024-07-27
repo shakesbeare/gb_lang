@@ -7,13 +7,13 @@ use std::rc::Rc;
 use self::environment::Environment;
 use crate::{
     ast::{
-        Alternative, BlockStatement, Expression, ExpressionStatement, FunctionLiteral,
-        FunctionLiteralStatement, Identifier, IfExpression, InfixExpression,
-        LetStatement, Node, PrefixExpression, Statement,
+        Alternative, BlockStatement, CallExpression, Expression, ExpressionStatement,
+        FunctionLiteral, FunctionLiteralStatement, Identifier, IfExpression,
+        InfixExpression, LetStatement, Node, PrefixExpression, Statement,
     },
     parser::error::ParserError,
 };
-use gb_type::{gb_pow, GbType};
+use gb_type::{gb_pow, GbFunc, GbType};
 use gxhash::{HashMap, HashMapExt};
 
 pub trait InterpreterStrategy {
@@ -41,7 +41,7 @@ impl<T: InterpreterStrategy> Interpreter<T> {
         Ok(Self { strategy, ast })
     }
 
-    fn evaluate(&mut self) -> GbType {
+    pub fn evaluate(&mut self) -> GbType {
         self.strategy.evaluate(&self.ast)
     }
 
@@ -83,7 +83,6 @@ impl InterpreterStrategy for TreeWalking {
     fn top_env(&mut self) -> &mut Environment {
         self.stack.last_mut().unwrap()
     }
-
 }
 
 impl Default for TreeWalking {
@@ -167,7 +166,7 @@ impl TreeWalking {
             Expression::BooleanLiteral(b) => GbType::Boolean(b.value),
             Expression::IfExpression(ie) => self.evaluate_if_expression(ie),
             Expression::FunctionLiteral(fl) => self.evaluate_function_literal(fl),
-            Expression::CallExpression(_) => todo!(),
+            Expression::CallExpression(fc) => self.evaluate_function_call(fc),
         }
     }
 
@@ -262,5 +261,29 @@ impl TreeWalking {
 
     fn evaluate_function_literal(&mut self, input: &FunctionLiteral) -> GbType {
         GbType::Function(Rc::new(input.clone()))
+    }
+
+    fn evaluate_function_call(&mut self, input: &CallExpression) -> GbType {
+        let Expression::Identifier(ref key) = *input.function else {
+            // TODO error handling
+            panic!("Expected Identifier, got {:?}", input.function);
+        };
+
+        let mut args = vec![];
+        for arg in input.arguments.iter() {
+            args.push(self.evaluate_expression(arg));
+        }
+
+        let GbType::Function(gb_func) = self.top_env().get(key.value()).unwrap() else {
+            // TODO error handling
+            panic!(
+                "Expected GbType::Function, got {:?}",
+                self.top_env().get(key.value())
+            );
+        };
+        // SAFETY:
+        // functions will not be able to access their own entry in the symbol table
+        let gb_func = unsafe { &*(& **gb_func as *const dyn GbFunc)};
+gb_func.execute(self, &args)
     }
 }
