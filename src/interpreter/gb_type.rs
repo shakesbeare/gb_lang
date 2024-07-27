@@ -243,7 +243,7 @@ impl std::fmt::Display for GbType {
             match self {
                 GbType::Integer(x) => x.to_string(),
                 GbType::Float(x) => x.to_string(),
-                GbType::String(x) => format!("\" {} \"", x).to_string(),
+                GbType::String(x) => x.to_string(),
                 GbType::Boolean(x) => x.to_string(),
                 GbType::None => "None".to_string(),
                 _ => todo!(),

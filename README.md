@@ -4,12 +4,72 @@ Gb is a project I created to learn more about the inner workings of programming
 languages. While it is not fully functional, it has achieved this goal and (usually)
 works within its extremely constrained scope. 
 
+# Why Gb? 
+
+Gb is intended to be a lightweight scripting language that combines the type system of
+Rust with the ease of use of Python. Combine a familiar syntax with an automatic command
+line argument parsing (not implemented), Gb should be perfect for small CLI automations
+in your daily workflow. 
+
 # Does it work?
 
-The main branch *should* always be at least minimally functional at all times, but 
-I won't guarantee, at this time, that the project will be useful. Specifically,
-the Gb interpreter is currently not built at all. There are versions in the history
-with a working interpreter, but the main branch doesn't have one, at the moment.
+Yes! The body of the interpreter is finished and the language can be used for simple
+calculations. The standard library is extremely sparse and error handling and messages
+can often be improved. Also, there is currently no repl nor anyway to use it without
+writing at least a touch of Rust (unless you want to write your entire project in
+"file.gb", in which case, `cargo r` is all you need!). 
+
+It's clear that this project is still in its infancy, but it should see more and more
+progress as time goes on. 
+
+# Features
+
+So, What makes Gb unique? Here are a few present and planned features on the docket for
+Gb. 
+
+- Top level code with auto-executing main function (if present)
+- Strong, inferred typing (not implemented)
+- Automatic parsing of command line arguments (not implemented)
+- First class support for interpreted, JIT, and compiled modes (1/3 complete)
+- Algebraic Data Types (not implemented)
+
+# Code Sample
+
+Gb is a very familiar language in its very early stages. While it looks largely
+unassuming now, it should gain additional character as development progresses.
+
+```
+fn main() {
+    let x = 0;
+    while x < 10 {
+        x = x + 1;
+    }
+    print(x);
+
+    let foo = fn() { print("Hello, foo!"); };
+    
+    x = 0;
+    while x < 10 {
+        foo();
+        x = x + 1;
+    }
+}
+```
+```
+Outputs:
+> 10
+> Hello, foo!
+> Hello, foo!
+> Hello, foo!
+> Hello, foo!
+> Hello, foo!
+> Hello, foo!
+> Hello, foo!
+> Hello, foo!
+> Hello, foo!
+> Hello, foo!
+
+```
 
 # Why not use a parser generator?
 

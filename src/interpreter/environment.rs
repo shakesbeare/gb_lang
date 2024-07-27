@@ -43,6 +43,7 @@ impl Default for Environment {
     fn default() -> Self {
         let mut stable = HashMap::new();
         stable.insert("None".into(), GbType::None);
+        stable.insert("print".into(), super::lib::GbPrint {}.export());
         Self::new(stable)
     }
 }

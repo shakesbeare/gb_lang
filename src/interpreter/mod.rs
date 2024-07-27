@@ -1,6 +1,7 @@
 pub mod environment;
 pub mod gb_type;
 mod tests;
+mod lib;
 
 use std::rc::Rc;
 
