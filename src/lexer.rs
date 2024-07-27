@@ -331,6 +331,18 @@ impl<T: Read> Lexer<T> {
             ' ' => {
                 return self.lex();
             }
+            '#' => {
+                if self.peek() == '!' && self.line == 1 {
+                    self.ignore_until('\n', None);
+                    return self.lex();
+                } else {
+                    return LexStatus::SyntaxError {
+                        failed_lexeme: c.to_string(),
+                        location: Point::from((self.line, self.col)),
+                        unexpected_char: c,
+                    };
+                }
+            }
             c => {
                 return LexStatus::SyntaxError {
                     failed_lexeme: c.to_string(),
@@ -529,7 +541,7 @@ impl<T: Read> Lexer<T> {
     }
 }
 
-mod test {
+mod tests {
     #![allow(unused_imports)]
 
     use crate::{
@@ -537,6 +549,25 @@ mod test {
         token::TokenKind,
     };
     use std::collections::HashMap;
+
+    #[test]
+    fn ignore_shebang() {
+        let input = "#!/bin/bash\nhello";
+        let mut lexer = Lexer::from(input.as_bytes());
+        let res = lexer.lex();
+        let tok = match res {
+            LexStatus::Reading { token } => token.kind,
+            LexStatus::SyntaxError {
+                failed_lexeme,
+                location,
+                ..
+            } => {
+                panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
+            }
+            LexStatus::Eof => TokenKind::Eof,
+        };
+        assert_eq!(tok, TokenKind::Identifier);
+    }
 
     #[test]
     fn lex_identifier() {
