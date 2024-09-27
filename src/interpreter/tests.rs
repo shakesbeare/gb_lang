@@ -1,6 +1,8 @@
 #![allow(unused_imports)]
 use std::rc::Rc;
 
+use tracing_test::traced_test;
+
 use crate::{
     ast::{
         BlockStatement, BooleanLiteral, Expression, FloatLiteral, IntegerLiteral,
@@ -15,6 +17,7 @@ use crate::{
 use super::{gb_type::GbFunc, Interpreter, InterpreterStrategy, TreeWalking};
 
 #[test]
+#[traced_test]
 fn integer() {
     let input = "7;";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
@@ -23,6 +26,7 @@ fn integer() {
 }
 
 #[test]
+#[traced_test]
 fn float() {
     let input = "7.0;";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
@@ -31,6 +35,7 @@ fn float() {
 }
 
 #[test]
+#[traced_test]
 fn boolean() {
     let input = "true;";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
@@ -42,6 +47,7 @@ fn boolean() {
 }
 
 #[test]
+#[traced_test]
 fn string() {
     let input = [
         ("'hello'", GbType::String("hello".to_string())),
@@ -57,15 +63,17 @@ fn string() {
 }
 
 #[test]
+#[traced_test]
 fn let_statement() {
     let input = "let x = 7;";
     let mut interpreter =
         Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     interpreter.evaluate();
     let dump = interpreter.strategy.inspect();
-    assert_eq!(dump.len(), 1);
-    assert_eq!(dump[0].len(), 2);
-    for (k, v) in dump[0].clone() {
+    println!("{:?}", dump);
+    assert_eq!(dump.len(), 2);
+    assert_eq!(dump[1].len(), 1);
+    for (k, v) in dump[1].clone() {
         if k == "None".into() {
             assert_eq!(v, &GbType::None);
         } else if k == "x".into() {
@@ -77,6 +85,7 @@ fn let_statement() {
 }
 
 #[test]
+#[traced_test]
 fn identifer() {
     let input = "let x = 7; x;";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
@@ -85,6 +94,7 @@ fn identifer() {
 }
 
 #[test]
+#[traced_test]
 fn prefix_expression() {
     let inputs = [
         ("-7;", GbType::Integer(-7)),
@@ -100,6 +110,7 @@ fn prefix_expression() {
 }
 
 #[test]
+#[traced_test]
 fn infix_expression() {
     let input = [
         ("5 + 5;", GbType::Integer(10)),
@@ -129,6 +140,7 @@ fn infix_expression() {
 }
 
 #[test]
+#[traced_test]
 fn if_expression() {
     let input = [
         ("if 3 < 5 { 7 } else { 7 }", GbType::Integer(7)),
@@ -144,11 +156,12 @@ fn if_expression() {
 }
 
 #[test]
+#[traced_test]
 fn function_literal_statement() {
     let input = "fn foo(x, y) { x + y }";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate();
-    let map = &i.strategy.stack[0];
+    let map = &i.strategy.top_env();
     let GbType::Function(ptr) = map.get("foo").unwrap().clone() else {
         panic!("Expected GbType::Function, got {:?}", res);
     };
@@ -157,6 +170,7 @@ fn function_literal_statement() {
 }
 
 #[test]
+#[traced_test]
 fn function_literal() {
     let input = "fn (x, y) { x + y }";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
@@ -169,6 +183,7 @@ fn function_literal() {
 }
 
 #[test]
+#[traced_test]
 fn function_call() {
     let input = "fn main(x, y) { x + y } main(3, 4)";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
@@ -177,6 +192,7 @@ fn function_call() {
 }
 
 #[test]
+#[traced_test]
 fn return_statement() {
     let input = "fn main() { 7; return 8; 9; } main()";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
@@ -190,6 +206,7 @@ fn return_statement() {
 }
 
 #[test]
+#[traced_test]
 #[should_panic]
 fn invalid_return_statements() {
     let input = "return 7;";
@@ -198,6 +215,7 @@ fn invalid_return_statements() {
 }
 
 #[test]
+#[traced_test]
 fn assignment() {
     let input = "let x = 7; x = 8; x";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
@@ -206,6 +224,7 @@ fn assignment() {
 }
 
 #[test]
+#[traced_test]
 #[should_panic]
 fn bad_assignment() {
     let input = "x = 7;";
@@ -214,6 +233,7 @@ fn bad_assignment() {
 }
 
 #[test]
+#[traced_test]
 #[should_panic]
 fn variable_use_before_declaration() {
     let input = "x";
@@ -222,6 +242,7 @@ fn variable_use_before_declaration() {
 }
 
 #[test]
+#[traced_test]
 fn while_expression() {
     let input = "let x = 0; while x < 10 { x = x + 1 }; x ";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
@@ -230,6 +251,7 @@ fn while_expression() {
 }
 
 #[test]
+#[traced_test]
 #[should_panic]
 fn disallow_mutating_functions() {
     let input = "fn foo() {} foo = 7;";
@@ -238,6 +260,7 @@ fn disallow_mutating_functions() {
 }
 
 #[test]
+#[traced_test]
 fn auto_exec_global_main() {
     let input = "fn main() { 7 }";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();

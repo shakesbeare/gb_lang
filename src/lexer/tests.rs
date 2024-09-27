@@ -1,5 +1,7 @@
 #![allow(unused_imports)]
 
+use tracing_test::traced_test;
+
 use crate::{
     lexer::{LexStatus, Lexer},
     token::TokenKind,
@@ -7,6 +9,7 @@ use crate::{
 use std::collections::HashMap;
 
 #[test]
+#[traced_test]
 fn ignore_shebang() {
     let input = "#!/bin/bash\nhello";
     let mut lexer = Lexer::from(input.as_bytes());
@@ -26,6 +29,7 @@ fn ignore_shebang() {
 }
 
 #[test]
+#[traced_test]
 fn lex_identifier() {
     let input: Vec<&str> = vec!["Word", "_Word", "my_word", "_Word123", "Word123"];
     for inp in input {
@@ -48,6 +52,7 @@ fn lex_identifier() {
 }
 
 #[test]
+#[traced_test]
 #[should_panic]
 fn lex_identifier_panics() {
     let input: Vec<&str> = vec!["123Word", "Word'"];
@@ -73,6 +78,7 @@ fn lex_identifier_panics() {
 }
 
 #[test]
+#[traced_test]
 fn lex_integer() {
     let input = "123".as_bytes();
     let mut lexer = Lexer::from(input);
@@ -94,6 +100,7 @@ fn lex_integer() {
 }
 
 #[test]
+#[traced_test]
 fn lex_float() {
     let input: Vec<&str> = vec!["123.", "123.123"];
     for inp in input {
@@ -117,6 +124,7 @@ fn lex_float() {
 }
 
 #[test]
+#[traced_test]
 fn lex_string() {
     let input: Vec<&str> = vec![
         "'Hello'",
@@ -147,6 +155,7 @@ fn lex_string() {
 }
 
 #[test]
+#[traced_test]
 #[should_panic]
 fn lex_string_panics() {
     let input: Vec<&str> = vec!["'hello", r#""hello"#, r#""hello\""#, r#"'hello\'"#];
@@ -171,6 +180,7 @@ fn lex_string_panics() {
 }
 
 #[test]
+#[traced_test]
 fn lex_operators() {
     let mut map: HashMap<&str, TokenKind> = HashMap::new();
     map.insert("+", TokenKind::Add);
@@ -202,6 +212,7 @@ fn lex_operators() {
 }
 
 #[test]
+#[traced_test]
 fn delimiters() {
     let mut map: HashMap<&str, TokenKind> = HashMap::new();
     map.insert("(", TokenKind::LParen);
@@ -232,6 +243,7 @@ fn delimiters() {
 }
 
 #[test]
+#[traced_test]
 fn single_line_comment() {
     let input: Vec<(&str, TokenKind)> = vec![
         (r#"hello //comment"#, TokenKind::Identifier),
@@ -259,6 +271,7 @@ fn single_line_comment() {
 }
 
 #[test]
+#[traced_test]
 fn block_comment() {
     let one = r#"hello/*this is a comment
 
@@ -296,6 +309,7 @@ fn block_comment() {
 }
 
 #[test]
+#[traced_test]
 fn keywords() {
     let mut map: HashMap<&str, TokenKind> = HashMap::new();
     map.insert("true", TokenKind::True);

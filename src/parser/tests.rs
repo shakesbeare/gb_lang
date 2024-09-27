@@ -2,6 +2,8 @@
 
 use std::ops::Deref;
 
+use tracing_test::traced_test;
+
 use crate::{
     ast::{Alternative, Expression, IntoExpression, Node, Statement},
     lexer::Lexer,
@@ -95,6 +97,7 @@ fn test_infix_expression<T>(
 }
 
 #[test]
+#[traced_test]
 fn let_statements() {
     let input: Vec<(&str, &str, i64)> = vec![
         ("let x = 5;", "x", 5),
@@ -131,6 +134,7 @@ fn let_statements() {
 }
 
 #[test]
+#[traced_test]
 fn return_statements() {
     let input: Vec<(&str, i64)> = vec![
         ("return 5;", 5),
@@ -163,6 +167,7 @@ fn return_statements() {
 }
 
 #[test]
+#[traced_test]
 fn identifier_expression() {
     let input = "foobar;".as_bytes();
     let mut parser = Parser::new(
@@ -186,6 +191,7 @@ fn identifier_expression() {
 }
 
 #[test]
+#[traced_test]
 fn integer_literal_expression() {
     let input = "5;".as_bytes();
     let mut parser = Parser::new(
@@ -208,6 +214,7 @@ fn integer_literal_expression() {
 }
 
 #[test]
+#[traced_test]
 fn float_literal_expression() {
     let input: Vec<(&str, f64)> = vec![("5.0;", 5.0), ("5.;", 5.0), ("0.5;", 0.5)];
     for (inp, expected) in input {
@@ -234,6 +241,7 @@ fn float_literal_expression() {
 }
 
 #[test]
+#[traced_test]
 fn string_literal_expression() {
     let input: Vec<(&str, &str)> = vec![("'hello';", "hello"), ("\"hello\";", "hello")];
     for (inp, expected) in input {
@@ -258,6 +266,7 @@ fn string_literal_expression() {
     }
 }
 #[test]
+#[traced_test]
 fn prefix_expression_1() {
     let input: Vec<(&str, &str, i64)> = vec![("!5;", "!", 5), ("-15;", "-", 15)];
 
@@ -286,6 +295,7 @@ fn prefix_expression_1() {
 }
 
 #[test]
+#[traced_test]
 fn prefix_expression_2() {
     let input: Vec<(&str, &str, bool)> =
         vec![("!true;", "!", true), ("!false", "!", false)];
@@ -315,6 +325,7 @@ fn prefix_expression_2() {
 }
 
 #[test]
+#[traced_test]
 fn infix_expression_1() {
     let input: Vec<(&str, i64, &str, i64)> = vec![
         ("5 + 5;", 5, "+", 5),
@@ -350,6 +361,7 @@ fn infix_expression_1() {
 }
 
 #[test]
+#[traced_test]
 fn infix_expression_2() {
     let input: Vec<(&str, bool, &str, bool)> = vec![
         ("true == true", true, "==", true),
@@ -379,6 +391,7 @@ fn infix_expression_2() {
 }
 
 #[test]
+#[traced_test]
 fn infix_expression_3() {
     let input: Vec<(&str, &str, &str, &str)> = vec![
         ("foobar + barfoo;", "foobar", "+", "barfoo"),
@@ -414,6 +427,7 @@ fn infix_expression_3() {
 }
 
 #[test]
+#[traced_test]
 fn operator_precedence() {
     let input: Vec<(&str, &str)> = vec![
         ("-a * b", "((-a) * b)"),
@@ -469,6 +483,7 @@ fn operator_precedence() {
 }
 
 #[test]
+#[traced_test]
 fn boolean_expression() {
     let input = "true;".as_bytes();
     let mut parser = Parser::new(
@@ -491,6 +506,7 @@ fn boolean_expression() {
 }
 
 #[test]
+#[traced_test]
 fn if_expression() {
     let input = "if x < y { x }";
     let mut parser = Parser::new(
@@ -533,6 +549,7 @@ fn if_expression() {
 }
 
 #[test]
+#[traced_test]
 fn if_else_expression() {
     let input = "if x < y { x } else { y }";
     let mut parser = Parser::new(
@@ -580,6 +597,7 @@ fn if_else_expression() {
 }
 
 #[test]
+#[traced_test]
 fn if_else_continuation() {
     let input = "if x < y { x } else if x < y { y }";
     let mut parser = Parser::new(
@@ -638,6 +656,7 @@ fn if_else_continuation() {
 }
 
 #[test]
+#[traced_test]
 fn function_literal() {
     let input = "fn(x, y) { x + y; }";
 
@@ -682,6 +701,7 @@ fn function_literal() {
 }
 
 #[test]
+#[traced_test]
 fn function_parameters() {
     let input: Vec<(&str, &[&str])> = vec![
         ("fn() {};", &[]),
@@ -727,6 +747,7 @@ fn function_parameters() {
 }
 
 #[test]
+#[traced_test]
 fn call_expression() {
     let input = "add(1, 2 * 3, 4 + 5);";
 
@@ -764,6 +785,7 @@ fn call_expression() {
 }
 
 #[test]
+#[traced_test]
 fn function_literal_statement() {
     let input = "fn main(x, y) { x + y; }";
     let mut parser = Parser::new(
@@ -808,6 +830,7 @@ fn function_literal_statement() {
 }
 
 #[test]
+#[traced_test]
 fn while_loop() {
     let input = "while x < y { z }";
     let mut parser = Parser::new(
@@ -843,6 +866,7 @@ fn while_loop() {
     test_identifier(expr.expression.deref().clone(), "z");
 }
  #[test]
+#[traced_test]
 fn assignment() {
     let input = "x = 7;";
     let mut parser = Parser::new(

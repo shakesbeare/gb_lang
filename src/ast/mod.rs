@@ -53,7 +53,7 @@ impl IntoNode for Statement {
 }
 
 impl Statement {
-    pub fn is_return_statement(&self) -> bool {
+    pub fn is_return_stmt(&self) -> bool {
         matches!(self, Statement::ReturnStatement(_))
     }
 }

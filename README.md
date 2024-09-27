@@ -104,3 +104,6 @@ wanted to switch to a fancier Pratt-parser rather than my grammar-based parser o
 I occasionally resume work on Gb. My plan is to one day make it a sleek scripting
 language with support for interop with Rust. As of now, development of the project
 has taken the back seat to my studies in college. 
+
+# Running Tests
+ 

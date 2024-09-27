@@ -2,6 +2,7 @@ use crate::interpreter::gb_type::GbType;
 use gxhash::{HashMap, HashMapExt};
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub struct Environment {
     symbol_table: HashMap<Rc<str>, GbType>,
 }
