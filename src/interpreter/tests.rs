@@ -144,12 +144,13 @@ fn if_expression() {
     let input = [
         ("if 3 < 5 { 7 } else { 8 }", GbType::Integer(7)),
         ("if 3 < 5 { 7 } else if 3 > 5 { 8 }", GbType::Integer(7)),
-
         ("if 5 < 3 { 7 } else { 8 }", GbType::Integer(8)),
         ("if 5 < 3 { 7 } else if 5 > 3 { 8 }", GbType::Integer(8)),
-
         ("if 5 < 3 { 7 } else if 5 > 3 { 8 }", GbType::Integer(8)),
-        ("if 5 < 3 { 7 } else if 5 < 3 { 8 } else { 9 }", GbType::Integer(9)),
+        (
+            "if 5 < 3 { 7 } else if 5 < 3 { 8 } else { 9 }",
+            GbType::Integer(9),
+        ),
     ];
 
     for (input, expected) in input {
@@ -350,5 +351,5 @@ fn fn_stack_pop() {
     "#;
 
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
-    let res = i.evaluate();
+    i.evaluate();
 }

@@ -4,7 +4,6 @@ mod lib;
 mod tests;
 
 use std::rc::Rc;
-use anyhow::Context;
 use tracing::instrument;
 
 use self::environment::Environment;

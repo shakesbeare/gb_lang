@@ -119,12 +119,7 @@ pub struct FunctionLiteralStatement {
 
 impl std::fmt::Display for FunctionLiteralStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} -> {}",
-            self.identifier,
-            self.literal
-        )
+        write!(f, "{} -> {}", self.identifier, self.literal)
     }
 }
 
@@ -455,7 +450,7 @@ impl IntoExpression for WhileExpression {
     }
 }
 
-impl IntoNode for WhileExpression { 
+impl IntoNode for WhileExpression {
     fn into_node(self) -> Node {
         Node::Expression(self.into_expression())
     }
@@ -463,12 +458,6 @@ impl IntoNode for WhileExpression {
 
 impl std::fmt::Display for WhileExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {} {}",
-            self.token.literal,
-            self.condition,
-            self.body,
-        )
+        write!(f, "{} {} {}", self.token.literal, self.condition, self.body,)
     }
 }

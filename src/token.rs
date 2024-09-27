@@ -23,11 +23,7 @@ impl std::hash::Hash for Token {
 impl Eq for Token {}
 
 impl Token {
-    pub fn new<S: Into<String>, P: Into<Point>>(
-        literal: S,
-        kind: TokenKind,
-        location: P,
-    ) -> Self {
+    pub fn new<S: Into<String>, P: Into<Point>>(literal: S, kind: TokenKind, location: P) -> Self {
         Self {
             literal: literal.into(),
             kind,
@@ -92,25 +88,25 @@ pub enum TokenKind {
 impl From<&String> for TokenKind {
     fn from(val: &String) -> Self {
         if val == "let" {
-            return TokenKind::Let;
+            TokenKind::Let
         } else if val == "if" {
-            return TokenKind::If;
+            TokenKind::If
         } else if val == "for" {
-            return TokenKind::For;
+            TokenKind::For
         } else if val == "while" {
-            return TokenKind::While;
+            TokenKind::While
         } else if val == "else" {
-            return TokenKind::Else;
+            TokenKind::Else
         } else if val == "fn" {
-            return TokenKind::Fn;
+            TokenKind::Fn
         } else if val == "return" {
-            return TokenKind::Return;
+            TokenKind::Return
         } else if val == "false" {
-            return TokenKind::False;
+            TokenKind::False
         } else if val == "true" {
-            return TokenKind::True;
+            TokenKind::True
         } else {
-            return TokenKind::Identifier;
+            TokenKind::Identifier
         }
     }
 }

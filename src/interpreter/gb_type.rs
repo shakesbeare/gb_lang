@@ -193,10 +193,11 @@ impl std::ops::Add<GbType> for GbType {
                 GbType::String(y) => {
                     let mut x = x.clone();
                     x.push_str(&y);
-                    GbType::String(x) }
+                    GbType::String(x)
+                }
 
                 _ => todo!(),
-            }
+            },
             _ => todo!(),
         }
     }

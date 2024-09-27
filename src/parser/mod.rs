@@ -117,7 +117,7 @@ impl<'a, R: Read> Parser<'a, R> {
         p.register_infix(TokenKind::Exponentiate, Parser::parse_infix_expression);
         p.register_infix(TokenKind::Assign, Parser::parse_infix_expression);
 
-        return p;
+        p
     }
 
     // Useful for debugging, set verbose to true
@@ -141,17 +141,17 @@ impl<'a, R: Read> Parser<'a, R> {
 
     fn peek_precedence(&mut self) -> Precedence {
         if let Some(p) = self.precedences.get(&self.peek_token.kind) {
-            return *p;
+            *p
         } else {
-            return Precedence::Lowest;
+            Precedence::Lowest
         }
     }
 
     fn cur_precedence(&mut self) -> Precedence {
         if let Some(p) = self.precedences.get(&self.cur_token.kind) {
-            return *p;
+            *p
         } else {
-            return Precedence::Lowest;
+            Precedence::Lowest
         }
     }
 
@@ -266,7 +266,7 @@ impl<'a, R: Read> Parser<'a, R> {
         }
 
         self.print("end program");
-        return Ok(Node::Program(program));
+        Ok(Node::Program(program))
     }
 
     fn parse_statement(&mut self) -> Option<Result<Statement, ParserError>> {
@@ -508,12 +508,12 @@ impl<'a, R: Read> Parser<'a, R> {
             body,
         };
 
-        return Ok(FunctionLiteralStatement {
+        Ok(FunctionLiteralStatement {
             token,
             identifier,
             literal: function_literal,
         }
-        .into_statement());
+        .into_statement())
     }
 
     fn parse_function_parameters(&mut self) -> Result<Vec<Identifier>, ParserError> {

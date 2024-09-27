@@ -1,6 +1,9 @@
 use std::rc::Rc;
 
-use super::{gb_type::{GbFunc, GbType}, InterpreterStrategy};
+use super::{
+    gb_type::{GbFunc, GbType},
+    InterpreterStrategy,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct GbPrint {}
