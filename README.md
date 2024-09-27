@@ -1,3 +1,4 @@
+![CI](https://github.com/shakesbeare/gb_lang/actions/workflows/rust.yml/badge.svg)
 # About Gb
 
 Gb is a project I created to learn more about the inner workings of programming
