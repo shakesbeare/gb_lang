@@ -1,5 +1,7 @@
 use std::{borrow::Borrow, fmt, ops::Not, rc::Rc};
 
+use tracing::instrument;
+
 use crate::ast::{FunctionLiteral, IntoNode};
 
 use super::InterpreterStrategy;
@@ -33,7 +35,20 @@ pub enum GbType {
     Boolean(bool),
     String(String),
     Function(Rc<dyn GbFunc>),
-    ReturnValue(Rc<GbType>),
+    ReturnValue(Box<GbType>),
+}
+
+impl GbType {
+    #[instrument]
+    pub fn unwrap_return(self) -> Self {
+        let mut x = self;
+        while let GbType::ReturnValue(inner) = x {
+            tracing::info!("Unwrapping return");
+            x = (*inner).unwrap_return();
+        }
+
+        x
+    }
 }
 
 impl PartialEq for GbType {
@@ -107,8 +122,8 @@ pub fn gb_bool(x: GbType) -> GbType {
 }
 
 /// Returns a string representation of the type of the input
-pub fn gb_type_of(x: GbType) -> String {
-    match x {
+pub fn gb_type_of(x: impl std::ops::Deref<Target = GbType>) -> String {
+    match *x {
         GbType::Empty => "Empty",
         GbType::Error => "Error",
         GbType::None => "None",

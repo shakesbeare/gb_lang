@@ -182,7 +182,7 @@ impl TreeWalking {
                 self.eval_expr(&rs.return_value, function_context)
             }
             Statement::ExpressionStatement(es) => self.eval_expr_stmt(es, function_context),
-            Statement::BlockStatement(bs) => self.eval_block_stmt(bs, function_context),
+            Statement::BlockStatement(bs) => self.eval_block_stmt(bs, function_context).unwrap_return(),
             Statement::FunctionLiteralStatement(fls) => self.eval_fn_lit_stmt(fls),
         }
     }
@@ -192,8 +192,14 @@ impl TreeWalking {
         let mut last = GbType::None;
         for stmt in input.statements.iter() {
             last = self.eval_stmt(stmt, function_context);
-            if stmt.is_return_stmt() && function_context {
-                return last;
+            if function_context {
+                if stmt.is_return_stmt() {
+                    tracing::info!("Returning value");
+                    return GbType::ReturnValue(last.into());
+                } else if gb_type::gb_type_of(&last) == "Return Value" {
+                    tracing::info!("Found returned value");
+                    return last;
+                }
             }
         }
         last
@@ -349,10 +355,12 @@ impl TreeWalking {
         GbType::None
     }
 
+    #[instrument(skip_all)]
     fn eval_fn_lit(&mut self, input: &FunctionLiteral) -> GbType {
         GbType::Function(Rc::new(input.clone()))
     }
 
+    #[instrument(skip_all)]
     fn eval_fn_call(&mut self, input: &CallExpression, function_context: bool) -> GbType {
         let Expression::Identifier(ref key) = *input.function else {
             // TODO error handling

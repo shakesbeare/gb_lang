@@ -214,7 +214,7 @@ fn return_statement() {
 #[test]
 #[traced_test]
 fn conditional_return() {
-    let input = "fn foo(n) { if n == 1 { return true; } } fn main() { foo(1); } main();";
+    let input = "fn foo(n) { if n == 1 { return true; } return false; } fn main() { foo(1); } main();";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate();
     assert_eq!(res, GbType::Boolean(true));
@@ -281,4 +281,13 @@ fn auto_exec_global_main() {
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate();
     assert_eq!(res, GbType::Integer(7));
+}
+
+#[test]
+#[traced_test]
+fn recursion() {
+    let input = "fn main() { foo(3) } fn foo(n) { if n <= 1 { return 1; } print(n); return foo(n-1); }";
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let res = i.evaluate();
+    assert_eq!(res, GbType::Integer(1));
 }
