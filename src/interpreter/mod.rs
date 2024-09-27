@@ -16,7 +16,7 @@ use crate::{
     parser::error::ParserError,
 };
 use gb_type::{gb_pow, GbFunc, GbType};
-use gxhash::{HashMap, HashMapExt};
+use std::collections::HashMap;
 
 pub trait InterpreterStrategy {
     fn eval(&mut self, input: &Node, function_context: bool) -> GbType;

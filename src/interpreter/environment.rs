@@ -1,5 +1,5 @@
 use crate::interpreter::gb_type::GbType;
-use gxhash::{HashMap, HashMapExt};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug)]
