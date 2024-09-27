@@ -186,7 +186,7 @@ impl TreeWalking {
         //     Function objects cannot be mutated
         let s = unsafe { &mut *(self as *mut Self) };
         if let Some(GbType::Function(main)) = self.top_env().get("main") {
-            tracing::info!("Found main function");
+            tracing::trace!("Found main function");
             // TODO:
             //     auto parse cli args as main args
             last_result = main.execute(s, &[]);
@@ -220,10 +220,10 @@ impl TreeWalking {
             last = self.eval_stmt(stmt, function_context);
             if function_context {
                 if stmt.is_return_stmt() {
-                    tracing::info!("Returning value");
+                    tracing::trace!("Returning value");
                     return GbType::ReturnValue(last.into());
                 } else if gb_type::gb_type_of(&last) == "Return Value" {
-                    tracing::info!("Hoisting returned value");
+                    tracing::trace!("Hoisting returned value");
                     return last.unwrap_return();
                 }
             }
@@ -265,7 +265,7 @@ impl TreeWalking {
     #[instrument(skip_all)]
     fn eval_ident(&mut self, input: &Identifier) -> GbType {
         if let Some(val) = self.lookup(input.value()) {
-            tracing::info!("Variable {:?} has value {:?}", input.token.literal, &val);
+            tracing::trace!("Variable {:?} has value {:?}", input.token.literal, &val);
             val.clone()
         } else {
             panic!("Variable used before it was declared");
@@ -283,7 +283,7 @@ impl TreeWalking {
 
     #[instrument(skip_all)]
     fn eval_infix_expr(&mut self, expr: &InfixExpression, function_context: bool) -> GbType {
-        tracing::info!("Doing {:?}", expr.operator.as_str());
+        tracing::trace!("Doing {:?}", expr.operator.as_str());
         match expr.operator.as_str() {
             "+" => {
                 self.eval_expr(&expr.left, function_context)
@@ -363,10 +363,10 @@ impl TreeWalking {
         };
 
         if cond {
-            tracing::info!("Condition was true");
+            tracing::trace!("Condition was true");
             return_if_return!(self.eval_block_stmt(&input.consequence, function_context))
         } else {
-            tracing::info!("Condition was false");
+            tracing::trace!("Condition was false");
             match &input.alternative {
                 Alternative::IfExpression(ie) => self.eval_expr(ie, function_context),
                 Alternative::BlockStatement(bs) => {
@@ -382,7 +382,7 @@ impl TreeWalking {
         let key: Rc<str> = input.identifier.value().into();
         let value = GbType::Function(Rc::new(input.literal.clone()));
         self.top_env().insert(key.clone(), value);
-        tracing::info!("Created Function: {:?}", key);
+        tracing::trace!("Created Function: {:?}", key);
         GbType::None
     }
 
@@ -419,7 +419,7 @@ impl TreeWalking {
         // SAFETY:
         // functions will not be able to access their own entry in the symbol table
         let gb_func = unsafe { &*(&**gb_func as *const dyn GbFunc) };
-        tracing::info!("Calling function {:?} with args {:?}", &key.value(), &args);
+        tracing::trace!("Calling function {:?} with args {:?}", &key.value(), &args);
         gb_func.execute(self, &args).unwrap_return()
     }
 

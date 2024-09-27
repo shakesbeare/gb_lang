@@ -11,7 +11,7 @@ fn main() -> Result<()> {
             .with_target(false)
             .without_time()
             .pretty())
-        .with_max_level(tracing::Level::TRACE)
+        .with_max_level(tracing::Level::INFO)
         .init();
     #[cfg(not(debug_assertions))]
     tracing_subscriber::fmt()

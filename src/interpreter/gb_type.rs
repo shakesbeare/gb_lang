@@ -45,7 +45,7 @@ impl GbType {
     pub fn unwrap_return(self) -> Self {
         let mut x = self;
         while let GbType::ReturnValue(inner) = x {
-            tracing::info!("Unwrapping return");
+            tracing::trace!("Unwrapping return");
             x = (*inner).unwrap_return();
         }
 

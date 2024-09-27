@@ -68,7 +68,37 @@ Outputs:
 > Hello, foo!
 > Hello, foo!
 > Hello, foo!
+```
 
+
+## Recursion!
+```
+fn main() {
+    print(fib(10));
+}
+
+fn fib(n) {
+    if n == 0 {
+        return 0;
+    } else if n == 1 {
+        return 1;
+    }
+
+    return fib(n - 1) + fib(n - 2);
+}
+```
+```
+Outputs:
+> 55
+```
+
+## Optional Main Function
+
+Gb will automatically execute any top-level function named `main`, but this is
+not required. The following is just as valid as the previous examples.
+
+```
+print("Hello, World!");
 ```
 
 # Why not use a parser generator?
@@ -105,5 +135,3 @@ I occasionally resume work on Gb. My plan is to one day make it a sleek scriptin
 language with support for interop with Rust. As of now, development of the project
 has taken the back seat to my studies in college. 
 
-# Running Tests
- 
