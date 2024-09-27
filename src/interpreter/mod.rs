@@ -66,14 +66,24 @@ pub struct TreeWalking {
     stack: Vec<Environment>,
 }
 
+/// Useful to automatically return if the evaluated function returns a GbType::ReturnValue
+macro_rules! return_if_return (
+    ($s:ident.$f:ident($($args:tt)*)) => {
+        match $s.$f($($args)*) {
+            GbType::ReturnValue(v) => return GbType::ReturnValue(v),
+            x => x
+        }
+    }
+);
+
 impl InterpreterStrategy for TreeWalking {
-    #[instrument(skip_all)]
     fn eval(&mut self, input: &Node, function_context: bool) -> GbType {
         match input {
             Node::Program(p) => self.eval_prog(p.statements.as_slice(), function_context),
             Node::Statement(s) => self.eval_stmt(s, function_context),
             Node::Expression(e) => self.eval_expr(e, function_context),
         }
+        .unwrap_return()
     }
 
     fn new_env(&mut self) {
@@ -145,7 +155,6 @@ impl TreeWalking {
         out
     }
 
-    #[instrument(skip_all)]
     fn eval_prog(&mut self, input: &[Node], function_context: bool) -> GbType {
         let mut last_result = GbType::None;
         for node in input {
@@ -171,7 +180,6 @@ impl TreeWalking {
         last_result
     }
 
-    #[instrument(skip_all)]
     fn eval_stmt(&mut self, input: &Statement, function_context: bool) -> GbType {
         match input {
             Statement::LetStatement(ls) => self.eval_let_stmt(ls, function_context),
@@ -182,12 +190,13 @@ impl TreeWalking {
                 self.eval_expr(&rs.return_value, function_context)
             }
             Statement::ExpressionStatement(es) => self.eval_expr_stmt(es, function_context),
-            Statement::BlockStatement(bs) => self.eval_block_stmt(bs, function_context).unwrap_return(),
+            Statement::BlockStatement(bs) => {
+                return_if_return!(self.eval_block_stmt(bs, function_context)).unwrap_return()
+            }
             Statement::FunctionLiteralStatement(fls) => self.eval_fn_lit_stmt(fls),
         }
     }
 
-    #[instrument(skip_all)]
     fn eval_block_stmt(&mut self, input: &BlockStatement, function_context: bool) -> GbType {
         let mut last = GbType::None;
         for stmt in input.statements.iter() {
@@ -205,23 +214,20 @@ impl TreeWalking {
         last
     }
 
-    #[instrument(skip_all)]
     fn eval_expr_stmt(&mut self, input: &ExpressionStatement, function_context: bool) -> GbType {
         // this function exists in case an expression statement should
         // evaluate to something other than the result of its expression
         self.eval_expr(&input.expression, function_context)
     }
 
-    #[instrument(skip_all)]
     fn eval_let_stmt(&mut self, input: &LetStatement, function_context: bool) -> GbType {
         let value = self.eval_expr(&input.value, function_context);
         self.top_env().insert(input.name.value(), value);
         GbType::Name(input.name.value().to_string())
     }
 
-    #[instrument(skip_all)]
     fn eval_expr(&mut self, input: &Expression, function_context: bool) -> GbType {
-        let res = match input {
+        match input {
             Expression::Identifier(id) => self.eval_ident(id),
             Expression::IntegerLiteral(i) => GbType::Integer(i.value),
             Expression::FloatLiteral(f) => GbType::Float(f.value),
@@ -233,15 +239,12 @@ impl TreeWalking {
             Expression::FunctionLiteral(fl) => self.eval_fn_lit(fl),
             Expression::CallExpression(fc) => self.eval_fn_call(fc, function_context),
             Expression::WhileExpression(we) => self.eval_while_expr(we, function_context),
-        };
-        tracing::info!("Expression: {:?}", res);
-        res
+        }
     }
 
-    #[instrument(skip_all)]
     fn eval_ident(&mut self, input: &Identifier) -> GbType {
-        tracing::info!("Accessing: {:?}", input);
         if let Some(val) = self.lookup(input.value()) {
+            tracing::info!("Variable {:?} has value {:?}", input.token.literal, &val);
             val.clone()
         } else {
             panic!("Variable used before it was declared");
@@ -257,6 +260,7 @@ impl TreeWalking {
     }
 
     fn eval_infix_expr(&mut self, expr: &InfixExpression, function_context: bool) -> GbType {
+        tracing::info!("Doing {:?}", expr.operator.as_str());
         match expr.operator.as_str() {
             "+" => {
                 self.eval_expr(&expr.left, function_context)
@@ -324,7 +328,6 @@ impl TreeWalking {
         }
     }
 
-    #[instrument(skip_all)]
     fn eval_if_expr(&mut self, input: &IfExpression, function_context: bool) -> GbType {
         // pub token: Token,
         // pub condition: Rc<Expression>,
@@ -336,17 +339,20 @@ impl TreeWalking {
         };
 
         if cond {
-            self.eval_block_stmt(&input.consequence, function_context)
+            tracing::info!("Condition was true");
+            return_if_return!(self.eval_block_stmt(&input.consequence, function_context))
         } else {
+            tracing::info!("Condition was false");
             match &input.alternative {
                 Alternative::IfExpression(ie) => self.eval_expr(ie, function_context),
-                Alternative::BlockStatement(bs) => self.eval_block_stmt(bs, function_context),
+                Alternative::BlockStatement(bs) => {
+                    return_if_return!(self.eval_block_stmt(bs, function_context))
+                }
                 Alternative::None => GbType::None,
             }
         }
     }
 
-    #[instrument(skip_all)]
     fn eval_fn_lit_stmt(&mut self, input: &FunctionLiteralStatement) -> GbType {
         let key: Rc<str> = input.identifier.value().into();
         let value = GbType::Function(Rc::new(input.literal.clone()));
@@ -355,12 +361,10 @@ impl TreeWalking {
         GbType::None
     }
 
-    #[instrument(skip_all)]
     fn eval_fn_lit(&mut self, input: &FunctionLiteral) -> GbType {
         GbType::Function(Rc::new(input.clone()))
     }
 
-    #[instrument(skip_all)]
     fn eval_fn_call(&mut self, input: &CallExpression, function_context: bool) -> GbType {
         let Expression::Identifier(ref key) = *input.function else {
             // TODO error handling
@@ -370,6 +374,12 @@ impl TreeWalking {
         let mut args = vec![];
         for arg in input.arguments.iter() {
             args.push(self.eval_expr(arg, function_context));
+        }
+
+        if key.token.literal == "log" {
+            // this function to be called eagerly!
+            lib::GbLog {}.execute(self, &args);
+            return GbType::None;
         }
 
         let Some(GbType::Function(gb_func)) = self.lookup(key.value()) else {
@@ -382,12 +392,13 @@ impl TreeWalking {
         // SAFETY:
         // functions will not be able to access their own entry in the symbol table
         let gb_func = unsafe { &*(&**gb_func as *const dyn GbFunc) };
+        tracing::info!("Calling function {:?} with args {:?}", &key.value(), &args);
         gb_func.execute(self, &args)
     }
 
     fn eval_while_expr(&mut self, input: &WhileExpression, function_context: bool) -> GbType {
         while self.eval_expr(&input.condition, function_context) == GbType::Boolean(true) {
-            self.eval_block_stmt(&input.body, false);
+            return_if_return!(self.eval_block_stmt(&input.body, false));
         }
 
         GbType::None

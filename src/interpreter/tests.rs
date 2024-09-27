@@ -4,10 +4,7 @@ use std::rc::Rc;
 use tracing_test::traced_test;
 
 use crate::{
-    ast::{
-        BlockStatement, BooleanLiteral, Expression, FloatLiteral, IntegerLiteral,
-        Statement,
-    },
+    ast::{BlockStatement, BooleanLiteral, Expression, FloatLiteral, IntegerLiteral, Statement},
     interpreter::gb_type::GbType,
     lexer::Lexer,
     parser::{error::DefaultErrorHandler, Parser},
@@ -55,8 +52,7 @@ fn string() {
     ];
 
     for (input, expected) in input {
-        let mut i =
-            Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+        let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
         let actual = i.evaluate();
         assert_eq!(actual, expected);
     }
@@ -66,8 +62,7 @@ fn string() {
 #[traced_test]
 fn let_statement() {
     let input = "let x = 7;";
-    let mut interpreter =
-        Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let mut interpreter = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     interpreter.evaluate();
     let dump = interpreter.strategy.inspect();
     println!("{:?}", dump);
@@ -102,8 +97,7 @@ fn prefix_expression() {
     ];
 
     for (input, expected) in inputs {
-        let mut i =
-            Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+        let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
         let actual = i.evaluate();
         assert_eq!(actual, expected);
     }
@@ -134,8 +128,7 @@ fn infix_expression() {
     ];
 
     for (input, expected) in input {
-        let mut i =
-            Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+        let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
         let actual = i.evaluate();
         if actual != expected {
             tracing::info!("Input: {:?}", input);
@@ -149,13 +142,15 @@ fn infix_expression() {
 #[traced_test]
 fn if_expression() {
     let input = [
-        ("if 3 < 5 { 7 } else { 7 }", GbType::Integer(7)),
+        ("if 3 < 5 { 7 } else { 8 }", GbType::Integer(7)),
+        ("if 3 < 5 { 7 } else if 3 > 5 { 8 }", GbType::Integer(7)),
+
         ("if 5 < 3 { 7 } else { 8 }", GbType::Integer(8)),
+        ("if 5 < 3 { 7 } else if 5 > 3 { 8 }", GbType::Integer(8)),
     ];
 
     for (input, expected) in input {
-        let mut i =
-            Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+        let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
         let actual = i.evaluate();
         assert_eq!(actual, expected);
     }
@@ -214,7 +209,8 @@ fn return_statement() {
 #[test]
 #[traced_test]
 fn conditional_return() {
-    let input = "fn foo(n) { if n == 1 { return true; } return false; } fn main() { foo(1); } main();";
+    let input =
+        "fn foo(n) { if n == 1 { return true; } return false; } fn main() { foo(1); } main();";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate();
     assert_eq!(res, GbType::Boolean(true));
@@ -286,8 +282,74 @@ fn auto_exec_global_main() {
 #[test]
 #[traced_test]
 fn recursion() {
-    let input = "fn main() { foo(3) } fn foo(n) { if n <= 1 { return 1; } print(n); return foo(n-1); }";
+    let input =
+        "fn main() { foo(3) } fn foo(n) { if n <= 1 { return 1; } print(n); return foo(n-1); }";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate();
     assert_eq!(res, GbType::Integer(1));
+}
+
+#[test]
+#[traced_test]
+fn fn_call_as_expr() {
+    let input = "fn foo(n) { return n; } fn main() { return foo(3) + foo(5); }";
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let res = i.evaluate();
+    assert_eq!(res, GbType::Integer(8));
+}
+
+#[test]
+#[traced_test]
+fn recursion_2() {
+    let input =
+        "fn foo(n) { if n <= 1 { return 1; } return foo(n-1) + 1; } fn main() { return foo(3); }";
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let res = i.evaluate();
+    assert_eq!(res, GbType::Integer(3));
+}
+
+#[test]
+#[traced_test]
+fn recursion_fib() {
+    let input = r#"
+    fn fib(n) {
+        if n == 1 {
+            return 1;
+        } else if n <= 0 {
+            return 0;
+        }
+
+        return fib(n-1) + fib(n-2);
+    }
+
+    fn main() {
+        return fib(10);
+    }"#;
+
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let res = i.evaluate();
+    assert_eq!(res, GbType::Integer(55));
+}
+
+#[test]
+#[traced_test]
+fn if_expression_2() {
+    let input = r#"
+    fn foo(n) {
+        if n < 1 {
+            return "LESS1";
+        } else if n > 5 {
+            return "GREATER5";
+        }
+
+        return "BORING";
+    }
+
+    fn main() {
+        return foo(0) + foo(6) + foo(2);
+    }
+"#;
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let res = i.evaluate();
+    assert_eq!(res, GbType::String("LESS1GREATER5BORING".into()));
 }
