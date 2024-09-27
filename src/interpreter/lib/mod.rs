@@ -8,8 +8,9 @@ pub(super) struct GbPrint {}
 impl GbPrint {
     pub(super) fn print(&self, args: &[GbType]) {
         for arg in args {
-            println!("{}", arg);
+            print!("{} ", arg);
         }
+        println!();
     }
 
     pub(super) fn export(self) -> GbType {
