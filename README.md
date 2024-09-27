@@ -100,6 +100,10 @@ not required. The following is just as valid as the previous examples.
 ```
 print("Hello, World!");
 ```
+```
+Outputs:
+> Hello, World!
+```
 
 # Why not use a parser generator?
 
@@ -126,7 +130,7 @@ was to hook into the Pest error system to emit useful error messages from Gb.
 It's also worth checking out [this](https://github.com/shakesbeare/gb_lang/tree/Rewrite) branch,
 which was the version I had before I began to use the *Writing an Interpreter in Go* version. 
 I learned the most from this version and ultimately decided to rewrite it again only because I
-wanted to switch to a fancier Pratt-parser rather than my grammar-based parser of this version. 
+wanted to switch to a fancier Pratt-parser rather than the grammar-based parser of this version. 
 
 
 # The future of Gb
