@@ -403,6 +403,8 @@ fn infix_expression_3() {
         ("foobar < barfoo;", "foobar", "<", "barfoo"),
         ("foobar == barfoo;", "foobar", "==", "barfoo"),
         ("foobar != barfoo;", "foobar", "!=", "barfoo"),
+        ("foobar >= barfoo;", "foobar", ">=", "barfoo"),
+        ("foobar <= barfoo;", "foobar", "<=", "barfoo"),
     ];
 
     for (inp, left, op, right) in input {

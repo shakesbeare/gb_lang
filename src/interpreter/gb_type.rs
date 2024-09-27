@@ -33,6 +33,7 @@ pub enum GbType {
     Boolean(bool),
     String(String),
     Function(Rc<dyn GbFunc>),
+    ReturnValue(Rc<GbType>),
 }
 
 impl PartialEq for GbType {
@@ -117,6 +118,7 @@ pub fn gb_type_of(x: GbType) -> String {
         GbType::String(_) => "String",
         GbType::Name(_) => "Name",
         GbType::Function(_) => "Function",
+        GbType::ReturnValue(_) => "Return Value",
     }
     .into()
 }

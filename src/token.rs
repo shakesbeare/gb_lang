@@ -72,6 +72,8 @@ pub enum TokenKind {
     NotEquals,
     GreaterThan,
     LessThan,
+    GreaterEquals,
+    LessEquals,
     Bang,
 
     LParen,

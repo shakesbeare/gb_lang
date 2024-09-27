@@ -272,19 +272,42 @@ impl<T: Read> Lexer<T> {
                 }
             } // end /
             '>' => {
-                let token = Token::new(
-                    char_read,
-                    TokenKind::GreaterThan,
-                    (self.line, self.col),
-                );
+                let token = if self.peek() == '=' {
+                    self.get_char();
+                    Token::new(
+                        ">=",
+                        TokenKind::GreaterEquals,
+                        (self.line, self.col)
+                    )
+                } else {
+                     Token::new(
+                        char_read,
+                        TokenKind::GreaterThan,
+                        (self.line, self.col),
+                    )
+                };
+
                 self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                 };
             }
             '<' => {
-                let token =
-                    Token::new(char_read, TokenKind::LessThan, (self.line, self.col));
+                let token = if self.peek() == '=' {
+                    self.get_char();
+                    Token::new(
+                        "<=",
+                        TokenKind::LessEquals,
+                        (self.line, self.col)
+                    )
+                } else {
+                     Token::new(
+                        char_read,
+                        TokenKind::LessThan,
+                        (self.line, self.col),
+                    )
+                };
+
                 self.next_token = Some(token);
                 return LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),

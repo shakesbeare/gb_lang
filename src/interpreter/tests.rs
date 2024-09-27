@@ -126,6 +126,10 @@ fn infix_expression() {
         ("true != false", GbType::Boolean(true)),
         ("true == false", GbType::Boolean(false)),
         ("false == false", GbType::Boolean(true)),
+        ("0 <= 1", GbType::Boolean(true)),
+        ("1 <= 1", GbType::Boolean(true)),
+        ("0 >= 1", GbType::Boolean(false)),
+        ("1 >= 1", GbType::Boolean(true)),
         ("let x = 7; let y = 7; x == y;", GbType::Boolean(true)),
     ];
 
@@ -133,8 +137,10 @@ fn infix_expression() {
         let mut i =
             Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
         let actual = i.evaluate();
-        dbg!(input);
-        dbg!(&actual, &expected);
+        if actual != expected {
+            tracing::info!("Input: {:?}", input);
+            tracing::info!("Actual: {:?}, Expected: {:?}", &actual, &expected);
+        }
         assert_eq!(actual, expected);
     }
 }
@@ -203,6 +209,15 @@ fn return_statement() {
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate();
     assert_eq!(res, GbType::Integer(8));
+}
+
+#[test]
+#[traced_test]
+fn conditional_return() {
+    let input = "fn foo(n) { if n == 1 { return true; } } fn main() { foo(1); } main();";
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let res = i.evaluate();
+    assert_eq!(res, GbType::Boolean(true));
 }
 
 #[test]
