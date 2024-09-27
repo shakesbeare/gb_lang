@@ -187,6 +187,14 @@ impl std::ops::Add<GbType> for GbType {
                 GbType::Integer(y) => GbType::Float(x + y as f64),
                 _ => todo!(),
             },
+            GbType::String(x) => match rhs {
+                GbType::String(y) => {
+                    let mut x = x.clone();
+                    x.push_str(&y);
+                    GbType::String(x) }
+
+                _ => todo!(),
+            }
             _ => todo!(),
         }
     }
