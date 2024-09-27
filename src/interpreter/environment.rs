@@ -30,7 +30,6 @@ impl Environment {
         self.symbol_table.get_mut(&key)
     }
 
-    #[cfg(test)]
     pub fn inspect(&self) -> Vec<(Rc<str>, &GbType)> {
         let mut out = Vec::new();
         for (k, v) in self.symbol_table.iter() {
@@ -45,6 +44,8 @@ impl Default for Environment {
         let mut stable = HashMap::new();
         stable.insert("None".into(), GbType::None);
         stable.insert("print".into(), super::lib::GbPrint {}.export());
+        stable.insert("to_string".into(), super::lib::GbToString {}.export());
+        stable.insert("dump".into(), super::lib::GbDump {}.export());
         Self::new(stable)
     }
 }

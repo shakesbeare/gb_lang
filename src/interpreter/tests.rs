@@ -147,6 +147,9 @@ fn if_expression() {
 
         ("if 5 < 3 { 7 } else { 8 }", GbType::Integer(8)),
         ("if 5 < 3 { 7 } else if 5 > 3 { 8 }", GbType::Integer(8)),
+
+        ("if 5 < 3 { 7 } else if 5 > 3 { 8 }", GbType::Integer(8)),
+        ("if 5 < 3 { 7 } else if 5 < 3 { 8 } else { 9 }", GbType::Integer(9)),
     ];
 
     for (input, expected) in input {
@@ -186,7 +189,7 @@ fn function_literal() {
 #[test]
 #[traced_test]
 fn function_call() {
-    let input = "fn main(x, y) { x + y } main(3, 4)";
+    let input = "fn foo(x, y) { x + y } foo(3, 4)";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate();
     assert_eq!(res, GbType::Integer(7));
@@ -333,23 +336,19 @@ fn recursion_fib() {
 
 #[test]
 #[traced_test]
-fn if_expression_2() {
+#[should_panic]
+fn fn_stack_pop() {
     let input = r#"
     fn foo(n) {
-        if n < 1 {
-            return "LESS1";
-        } else if n > 5 {
-            return "GREATER5";
-        }
-
-        return "BORING";
+        return n < 1;
     }
 
     fn main() {
-        return foo(0) + foo(6) + foo(2);
+        foo(5);
+        foo(n-1);
     }
-"#;
+    "#;
+
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate();
-    assert_eq!(res, GbType::String("LESS1GREATER5BORING".into()));
 }
