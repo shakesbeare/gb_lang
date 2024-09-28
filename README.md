@@ -119,7 +119,7 @@ fn foo() {
 ```
 // file.gb
 fn main() {
-    other.foo();
+    foo.foo();
 }
 ```
 ```
