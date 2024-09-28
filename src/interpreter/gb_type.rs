@@ -287,7 +287,7 @@ impl std::fmt::Display for GbType {
                 GbType::Boolean(x) => x.to_string(),
                 GbType::None => "None".to_string(),
                 GbType::Function(x) => format!("{:?}", x),
-                _ => todo!()
+                _ => todo!(),
             }
         )
     }

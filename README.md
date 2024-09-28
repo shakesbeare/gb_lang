@@ -106,6 +106,27 @@ Outputs:
 > Hello, World!
 ```
 
+## Working with multiple files
+
+Gb automatically attempts to load a file when namespace lookup fails. Folders are
+currently not supported. In the future, you will be able to alias paths to types.
+```
+// foo.gb
+fn foo() {
+    std.print("Hello from foo!");
+}
+```
+```
+// file.gb
+fn main() {
+    other.foo();
+}
+```
+```
+Outputs:
+> Hello from foo!
+```
+
 # Why not use a parser generator?
 
 Since Gb was primarily a learning exercise, I wanted to try and do as much as possible
