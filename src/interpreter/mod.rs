@@ -355,7 +355,11 @@ impl TreeWalking {
                         let Expression::Identifier(ref child) = *expr.right else {
                             panic!("Cannot lookup to {:?}", expr.left);
                         };
-                        tracing::trace!("Looking for attr {:?} in {:?}", child.to_string(), parent.to_string());
+                        tracing::trace!(
+                            "Looking for attr {:?} in {:?}",
+                            child.to_string(),
+                            parent.to_string()
+                        );
                         match item.get_attr(child.to_string()) {
                             Some(v) => (*v).clone(),
                             None => GbType::Error,
@@ -421,15 +425,18 @@ impl TreeWalking {
                 };
                 // SAFETY:
                 // functions will not be able to access their own entry in the symbol table
-                (key.to_string(), unsafe { &*(&**gb_func as *const dyn GbFunc) })
+                (key.to_string(), unsafe {
+                    &*(&**gb_func as *const dyn GbFunc)
+                })
             }
             Expression::InfixExpression(ref ie) => {
                 let val = self.eval_infix_expr(ie, function_context);
                 let GbType::Function(gb_func) = val else {
-                    panic!("Expected GbType::Function, get {:?}",
-                        val)
+                    panic!("Expected GbType::Function, get {:?}", val)
                 };
-                (ie.to_string(), unsafe { &*(&*gb_func as *const dyn GbFunc) })
+                (ie.to_string(), unsafe {
+                    &*(&*gb_func as *const dyn GbFunc)
+                })
             }
             _ => {
                 panic!("Expected identifier or lookup, get {:?}", input.function);

@@ -59,7 +59,7 @@ impl GbType {
                 // TODO remove unwrap
                 Some(ns.get(attr.as_ref())?.clone())
             }
-            _ => todo!()
+            _ => todo!(),
         }
     }
 }

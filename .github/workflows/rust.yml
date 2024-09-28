@@ -17,14 +17,14 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Run tests
-      run: cargo test --verbose
+      run: ./test.sh
   lint:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
     - name: Lint
-      run: cargo clippy --all -- -Dwarnings
+      run: ./lint.sh
 
   format:
     runs-on: ubuntu-latest
@@ -32,4 +32,4 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Format
-      run: cargo fmt --all --check
+      run: ./fmt.sh

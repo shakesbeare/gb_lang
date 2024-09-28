@@ -362,4 +362,3 @@ fn dot_lookup() {
     let res = i.evaluate();
     assert!(gb_type_of(&res) == "Function");
 }
-

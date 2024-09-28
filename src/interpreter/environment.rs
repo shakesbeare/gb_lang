@@ -44,7 +44,10 @@ impl Default for Environment {
         let mut stable = HashMap::new();
         let mut r#std = HashMap::new();
         r#std.insert("dump".into(), super::lib::GbDump {}.export().into());
-        r#std.insert("to_string".into(), super::lib::GbToString {}.export().into());
+        r#std.insert(
+            "to_string".into(),
+            super::lib::GbToString {}.export().into(),
+        );
         r#std.insert("print".into(), super::lib::GbPrint {}.export().into());
         r#std.insert("warn".into(), super::lib::GbWarn {}.export().into());
 

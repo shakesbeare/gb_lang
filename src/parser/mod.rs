@@ -90,7 +90,8 @@ impl<'a, R: Read> Parser<'a, R> {
         p.precedences
             .insert(TokenKind::Exponentiate, Precedence::Exponent);
         p.precedences.insert(TokenKind::LParen, Precedence::Call);
-        p.precedences.insert(TokenKind::DotLookup, Precedence::Lookup);
+        p.precedences
+            .insert(TokenKind::DotLookup, Precedence::Lookup);
 
         p.register_prefix(TokenKind::Identifier, Parser::parse_identifier);
         p.register_prefix(TokenKind::IntLiteral, Parser::parse_integer_literal);
