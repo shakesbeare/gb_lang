@@ -2,7 +2,7 @@ use crate::interpreter::gb_type::GbType;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Environment {
     symbol_table: HashMap<Rc<str>, GbType>,
 }
@@ -37,6 +37,7 @@ impl Environment {
         }
         out
     }
+
 }
 
 impl Default for Environment {

@@ -67,6 +67,7 @@ impl<T: InterpreterStrategy> Interpreter<T> {
 #[derive(Debug)]
 pub struct TreeWalking {
     stack: Vec<Environment>,
+    loaded_files: Vec<String>,
 }
 
 /// Useful to automatically return if the evaluated function returns a GbType::ReturnValue
@@ -123,10 +124,13 @@ impl Default for TreeWalking {
 
 impl TreeWalking {
     fn new(stack: Vec<Environment>) -> Self {
-        Self { stack }
+        Self {
+            stack,
+            loaded_files: vec![],
+        }
     }
 
-    fn lookup<T: Into<Rc<str>>>(&mut self, key: T) -> Option<&GbType> {
+    fn lookup<T: Into<Rc<str>>>(&self, key: T) -> Option<&GbType> {
         let key = key.into();
         let mut idx = self.stack.len() - 1;
         loop {
@@ -154,6 +158,65 @@ impl TreeWalking {
                 idx -= 1;
             } else {
                 return None;
+            }
+        }
+    }
+
+    fn dot_lookup(&mut self, parent: impl AsRef<str>, child: impl AsRef<str>) -> GbType {
+        match self.lookup(parent.as_ref()) {
+            Some(item) => self.namespace_lookup(item, parent, child),
+            None => {
+                let folder_name = parent.as_ref();
+                let file_name = format!("{}.gb", parent.as_ref());
+                if std::fs::exists(&file_name).unwrap() && !self.loaded_files.contains(&file_name) {
+                    tracing::trace!("Found file");
+                    let contents =
+                        std::fs::read_to_string(&file_name).expect("Failed to read file");
+                    let mut i = Interpreter::new(TreeWalking::default(), contents)
+                        .expect("Failed to create sub interpreter");
+                    i.evaluate();
+
+                    self.loaded_files.push(file_name.clone());
+                    let mut ns = HashMap::new();
+                    for (k, v) in i.strategy.top_env().inspect() {
+                        ns.insert(k.to_string(), v.clone().into());
+                    }
+                    tracing::trace!("Created namespace {}", parent.as_ref());
+                    self.top_env()
+                        .insert(parent.as_ref().to_string(), GbType::Namespace(ns));
+
+                    self.dot_lookup(parent, child)
+                } else if std::fs::exists(folder_name).unwrap() {
+                    tracing::error!("Folders are not yet supported");
+                    todo!()
+                } else {
+                    tracing::error!(
+                        "Could not resolve lookup for {:?} in {:?}",
+                        child.as_ref(),
+                        parent.as_ref()
+                    );
+                    return GbType::Error;
+                }
+            }
+        }
+    }
+
+    fn namespace_lookup(
+        &self,
+        item: &GbType,
+        parent: impl AsRef<str>,
+        child: impl AsRef<str>,
+    ) -> GbType {
+        tracing::trace!(
+            "Looking for attr {:?} in {:?}",
+            child.as_ref(),
+            parent.as_ref()
+        );
+        match item.get_attr(child.as_ref()) {
+            Some(v) => (*v).clone(),
+            None => {
+                tracing::error!("{} has no attribute {}", parent.as_ref(), child.as_ref());
+                GbType::Error
             }
         }
     }
@@ -350,23 +413,10 @@ impl TreeWalking {
                 let Expression::Identifier(ref parent) = *expr.left else {
                     panic!("Cannot use . with {:?}", expr.left);
                 };
-                match self.lookup(parent.to_string()) {
-                    Some(item) => {
-                        let Expression::Identifier(ref child) = *expr.right else {
-                            panic!("Cannot lookup to {:?}", expr.left);
-                        };
-                        tracing::trace!(
-                            "Looking for attr {:?} in {:?}",
-                            child.to_string(),
-                            parent.to_string()
-                        );
-                        match item.get_attr(child.to_string()) {
-                            Some(v) => (*v).clone(),
-                            None => GbType::Error,
-                        }
-                    }
-                    None => todo!(),
-                }
+                let Expression::Identifier(ref child) = *expr.right else {
+                    panic!("Cannot use . with {:?}", expr.left);
+                };
+                self.dot_lookup(parent.to_string(), child.to_string())
             }
             _ => unreachable!(),
         }
