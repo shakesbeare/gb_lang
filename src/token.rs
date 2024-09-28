@@ -71,6 +71,7 @@ pub enum TokenKind {
     GreaterEquals,
     LessEquals,
     Bang,
+    DotLookup,
 
     LParen,
     RParen,

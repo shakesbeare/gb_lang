@@ -5,7 +5,7 @@ use tracing_test::traced_test;
 
 use crate::{
     ast::{BlockStatement, BooleanLiteral, Expression, FloatLiteral, IntegerLiteral, Statement},
-    interpreter::gb_type::GbType,
+    interpreter::gb_type::{gb_type_of, variant_eq, GbType},
     lexer::Lexer,
     parser::{error::DefaultErrorHandler, Parser},
     token::{Point, Token, TokenKind},
@@ -287,7 +287,7 @@ fn auto_exec_global_main() {
 #[traced_test]
 fn recursion() {
     let input =
-        "fn main() { foo(3) } fn foo(n) { if n <= 1 { return 1; } print(n); return foo(n-1); }";
+        "fn main() { foo(3) } fn foo(n) { if n <= 1 { return 1; } std.print(n); return foo(n-1); }";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate();
     assert_eq!(res, GbType::Integer(1));
@@ -353,3 +353,13 @@ fn fn_stack_pop() {
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     i.evaluate();
 }
+
+#[test]
+#[traced_test]
+fn dot_lookup() {
+    let input = r#"std.print"#;
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let res = i.evaluate();
+    assert!(gb_type_of(&res) == "Function");
+}
+

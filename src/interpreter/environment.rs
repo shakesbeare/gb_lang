@@ -42,10 +42,14 @@ impl Environment {
 impl Default for Environment {
     fn default() -> Self {
         let mut stable = HashMap::new();
+        let mut r#std = HashMap::new();
+        r#std.insert("dump".into(), super::lib::GbDump {}.export().into());
+        r#std.insert("to_string".into(), super::lib::GbToString {}.export().into());
+        r#std.insert("print".into(), super::lib::GbPrint {}.export().into());
+        r#std.insert("warn".into(), super::lib::GbWarn {}.export().into());
+
         stable.insert("None".into(), GbType::None);
-        stable.insert("print".into(), super::lib::GbPrint {}.export());
-        stable.insert("to_string".into(), super::lib::GbToString {}.export());
-        stable.insert("dump".into(), super::lib::GbDump {}.export());
+        stable.insert("std".into(), GbType::Namespace(r#std));
         Self::new(stable)
     }
 }

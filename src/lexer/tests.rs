@@ -193,6 +193,7 @@ fn lex_operators() {
     map.insert(">", TokenKind::GreaterThan);
     map.insert(">=", TokenKind::GreaterEquals);
     map.insert("<=", TokenKind::LessEquals);
+    map.insert(".", TokenKind::DotLookup);
 
     for (k, v) in map.iter() {
         let mut lexer = Lexer::from(k.as_bytes());

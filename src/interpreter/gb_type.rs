@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, fmt, ops::Not, rc::Rc};
+use std::{borrow::Borrow, collections::HashMap, fmt, ops::Not, rc::Rc};
 
 use tracing::instrument;
 
@@ -37,6 +37,7 @@ pub enum GbType {
     Boolean(bool),
     String(String),
     Function(Rc<dyn GbFunc>),
+    Namespace(HashMap<String, Rc<GbType>>),
     ReturnValue(Box<GbType>),
 }
 
@@ -50,6 +51,16 @@ impl GbType {
         }
 
         x
+    }
+
+    pub fn get_attr(&self, attr: impl AsRef<str>) -> Option<Rc<GbType>> {
+        match self {
+            GbType::Namespace(ns) => {
+                // TODO remove unwrap
+                Some(ns.get(attr.as_ref())?.clone())
+            }
+            _ => todo!()
+        }
     }
 }
 
@@ -136,6 +147,7 @@ pub fn gb_type_of(x: impl std::ops::Deref<Target = GbType>) -> String {
         GbType::Name(_) => "Name",
         GbType::Function(_) => "Function",
         GbType::ReturnValue(_) => "Return Value",
+        GbType::Namespace(_) => "Namespace",
     }
     .into()
 }

@@ -346,6 +346,24 @@ impl TreeWalking {
                 self.eval_expr(&expr.left, function_context)
                     <= self.eval_expr(&expr.right, function_context),
             ),
+            "." => {
+                let Expression::Identifier(ref parent) = *expr.left else {
+                    panic!("Cannot use . with {:?}", expr.left);
+                };
+                match self.lookup(parent.to_string()) {
+                    Some(item) => {
+                        let Expression::Identifier(ref child) = *expr.right else {
+                            panic!("Cannot lookup to {:?}", expr.left);
+                        };
+                        tracing::trace!("Looking for attr {:?} in {:?}", child.to_string(), parent.to_string());
+                        match item.get_attr(child.to_string()) {
+                            Some(v) => (*v).clone(),
+                            None => GbType::Error,
+                        }
+                    }
+                    None => todo!(),
+                }
+            }
             _ => unreachable!(),
         }
     }
@@ -392,9 +410,30 @@ impl TreeWalking {
 
     #[instrument(skip_all)]
     fn eval_fn_call(&mut self, input: &CallExpression, function_context: bool) -> GbType {
-        let Expression::Identifier(ref key) = *input.function else {
-            // TODO error handling
-            panic!("Expected Identifier, got {:?}", input.function);
+        let (func, gb_func) = match *input.function {
+            Expression::Identifier(ref key) => {
+                let Some(GbType::Function(gb_func)) = self.lookup(key.value()) else {
+                    // TODO error handling
+                    panic!(
+                        "Expected GbType::Function, got {:?}",
+                        self.lookup(key.value())
+                    );
+                };
+                // SAFETY:
+                // functions will not be able to access their own entry in the symbol table
+                (key.to_string(), unsafe { &*(&**gb_func as *const dyn GbFunc) })
+            }
+            Expression::InfixExpression(ref ie) => {
+                let val = self.eval_infix_expr(ie, function_context);
+                let GbType::Function(gb_func) = val else {
+                    panic!("Expected GbType::Function, get {:?}",
+                        val)
+                };
+                (ie.to_string(), unsafe { &*(&*gb_func as *const dyn GbFunc) })
+            }
+            _ => {
+                panic!("Expected identifier or lookup, get {:?}", input.function);
+            }
         };
 
         let mut args = vec![];
@@ -402,23 +441,7 @@ impl TreeWalking {
             args.push(self.eval_expr(arg, function_context));
         }
 
-        if key.token.literal == "warn" {
-            // this function to be called eagerly!
-            lib::GbWarn {}.execute(self, &args);
-            return GbType::None;
-        }
-
-        let Some(GbType::Function(gb_func)) = self.lookup(key.value()) else {
-            // TODO error handling
-            panic!(
-                "Expected GbType::Function, got {:?}",
-                self.lookup(key.value())
-            );
-        };
-        // SAFETY:
-        // functions will not be able to access their own entry in the symbol table
-        let gb_func = unsafe { &*(&**gb_func as *const dyn GbFunc) };
-        tracing::trace!("Calling function {:?} with args {:?}", &key.value(), &args);
+        tracing::trace!("Calling function {:?} with args {:?}", func, &args);
         gb_func.execute(self, &args).unwrap_return()
     }
 

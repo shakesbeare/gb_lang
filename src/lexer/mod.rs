@@ -307,6 +307,13 @@ impl<T: Read> Lexer<T> {
                     token: self.next_token.clone().unwrap(),
                 }
             }
+            '.' => {
+                let token = Token::new(char_read, TokenKind::DotLookup, (self.line, self.col));
+                self.next_token = Some(token);
+                LexStatus::Reading {
+                    token: self.next_token.clone().unwrap(),
+                }
+            }
             '\n' => {
                 self.col = 1;
                 self.line += 1;

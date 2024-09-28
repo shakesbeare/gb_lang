@@ -39,7 +39,7 @@ impl GbWarn {
         tracing::warn!("{}", info.as_ref());
     }
 
-    pub(super) fn _export(self) -> GbType {
+    pub(super) fn export(self) -> GbType {
         GbType::Function(Rc::new(self))
     }
 }

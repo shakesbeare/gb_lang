@@ -45,9 +45,9 @@ fn main() {
     while x < 10 {
         x = x + 1;
     }
-    print(x);
+    std.print(x);
 
-    let foo = fn() { print("Hello, foo!"); };
+    let foo = fn() { std.print("Hello, foo!"); };
     
     x = 0;
     while x < 10 {
@@ -75,7 +75,7 @@ Outputs:
 ## Recursion!
 ```
 fn main() {
-    print(fib(10));
+    std.print(fib(10));
 }
 
 fn fib(n) {
@@ -99,7 +99,7 @@ Gb will automatically execute any top-level function named `main`, but this is
 not required. The following is just as valid as the previous examples.
 
 ```
-print("Hello, World!");
+std.print("Hello, World!");
 ```
 ```
 Outputs:

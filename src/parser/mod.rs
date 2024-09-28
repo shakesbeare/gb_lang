@@ -28,6 +28,7 @@ enum Precedence {
     Exponent,
     Prefix,
     Call,
+    Lookup,
 }
 
 pub struct Parser<'a, R: Read> {
@@ -89,6 +90,7 @@ impl<'a, R: Read> Parser<'a, R> {
         p.precedences
             .insert(TokenKind::Exponentiate, Precedence::Exponent);
         p.precedences.insert(TokenKind::LParen, Precedence::Call);
+        p.precedences.insert(TokenKind::DotLookup, Precedence::Lookup);
 
         p.register_prefix(TokenKind::Identifier, Parser::parse_identifier);
         p.register_prefix(TokenKind::IntLiteral, Parser::parse_integer_literal);
@@ -116,6 +118,7 @@ impl<'a, R: Read> Parser<'a, R> {
         p.register_infix(TokenKind::LParen, Parser::parse_call_expression);
         p.register_infix(TokenKind::Exponentiate, Parser::parse_infix_expression);
         p.register_infix(TokenKind::Assign, Parser::parse_infix_expression);
+        p.register_infix(TokenKind::DotLookup, Parser::parse_infix_expression);
 
         p
     }
