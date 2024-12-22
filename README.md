@@ -16,12 +16,24 @@ in your daily workflow.
 
 Yes! The body of the interpreter is finished and the language can be used for simple
 calculations. The standard library is extremely sparse and error handling and messages
-can often be improved. Also, there is currently no repl nor anyway to use it without
-writing at least a touch of Rust (unless you want to write your entire project in
-"file.gb", in which case, `cargo r` is all you need!). 
+can often be improved. 
 
-It's clear that this project is still in its infancy, but it should see more and more
-progress as time goes on. 
+The REPL is very rudimentary, at the moment.
+
+## Using Cargo
+
+```
+cargo r                    # for REPL
+cargo r -- my_cool_file.gb # to run a file
+```
+
+## Standalone
+
+```
+cargo b -r                          # build the project
+./target/release/gb                 # for REPL
+./target/release/gb my_cool_file.gb # to run a file
+```
 
 # Features
 

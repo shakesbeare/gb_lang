@@ -50,8 +50,10 @@ impl Default for Environment {
         );
         r#std.insert("print".into(), super::lib::GbPrint {}.export().into());
         r#std.insert("warn".into(), super::lib::GbWarn {}.export().into());
+        r#std.insert("exit".into(), super::lib::GbExit {}.export().into());
 
         stable.insert("None".into(), GbType::None);
+        stable.insert("exit".into(), super::lib::GbExit {}.export());
         stable.insert("std".into(), GbType::Namespace(r#std));
         Self::new(stable)
     }

@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use super::{
-    gb_type::{GbFunc, GbType},
+    gb_type::{GbError, GbFunc, GbType},
     InterpreterStrategy,
 };
 
@@ -98,5 +98,35 @@ impl GbFunc for GbDump {
             panic!("Too many arguments");
         }
         self.dump(strategy)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct GbExit {}
+
+impl GbExit {
+    /// Exits the program gracefully
+    /// Panics if the provided exit code is not representable as an i32
+    pub(super) fn exit(&self, code: GbType) -> GbType {
+        match code {
+            GbType::Integer(i) => GbType::ReturnValue(Box::new(GbType::ExitSignal(i as i32))),
+            _ => GbType::Error(GbError::WrongTypeInFunctionArg),
+        }
+    }
+
+    pub(super) fn export(self) -> GbType {
+        GbType::Function(Rc::new(self))
+    }
+}
+
+impl GbFunc for GbExit {
+    fn execute(&self, _strategy: &mut dyn InterpreterStrategy, args: &[GbType]) -> GbType {
+        if args.len() > 1 {
+            panic!("Too many arguments");
+        } else if args.is_empty() {
+            self.exit(GbType::Integer(0))
+        } else {
+            self.exit(args[0].clone())
+        }
     }
 }

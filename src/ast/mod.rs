@@ -7,6 +7,7 @@ pub enum Node {
     Program(Program),
     Statement(Statement),
     Expression(Expression),
+    Empty,
 }
 
 pub trait IntoNode {
@@ -93,6 +94,7 @@ impl std::fmt::Display for Node {
             Node::Program(p) => write!(f, "{}", p),
             Node::Statement(s) => write!(f, "{}", s),
             Node::Expression(e) => write!(f, "{}", e),
+            Node::Empty => write!(f, ""),
         }
     }
 }

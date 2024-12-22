@@ -15,7 +15,7 @@ use crate::{
     },
     parser::error::ParserError,
 };
-use gb_type::{gb_pow, GbFunc, GbType};
+use gb_type::{gb_pow, GbError, GbFunc, GbType};
 use std::collections::HashMap;
 
 pub trait InterpreterStrategy {
@@ -46,15 +46,25 @@ impl<T: InterpreterStrategy> Interpreter<T> {
         Ok(Self { strategy, ast })
     }
 
+    pub fn new_lazy(strategy: T) -> Self {
+        Self {
+            strategy,
+            ast: Node::Empty,
+        }
+    }
+
     pub fn evaluate(&mut self) -> GbType {
         self.strategy.eval(&self.ast, false)
     }
 
-    pub fn new_input(&mut self, input: String) -> Result<(), ParserError> {
+    pub fn new_input<S>(&mut self, input: S) -> Result<(), ParserError>
+    where
+        S: AsRef<str>,
+    {
         let mut p = crate::parser::Parser::new(
-            crate::lexer::Lexer::from(input.as_bytes()),
+            crate::lexer::Lexer::from(input.as_ref().as_bytes()),
             Box::new(crate::parser::error::DefaultErrorHandler {
-                input: input.to_string(),
+                input: input.as_ref().to_string(),
             }),
             false,
         );
@@ -87,6 +97,7 @@ impl InterpreterStrategy for TreeWalking {
             Node::Program(p) => self.eval_prog(p.statements.as_slice(), function_context),
             Node::Statement(s) => self.eval_stmt(s, function_context),
             Node::Expression(e) => self.eval_expr(e, function_context),
+            Node::Empty => GbType::Empty,
         }
         .unwrap_return()
     }
@@ -195,7 +206,7 @@ impl TreeWalking {
                         child.as_ref(),
                         parent.as_ref()
                     );
-                    return GbType::Error;
+                    return GbType::Error(GbError::FailedToResolveNameLookup);
                 }
             }
         }
@@ -216,7 +227,7 @@ impl TreeWalking {
             Some(v) => (*v).clone(),
             None => {
                 tracing::error!("{} has no attribute {}", parent.as_ref(), child.as_ref());
-                GbType::Error
+                GbType::Error(GbError::FailedToResolveNameLookup)
             }
         }
     }
@@ -241,6 +252,9 @@ impl TreeWalking {
                     last_result = self.eval_stmt(statement, function_context)
                 }
                 Node::Expression(_) => unreachable!(),
+                Node::Empty => {
+                    last_result = GbType::Empty;
+                }
             };
         }
 
@@ -263,7 +277,7 @@ impl TreeWalking {
             Statement::LetStatement(ls) => self.eval_let_stmt(ls, function_context),
             Statement::ReturnStatement(rs) => {
                 if !function_context {
-                    panic!("Return only allowed in function context");
+                    return GbType::Error(GbError::MisplacedReturn);
                 }
                 self.eval_expr(&rs.return_value, function_context)
             }
@@ -330,7 +344,7 @@ impl TreeWalking {
             tracing::trace!("Variable {:?} has value {:?}", input.token.literal, &val);
             val.clone()
         } else {
-            panic!("Variable used before it was declared");
+            return GbType::Error(GbError::VariableUsedBeforeDeclaration);
         }
     }
 
@@ -385,15 +399,15 @@ impl TreeWalking {
             ),
             "=" => {
                 let Expression::Identifier(ref key) = *expr.left else {
-                    panic!("Cannot assign to {:?}", expr.left);
+                    return GbType::Error(GbError::VariableCannotBeAssignedToType);
                 };
 
                 let Some(env_location) = self.lookup_name_location(key.value()) else {
-                    panic!("Variable assigned to before it was declared");
+                    return GbType::Error(GbError::VariableUsedBeforeDeclaration);
                 };
                 let current_value = self.lookup(key.value()).unwrap();
                 if let GbType::Function(_) = current_value {
-                    panic!("Function types cannot be mutated");
+                    return GbType::Error(GbError::FunctionMayNotBeMutated);
                 }
 
                 let value = self.eval_expr(&expr.right, function_context);
@@ -411,10 +425,10 @@ impl TreeWalking {
             ),
             "." => {
                 let Expression::Identifier(ref parent) = *expr.left else {
-                    panic!("Cannot use . with {:?}", expr.left);
+                    return GbType::Error(GbError::DotLookupOnlyApplicableToIdentifiers);
                 };
                 let Expression::Identifier(ref child) = *expr.right else {
-                    panic!("Cannot use . with {:?}", expr.left);
+                    return GbType::Error(GbError::DotLookupOnlyApplicableToIdentifiers);
                 };
                 self.dot_lookup(parent.to_string(), child.to_string())
             }
@@ -430,7 +444,7 @@ impl TreeWalking {
         // pub alternative: Option<BlockStatement>,
 
         let GbType::Boolean(cond) = self.eval_expr(&input.condition, function_context) else {
-            return GbType::Error;
+            return GbType::Error(GbError::ConditionalMustEvaluateToBool);
         };
 
         if cond {
@@ -467,11 +481,7 @@ impl TreeWalking {
         let (func, gb_func) = match *input.function {
             Expression::Identifier(ref key) => {
                 let Some(GbType::Function(gb_func)) = self.lookup(key.value()) else {
-                    // TODO error handling
-                    panic!(
-                        "Expected GbType::Function, got {:?}",
-                        self.lookup(key.value())
-                    );
+                    return GbType::Error(GbError::AttemptedToCallNonFunctionType);
                 };
                 // SAFETY:
                 // functions will not be able to access their own entry in the symbol table
@@ -482,14 +492,14 @@ impl TreeWalking {
             Expression::InfixExpression(ref ie) => {
                 let val = self.eval_infix_expr(ie, function_context);
                 let GbType::Function(gb_func) = val else {
-                    panic!("Expected GbType::Function, get {:?}", val)
+                    return GbType::Error(GbError::AttemptedToCallNonFunctionType);
                 };
                 (ie.to_string(), unsafe {
                     &*(&*gb_func as *const dyn GbFunc)
                 })
             }
             _ => {
-                panic!("Expected identifier or lookup, get {:?}", input.function);
+                return GbType::Error(GbError::AttemptedToCallNonFunctionType);
             }
         };
 

@@ -38,7 +38,7 @@ fn boolean() {
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate();
     assert_eq!(res, GbType::Boolean(true));
-    i.new_input("false;".to_string()).unwrap();
+    i.new_input("false;").unwrap();
     let res = i.evaluate();
     assert_eq!(res, GbType::Boolean(false));
 }
@@ -222,11 +222,12 @@ fn conditional_return() {
 
 #[test]
 #[traced_test]
-#[should_panic]
 fn invalid_return_statements() {
     let input = "return 7;";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     i.evaluate();
+    let result = i.evaluate();
+    assert_eq!(gb_type_of(&result), "Error");
 }
 
 #[test]
@@ -240,20 +241,21 @@ fn assignment() {
 
 #[test]
 #[traced_test]
-#[should_panic]
 fn bad_assignment() {
     let input = "x = 7;";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
-    i.evaluate();
+    let result = i.evaluate();
+    assert_eq!(gb_type_of(&result), "Error");
 }
 
 #[test]
 #[traced_test]
-#[should_panic]
 fn variable_use_before_declaration() {
     let input = "x";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     i.evaluate();
+    let result = i.evaluate();
+    assert_eq!(gb_type_of(&result), "Error");
 }
 
 #[test]
@@ -267,11 +269,12 @@ fn while_expression() {
 
 #[test]
 #[traced_test]
-#[should_panic]
 fn disallow_mutating_functions() {
     let input = "fn foo() {} foo = 7;";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     i.evaluate();
+    let result = i.evaluate();
+    assert_eq!(gb_type_of(&result), "Error");
 }
 
 #[test]
