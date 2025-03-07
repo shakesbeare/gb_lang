@@ -324,6 +324,7 @@ impl<T: Read> Lexer<T> {
                 }
             }
             ' ' => self.lex(),
+            '\t' => self.lex(),
             '#' => {
                 if self.peek() == '!' && self.line == 1 {
                     self.ignore_until('\n', None);

@@ -10,6 +10,26 @@ use std::collections::HashMap;
 
 #[test]
 #[traced_test]
+fn ignore_whitespace() {
+    let input = "  \tword";
+    let mut lexer = Lexer::from(input.as_bytes());
+    let res = lexer.lex();
+    let tok = match res {
+        LexStatus::Reading { token } => token.kind,
+        LexStatus::SyntaxError {
+            failed_lexeme,
+            location,
+            ..
+        } => {
+            panic!("Syntax Error at {:?}, lexeme: {}", location, failed_lexeme)
+        }
+        LexStatus::Eof => TokenKind::Eof,
+    };
+    assert_eq!(tok, TokenKind::Identifier);
+}
+
+#[test]
+#[traced_test]
 fn ignore_shebang() {
     let input = "#!/bin/bash\nhello";
     let mut lexer = Lexer::from(input.as_bytes());
