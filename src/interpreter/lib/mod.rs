@@ -34,35 +34,6 @@ impl GbFunc for GbPrint {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(super) struct GbWarn {}
-
-impl GbWarn {
-    /// Generate a warning.
-    /// This may result in an output sooner in the execution process than `GbPrint`.
-    pub(super) fn warn(&self, info: impl AsRef<str>) {
-        tracing::warn!("{}", info.as_ref());
-    }
-
-    pub(super) fn export(self) -> GbType {
-        GbType::Function(Rc::new(self))
-    }
-}
-
-impl GbFunc for GbWarn {
-    fn execute(
-        &self,
-        _strategy: &mut dyn InterpreterStrategy,
-        args: &[GbType],
-    ) -> GbType {
-        if args.len() > 1 {
-            panic!("Too many arguments");
-        }
-        self.warn(args[0].to_string());
-        GbType::None
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub(super) struct GbToString {}
 
 impl GbToString {

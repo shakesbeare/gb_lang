@@ -49,7 +49,6 @@ impl Default for Environment {
             super::lib::GbToString {}.export().into(),
         );
         r#std.insert("print".into(), super::lib::GbPrint {}.export().into());
-        r#std.insert("warn".into(), super::lib::GbWarn {}.export().into());
         r#std.insert("exit".into(), super::lib::GbExit {}.export().into());
 
         stable.insert("None".into(), GbType::None);
