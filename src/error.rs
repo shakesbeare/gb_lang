@@ -1,7 +1,7 @@
 use crate::{interpreter::gb_type::GbError, token::Token};
 
 const UP_ARROWHEAD: &str = "⌃";
-const DIVIDER: &str = "--------------------------------";
+const DIVIDER: &str = "――――――――――――――――――――――――――――――――";
 
 pub trait ErrorHandler {
     fn syntax_error(&self, token: Token) -> String;

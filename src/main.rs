@@ -45,7 +45,7 @@ fn main() -> Result<()> {
         }
         None => {
             println!("Gb v{}", env!("CARGO_PKG_VERSION"));
-            println!("-----------------------");
+            println!("―――――――――――――――――――――――");
             repl()
         }
     }
