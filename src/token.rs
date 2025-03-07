@@ -23,7 +23,11 @@ impl std::hash::Hash for Token {
 impl Eq for Token {}
 
 impl Token {
-    pub fn new<S: Into<String>, P: Into<Point>>(literal: S, kind: TokenKind, location: P) -> Self {
+    pub fn new<S: Into<String>, P: Into<Point>>(
+        literal: S,
+        kind: TokenKind,
+        location: P,
+    ) -> Self {
         Self {
             literal: literal.into(),
             kind,

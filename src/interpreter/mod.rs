@@ -10,8 +10,9 @@ use self::environment::Environment;
 use crate::{
     ast::{
         Alternative, BlockStatement, CallExpression, Expression, ExpressionStatement,
-        FunctionLiteral, FunctionLiteralStatement, Identifier, IfExpression, InfixExpression,
-        LetStatement, Node, PrefixExpression, Statement, WhileExpression,
+        FunctionLiteral, FunctionLiteralStatement, Identifier, IfExpression,
+        InfixExpression, LetStatement, Node, PrefixExpression, Statement,
+        WhileExpression,
     },
     parser::error::ParserError,
 };
@@ -19,7 +20,8 @@ use gb_type::{gb_pow, GbError, GbFunc, GbType};
 use std::collections::HashMap;
 
 pub trait InterpreterStrategy {
-    fn eval(&mut self, input: &Node, function_context: bool, auto_main: bool) -> GbType;
+    fn eval(&mut self, input: &Node, function_context: bool, auto_main: bool)
+        -> GbType;
     fn push_env(&mut self);
     fn builtins_env(&mut self) -> &mut Environment;
     fn top_env(&mut self) -> &mut Environment;
@@ -54,7 +56,7 @@ impl<T: InterpreterStrategy> Interpreter<T> {
     }
 
     pub fn evaluate(&mut self) -> GbType {
-        self.strategy.eval(&self.ast, false, false)
+        self.strategy.eval(&self.ast, false, true)
     }
 
     pub fn new_input<S>(&mut self, input: S) -> Result<(), ParserError>
@@ -96,9 +98,16 @@ macro_rules! return_if_return (
 
 impl InterpreterStrategy for TreeWalking {
     #[instrument(skip_all)]
-    fn eval(&mut self, input: &Node, function_context: bool, auto_main: bool) -> GbType {
+    fn eval(
+        &mut self,
+        input: &Node,
+        function_context: bool,
+        auto_main: bool,
+    ) -> GbType {
         match input {
-            Node::Program(p) => self.eval_prog(p.statements.as_slice(), function_context, auto_main),
+            Node::Program(p) => {
+                self.eval_prog(p.statements.as_slice(), function_context, auto_main)
+            }
             Node::Statement(s) => self.eval_stmt(s, function_context),
             Node::Expression(e) => self.eval_expr(e, function_context),
             Node::Empty => GbType::Empty,
@@ -177,16 +186,22 @@ impl TreeWalking {
         }
     }
 
-    fn dot_lookup(&mut self, parent: impl AsRef<str>, child: impl AsRef<str>) -> GbType {
+    fn dot_lookup(
+        &mut self,
+        parent: impl AsRef<str>,
+        child: impl AsRef<str>,
+    ) -> GbType {
         match self.lookup(parent.as_ref()) {
             Some(item) => self.namespace_lookup(item, parent, child),
             None => {
                 let folder_name = parent.as_ref();
                 let file_name = format!("{}.gb", parent.as_ref());
-                if std::fs::exists(&file_name).unwrap() && !self.loaded_files.contains(&file_name) {
+                if std::fs::exists(&file_name).unwrap()
+                    && !self.loaded_files.contains(&file_name)
+                {
                     tracing::trace!("Found file");
-                    let contents =
-                        std::fs::read_to_string(&file_name).expect("Failed to read file");
+                    let contents = std::fs::read_to_string(&file_name)
+                        .expect("Failed to read file");
                     let mut i = Interpreter::new(TreeWalking::default(), contents)
                         .expect("Failed to create sub interpreter");
                     i.evaluate();
@@ -230,7 +245,11 @@ impl TreeWalking {
         match item.get_attr(child.as_ref()) {
             Some(v) => (*v).clone(),
             None => {
-                tracing::error!("{} has no attribute {}", parent.as_ref(), child.as_ref());
+                tracing::error!(
+                    "{} has no attribute {}",
+                    parent.as_ref(),
+                    child.as_ref()
+                );
                 GbType::Error(GbError::FailedToResolveNameLookup)
             }
         }
@@ -247,7 +266,12 @@ impl TreeWalking {
     }
 
     #[instrument(skip_all)]
-    fn eval_prog(&mut self, input: &[Node], function_context: bool, auto_main: bool) -> GbType {
+    fn eval_prog(
+        &mut self,
+        input: &[Node],
+        function_context: bool,
+        auto_main: bool,
+    ) -> GbType {
         let mut last_result = GbType::None;
         for node in input {
             match node {
@@ -289,7 +313,9 @@ impl TreeWalking {
                 }
                 self.eval_expr(&rs.return_value, function_context)
             }
-            Statement::ExpressionStatement(es) => self.eval_expr_stmt(es, function_context),
+            Statement::ExpressionStatement(es) => {
+                self.eval_expr_stmt(es, function_context)
+            }
             Statement::BlockStatement(bs) => {
                 return_if_return!(self.eval_block_stmt(bs, function_context))
             }
@@ -298,7 +324,11 @@ impl TreeWalking {
     }
 
     #[instrument(skip_all)]
-    fn eval_block_stmt(&mut self, input: &BlockStatement, function_context: bool) -> GbType {
+    fn eval_block_stmt(
+        &mut self,
+        input: &BlockStatement,
+        function_context: bool,
+    ) -> GbType {
         let mut last = GbType::None;
         for stmt in input.statements.iter() {
             last = self.eval_stmt(stmt, function_context);
@@ -316,14 +346,22 @@ impl TreeWalking {
     }
 
     #[instrument(skip_all)]
-    fn eval_expr_stmt(&mut self, input: &ExpressionStatement, function_context: bool) -> GbType {
+    fn eval_expr_stmt(
+        &mut self,
+        input: &ExpressionStatement,
+        function_context: bool,
+    ) -> GbType {
         // this function exists in case an expression statement should
         // evaluate to something other than the result of its expression
         self.eval_expr(&input.expression, function_context)
     }
 
     #[instrument(skip_all)]
-    fn eval_let_stmt(&mut self, input: &LetStatement, function_context: bool) -> GbType {
+    fn eval_let_stmt(
+        &mut self,
+        input: &LetStatement,
+        function_context: bool,
+    ) -> GbType {
         let value = self.eval_expr(&input.value, function_context);
         self.top_env().insert(input.name.value(), value);
         GbType::Name(input.name.value().to_string())
@@ -336,13 +374,19 @@ impl TreeWalking {
             Expression::IntegerLiteral(i) => GbType::Integer(i.value),
             Expression::FloatLiteral(f) => GbType::Float(f.value),
             Expression::StringLiteral(st) => GbType::String(st.value.clone()),
-            Expression::PrefixExpression(pe) => self.eval_prefix_expr(pe, function_context),
-            Expression::InfixExpression(ie) => self.eval_infix_expr(ie, function_context),
+            Expression::PrefixExpression(pe) => {
+                self.eval_prefix_expr(pe, function_context)
+            }
+            Expression::InfixExpression(ie) => {
+                self.eval_infix_expr(ie, function_context)
+            }
             Expression::BooleanLiteral(b) => GbType::Boolean(b.value),
             Expression::IfExpression(ie) => self.eval_if_expr(ie, function_context),
             Expression::FunctionLiteral(fl) => self.eval_fn_lit(fl),
             Expression::CallExpression(fc) => self.eval_fn_call(fc, function_context),
-            Expression::WhileExpression(we) => self.eval_while_expr(we, function_context),
+            Expression::WhileExpression(we) => {
+                self.eval_while_expr(we, function_context)
+            }
         }
     }
 
@@ -357,7 +401,11 @@ impl TreeWalking {
     }
 
     #[instrument(skip_all)]
-    fn eval_prefix_expr(&mut self, expr: &PrefixExpression, function_context: bool) -> GbType {
+    fn eval_prefix_expr(
+        &mut self,
+        expr: &PrefixExpression,
+        function_context: bool,
+    ) -> GbType {
         match expr.operator.as_str() {
             "-" => GbType::Integer(-1) * self.eval_expr(&expr.right, function_context),
             "!" => !self.eval_expr(&expr.right, function_context),
@@ -366,7 +414,11 @@ impl TreeWalking {
     }
 
     #[instrument(skip_all)]
-    fn eval_infix_expr(&mut self, expr: &InfixExpression, function_context: bool) -> GbType {
+    fn eval_infix_expr(
+        &mut self,
+        expr: &InfixExpression,
+        function_context: bool,
+    ) -> GbType {
         tracing::trace!("Doing {:?}", expr.operator.as_str());
         match expr.operator.as_str() {
             "+" => {
@@ -433,10 +485,14 @@ impl TreeWalking {
             ),
             "." => {
                 let Expression::Identifier(ref parent) = *expr.left else {
-                    return GbType::Error(GbError::DotLookupOnlyApplicableToIdentifiers);
+                    return GbType::Error(
+                        GbError::DotLookupOnlyApplicableToIdentifiers,
+                    );
                 };
                 let Expression::Identifier(ref child) = *expr.right else {
-                    return GbType::Error(GbError::DotLookupOnlyApplicableToIdentifiers);
+                    return GbType::Error(
+                        GbError::DotLookupOnlyApplicableToIdentifiers,
+                    );
                 };
                 self.dot_lookup(parent.to_string(), child.to_string())
             }
@@ -451,7 +507,8 @@ impl TreeWalking {
         // pub consequence: BlockStatement,
         // pub alternative: Option<BlockStatement>,
 
-        let GbType::Boolean(cond) = self.eval_expr(&input.condition, function_context) else {
+        let GbType::Boolean(cond) = self.eval_expr(&input.condition, function_context)
+        else {
             return GbType::Error(GbError::ConditionalMustEvaluateToBool);
         };
 
@@ -485,7 +542,11 @@ impl TreeWalking {
     }
 
     #[instrument(skip_all)]
-    fn eval_fn_call(&mut self, input: &CallExpression, function_context: bool) -> GbType {
+    fn eval_fn_call(
+        &mut self,
+        input: &CallExpression,
+        function_context: bool,
+    ) -> GbType {
         let (func, gb_func) = match *input.function {
             Expression::Identifier(ref key) => {
                 let Some(GbType::Function(gb_func)) = self.lookup(key.value()) else {
@@ -521,8 +582,14 @@ impl TreeWalking {
     }
 
     #[instrument(skip_all)]
-    fn eval_while_expr(&mut self, input: &WhileExpression, function_context: bool) -> GbType {
-        while self.eval_expr(&input.condition, function_context) == GbType::Boolean(true) {
+    fn eval_while_expr(
+        &mut self,
+        input: &WhileExpression,
+        function_context: bool,
+    ) -> GbType {
+        while self.eval_expr(&input.condition, function_context)
+            == GbType::Boolean(true)
+        {
             return_if_return!(self.eval_block_stmt(&input.body, false));
         }
 

@@ -4,7 +4,10 @@ use std::rc::Rc;
 use tracing_test::traced_test;
 
 use crate::{
-    ast::{BlockStatement, BooleanLiteral, Expression, FloatLiteral, IntegerLiteral, Statement},
+    ast::{
+        BlockStatement, BooleanLiteral, Expression, FloatLiteral, IntegerLiteral,
+        Statement,
+    },
     interpreter::gb_type::{gb_type_of, variant_eq, GbType},
     lexer::Lexer,
     parser::{error::DefaultErrorHandler, Parser},
@@ -52,7 +55,8 @@ fn string() {
     ];
 
     for (input, expected) in input {
-        let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+        let mut i =
+            Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
         let actual = i.evaluate();
         assert_eq!(actual, expected);
     }
@@ -62,7 +66,8 @@ fn string() {
 #[traced_test]
 fn let_statement() {
     let input = "let x = 7;";
-    let mut interpreter = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let mut interpreter =
+        Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     interpreter.evaluate();
     let dump = interpreter.strategy.inspect();
     println!("{:?}", dump);
@@ -97,7 +102,8 @@ fn prefix_expression() {
     ];
 
     for (input, expected) in inputs {
-        let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+        let mut i =
+            Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
         let actual = i.evaluate();
         assert_eq!(actual, expected);
     }
@@ -128,7 +134,8 @@ fn infix_expression() {
     ];
 
     for (input, expected) in input {
-        let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+        let mut i =
+            Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
         let actual = i.evaluate();
         if actual != expected {
             tracing::info!("Input: {:?}", input);
@@ -154,7 +161,8 @@ fn if_expression() {
     ];
 
     for (input, expected) in input {
-        let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+        let mut i =
+            Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
         let actual = i.evaluate();
         assert_eq!(actual, expected);
     }
@@ -170,7 +178,8 @@ fn function_literal_statement() {
     let GbType::Function(ptr) = map.get("foo").unwrap().clone() else {
         panic!("Expected GbType::Function, got {:?}", res);
     };
-    let actual = ptr.execute(&mut i.strategy, &[GbType::Integer(3), GbType::Integer(4)]);
+    let actual =
+        ptr.execute(&mut i.strategy, &[GbType::Integer(3), GbType::Integer(4)]);
     assert_eq!(actual, GbType::Integer(7));
 }
 
@@ -183,7 +192,8 @@ fn function_literal() {
     let GbType::Function(ptr) = res else {
         panic!("Expected GbType::Function, got {:?}", res);
     };
-    let actual = ptr.execute(&mut i.strategy, &[GbType::Integer(3), GbType::Integer(4)]);
+    let actual =
+        ptr.execute(&mut i.strategy, &[GbType::Integer(3), GbType::Integer(4)]);
     assert_eq!(actual, GbType::Integer(7));
 }
 

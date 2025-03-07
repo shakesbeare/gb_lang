@@ -4,13 +4,21 @@ use std::{borrow::Borrow, collections::HashMap, fmt, ops::Not, rc::Rc};
 use tracing::instrument;
 
 pub trait GbFunc: std::fmt::Debug {
-    fn execute(&self, strategy: &mut dyn InterpreterStrategy, args: &[GbType]) -> GbType;
+    fn execute(
+        &self,
+        strategy: &mut dyn InterpreterStrategy,
+        args: &[GbType],
+    ) -> GbType;
 }
 
 impl GbFunc for FunctionLiteral {
-    // TODD: this really should execute on a pointer to the block
+    // TODO: this really should execute on a pointer to the block
     //       rather than cloning the block...
-    fn execute(&self, strategy: &mut dyn InterpreterStrategy, args: &[GbType]) -> GbType {
+    fn execute(
+        &self,
+        strategy: &mut dyn InterpreterStrategy,
+        args: &[GbType],
+    ) -> GbType {
         strategy.push_env();
         let new_env = strategy.top_env();
         for (param, arg) in self.parameters.iter().zip(args) {

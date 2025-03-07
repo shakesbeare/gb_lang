@@ -161,46 +161,54 @@ impl<T: Read> Lexer<T> {
 
         // consume the buffer and build next_token and next_lexeme
         match char_read {
-            _ if char_read.is_alphabetic() || char_read == '_' => self.lex_word(char_read), // end identifier
+            _ if char_read.is_alphabetic() || char_read == '_' => {
+                self.lex_word(char_read)
+            } // end identifier
             '0'..='9' => self.lex_number(char_read), // end number literal
             '"' | '\'' => self.lex_string_literal(char_read), // end string literal
             '(' => {
-                let token = Token::new(char_read, TokenKind::LParen, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::LParen, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                 }
             } // end L paren
             ')' => {
-                let token = Token::new(char_read, TokenKind::RParen, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::RParen, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                 }
             } // end R paren
             '{' => {
-                let token = Token::new(char_read, TokenKind::LBrace, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::LBrace, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                 }
             } // end L brace
             '}' => {
-                let token = Token::new(char_read, TokenKind::RBrace, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::RBrace, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                 }
             } // end R brace
             '[' => {
-                let token = Token::new(char_read, TokenKind::LBracket, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::LBracket, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                 }
             } // end L bracket
             ']' => {
-                let token = Token::new(char_read, TokenKind::RBracket, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::RBracket, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
@@ -210,31 +218,37 @@ impl<T: Read> Lexer<T> {
                 if let Some(status) = self.lex_peek(char_read, '=', TokenKind::Equals) {
                     return status;
                 }
-                let token = Token::new(char_read, TokenKind::Assign, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::Assign, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                 }
             }
             '+' => {
-                let token = Token::new(char_read, TokenKind::Add, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::Add, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                 }
             } // end +
             '-' => {
-                let token = Token::new(char_read, TokenKind::Subtract, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::Subtract, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                 }
             } // end -
             '*' => {
-                if let Some(status) = self.lex_peek(char_read, '*', TokenKind::Exponentiate) {
+                if let Some(status) =
+                    self.lex_peek(char_read, '*', TokenKind::Exponentiate)
+                {
                     return status;
                 }
-                let token = Token::new(char_read, TokenKind::Multiply, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::Multiply, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
@@ -249,7 +263,8 @@ impl<T: Read> Lexer<T> {
                     self.ignore_until('\n', None);
                     return self.lex();
                 } else {
-                    let token = Token::new(char_read, TokenKind::Divide, (self.line, self.col));
+                    let token =
+                        Token::new(char_read, TokenKind::Divide, (self.line, self.col));
                     self.next_token = Some(token);
                     return LexStatus::Reading {
                         token: self.next_token.clone().unwrap(),
@@ -283,32 +298,38 @@ impl<T: Read> Lexer<T> {
                 }
             }
             '!' => {
-                if let Some(status) = self.lex_peek(char_read, '=', TokenKind::NotEquals) {
+                if let Some(status) =
+                    self.lex_peek(char_read, '=', TokenKind::NotEquals)
+                {
                     return status;
                 }
 
-                let token = Token::new(char_read, TokenKind::Bang, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::Bang, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                 }
             }
             ';' => {
-                let token = Token::new(char_read, TokenKind::Semicolon, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::Semicolon, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                 }
             }
             ',' => {
-                let token = Token::new(char_read, TokenKind::Comma, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::Comma, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
                 }
             }
             '.' => {
-                let token = Token::new(char_read, TokenKind::DotLookup, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::DotLookup, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
@@ -317,7 +338,8 @@ impl<T: Read> Lexer<T> {
             '\n' => {
                 self.col = 1;
                 self.line += 1;
-                let token = Token::new(char_read, TokenKind::Eol, (self.line, self.col));
+                let token =
+                    Token::new(char_read, TokenKind::Eol, (self.line, self.col));
                 self.next_token = Some(token);
                 LexStatus::Reading {
                     token: self.next_token.clone().unwrap(),
@@ -345,7 +367,10 @@ impl<T: Read> Lexer<T> {
         }
     }
 
-    fn lex_string_literal(&mut self, char_read /* delimiter, " or ' */: char) -> LexStatus {
+    fn lex_string_literal(
+        &mut self,
+        char_read /* delimiter, " or ' */: char,
+    ) -> LexStatus {
         let mut lexeme = String::new();
         while self.peek() != '\0' {
             let next_char = self.peek();
@@ -391,7 +416,8 @@ impl<T: Read> Lexer<T> {
                     lexeme.push(c);
                 }
                 _ if next_char.is_whitespace()
-                    || ["{", "}", "(", ")", "[", "]"].contains(&char_read.to_string().as_str()) =>
+                    || ["{", "}", "(", ")", "[", "]"]
+                        .contains(&char_read.to_string().as_str()) =>
                 {
                     break;
                 }
@@ -448,7 +474,8 @@ impl<T: Read> Lexer<T> {
         }
         if KEYWORDS.contains(&lexeme.as_str()) {
             let token_kind: TokenKind = (&lexeme).into();
-            self.next_token = Some(Token::new(lexeme, token_kind, (self.line, self.col)));
+            self.next_token =
+                Some(Token::new(lexeme, token_kind, (self.line, self.col)));
         } else {
             self.next_token = Some(Token::new(
                 lexeme,

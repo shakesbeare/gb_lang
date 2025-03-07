@@ -23,7 +23,11 @@ impl GbPrint {
 }
 
 impl GbFunc for GbPrint {
-    fn execute(&self, _strategy: &mut dyn InterpreterStrategy, args: &[GbType]) -> GbType {
+    fn execute(
+        &self,
+        _strategy: &mut dyn InterpreterStrategy,
+        args: &[GbType],
+    ) -> GbType {
         self.print(args);
         GbType::None
     }
@@ -45,7 +49,11 @@ impl GbWarn {
 }
 
 impl GbFunc for GbWarn {
-    fn execute(&self, _strategy: &mut dyn InterpreterStrategy, args: &[GbType]) -> GbType {
+    fn execute(
+        &self,
+        _strategy: &mut dyn InterpreterStrategy,
+        args: &[GbType],
+    ) -> GbType {
         if args.len() > 1 {
             panic!("Too many arguments");
         }
@@ -68,7 +76,11 @@ impl GbToString {
 }
 
 impl GbFunc for GbToString {
-    fn execute(&self, _strategy: &mut dyn InterpreterStrategy, args: &[GbType]) -> GbType {
+    fn execute(
+        &self,
+        _strategy: &mut dyn InterpreterStrategy,
+        args: &[GbType],
+    ) -> GbType {
         if args.len() > 1 {
             panic!("Too many arguments");
         }
@@ -93,7 +105,11 @@ impl GbDump {
 }
 
 impl GbFunc for GbDump {
-    fn execute(&self, strategy: &mut dyn InterpreterStrategy, args: &[GbType]) -> GbType {
+    fn execute(
+        &self,
+        strategy: &mut dyn InterpreterStrategy,
+        args: &[GbType],
+    ) -> GbType {
         if !args.is_empty() {
             panic!("Too many arguments");
         }
@@ -109,7 +125,9 @@ impl GbExit {
     /// Panics if the provided exit code is not representable as an i32
     pub(super) fn exit(&self, code: GbType) -> GbType {
         match code {
-            GbType::Integer(i) => GbType::ReturnValue(Box::new(GbType::ExitSignal(i as i32))),
+            GbType::Integer(i) => {
+                GbType::ReturnValue(Box::new(GbType::ExitSignal(i as i32)))
+            }
             _ => GbType::Error(GbError::WrongTypeInFunctionArg),
         }
     }
@@ -120,7 +138,11 @@ impl GbExit {
 }
 
 impl GbFunc for GbExit {
-    fn execute(&self, _strategy: &mut dyn InterpreterStrategy, args: &[GbType]) -> GbType {
+    fn execute(
+        &self,
+        _strategy: &mut dyn InterpreterStrategy,
+        args: &[GbType],
+    ) -> GbType {
         if args.len() > 1 {
             panic!("Too many arguments");
         } else if args.is_empty() {

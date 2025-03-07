@@ -111,14 +111,17 @@ fn repl() -> Result<()> {
     }
 }
 
-fn check_balanced<S: AsRef<str>>(input: S, delimiters: &mut Vec<Delimiter>) -> Result<(), char> {
+fn check_balanced<S: AsRef<str>>(
+    input: S,
+    delimiters: &mut Vec<Delimiter>,
+) -> Result<(), char> {
     for c in input.as_ref().chars() {
         match c {
             '(' => delimiters.push(Delimiter::Paren),
             '{' => delimiters.push(Delimiter::Brace),
             '[' => delimiters.push(Delimiter::Bracket),
             c if [')', '}', ']'].contains(&c) => check_matches(c, delimiters)?,
-            _ => ()
+            _ => (),
         }
     }
 
@@ -131,11 +134,11 @@ fn check_matches(c: char, delimiters: &mut Vec<Delimiter>) -> Result<(), char> {
         Some(delim) => {
             let delim = delim.into();
             if c == delim {
-                return Ok(());
+                Ok(())
             } else {
-                return Err(c);
+                Err(c)
             }
         }
-        None => return Err(c),
+        None => Err(c),
     }
 }
