@@ -16,7 +16,7 @@ impl GbFunc for FunctionLiteral {
         for (param, arg) in self.parameters.iter().zip(args) {
             new_env.insert(param.value(), arg.clone());
         }
-        let val = strategy.eval(self.body.clone().into_node().borrow(), true);
+        let val = strategy.eval(self.body.clone().into_node().borrow(), true, true);
         strategy.pop_env();
         val
     }

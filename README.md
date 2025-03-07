@@ -110,6 +110,8 @@ Outputs:
 Gb will automatically execute any top-level function named `main`, but this is
 not required. The following is just as valid as the previous examples.
 
+Note: Autoexecution of functions named `main` is disabled in the REPL.
+
 ```
 std.print("Hello, World!");
 ```

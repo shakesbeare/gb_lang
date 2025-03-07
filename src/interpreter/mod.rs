@@ -19,7 +19,7 @@ use gb_type::{gb_pow, GbError, GbFunc, GbType};
 use std::collections::HashMap;
 
 pub trait InterpreterStrategy {
-    fn eval(&mut self, input: &Node, function_context: bool) -> GbType;
+    fn eval(&mut self, input: &Node, function_context: bool, auto_main: bool) -> GbType;
     fn push_env(&mut self);
     fn builtins_env(&mut self) -> &mut Environment;
     fn top_env(&mut self) -> &mut Environment;
@@ -54,7 +54,7 @@ impl<T: InterpreterStrategy> Interpreter<T> {
     }
 
     pub fn evaluate(&mut self) -> GbType {
-        self.strategy.eval(&self.ast, false)
+        self.strategy.eval(&self.ast, false, false)
     }
 
     pub fn new_input<S>(&mut self, input: S) -> Result<(), ParserError>
@@ -73,8 +73,8 @@ impl<T: InterpreterStrategy> Interpreter<T> {
         Ok(())
     }
 
-    pub fn eval_ast(&mut self, ast: &Node) -> GbType {
-        self.strategy.eval(ast, false)
+    pub fn eval_ast(&mut self, ast: &Node, auto_main: bool) -> GbType {
+        self.strategy.eval(ast, false, auto_main)
     }
 }
 
@@ -96,9 +96,9 @@ macro_rules! return_if_return (
 
 impl InterpreterStrategy for TreeWalking {
     #[instrument(skip_all)]
-    fn eval(&mut self, input: &Node, function_context: bool) -> GbType {
+    fn eval(&mut self, input: &Node, function_context: bool, auto_main: bool) -> GbType {
         match input {
-            Node::Program(p) => self.eval_prog(p.statements.as_slice(), function_context),
+            Node::Program(p) => self.eval_prog(p.statements.as_slice(), function_context, auto_main),
             Node::Statement(s) => self.eval_stmt(s, function_context),
             Node::Expression(e) => self.eval_expr(e, function_context),
             Node::Empty => GbType::Empty,
@@ -247,7 +247,7 @@ impl TreeWalking {
     }
 
     #[instrument(skip_all)]
-    fn eval_prog(&mut self, input: &[Node], function_context: bool) -> GbType {
+    fn eval_prog(&mut self, input: &[Node], function_context: bool, auto_main: bool) -> GbType {
         let mut last_result = GbType::None;
         for node in input {
             match node {
@@ -260,6 +260,10 @@ impl TreeWalking {
                     last_result = GbType::Empty;
                 }
             };
+        }
+
+        if !auto_main {
+            return last_result;
         }
 
         // SAFETY
