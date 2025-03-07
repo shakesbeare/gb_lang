@@ -39,7 +39,8 @@ fn main() -> Result<()> {
                 interpreter::TreeWalking::default(),
                 input,
             )?;
-            i.evaluate();
+            let _ = i.evaluate();
+
             Ok(())
         }
         None => {
@@ -95,6 +96,7 @@ fn repl() -> Result<()> {
             delimiters.clear();
             balanced = check_balanced(&buf, &mut delimiters);
         }
+        i.new_input(&buf);
         match parser::quick_parse(&buf) {
             Ok(ast) => {
                 while !delimiters.is_empty() {}
@@ -105,7 +107,7 @@ fn repl() -> Result<()> {
                 println!("{}", result);
             }
             Err(e) => {
-                eprintln!("{:?}", e);
+                println!("{}", e);
             }
         }
     }

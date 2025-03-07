@@ -11,7 +11,8 @@ use std::{ops::Deref, rc::Rc};
 
 use crate::{lexer::Lexer, token::Token};
 
-use self::error::{ErrorHandler, ParserError};
+use self::error::ParserError;
+use crate::error::ErrorHandler;
 
 type PrefixParseFn<'a, R> = fn(&mut Parser<'a, R>) -> Result<Expression, ParserError>;
 type InfixParseFn<'a, R> =
@@ -612,7 +613,7 @@ impl<'a, R: Read> Parser<'a, R> {
 pub fn quick_parse<S: AsRef<str>>(input: S) -> Result<crate::ast::Node, ParserError> {
     let mut p = Parser::new(
         crate::lexer::Lexer::from(input.as_ref().as_bytes()),
-        Box::new(crate::parser::error::DefaultErrorHandler {
+        Box::new(crate::error::DefaultErrorHandler {
             input: input.as_ref().to_string(),
         }),
         false,

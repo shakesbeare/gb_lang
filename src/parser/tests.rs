@@ -6,8 +6,9 @@ use tracing_test::traced_test;
 
 use crate::{
     ast::{Alternative, Expression, IntoExpression, Node, Statement},
+    error::DefaultErrorHandler,
     lexer::Lexer,
-    parser::{error::DefaultErrorHandler, Parser},
+    parser::Parser,
     token::TokenKind,
 };
 

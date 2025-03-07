@@ -1,6 +1,9 @@
 use super::InterpreterStrategy;
-use crate::ast::{FunctionLiteral, IntoNode};
-use std::{borrow::Borrow, collections::HashMap, fmt, ops::Not, rc::Rc};
+use crate::{
+    ast::{FunctionLiteral, IntoNode},
+    token::Token,
+};
+use std::{borrow::Borrow, collections::HashMap, fmt, rc::Rc};
 use tracing::instrument;
 
 pub trait GbFunc: std::fmt::Debug {
@@ -8,6 +11,7 @@ pub trait GbFunc: std::fmt::Debug {
         &self,
         strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
+        token: Token,
     ) -> GbType;
 }
 
@@ -18,6 +22,7 @@ impl GbFunc for FunctionLiteral {
         &self,
         strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
+        _token: Token,
     ) -> GbType {
         strategy.push_env();
         let new_env = strategy.top_env();
@@ -34,7 +39,7 @@ impl GbFunc for FunctionLiteral {
 pub enum GbType {
     Empty,
     /// Represents an error that has occurred
-    Error(GbError),
+    Error(Token, GbError),
     None,
     /// Exits the program when returned. This should only be accessible through `std.exit()` or
     /// `exit()`
@@ -53,7 +58,15 @@ pub enum GbType {
 #[derive(Debug, Clone, PartialEq)]
 pub enum GbError {
     MisplacedReturn,
-    InvalidOperatorForTypes,
+    InvalidOperatorForTypes {
+        left: String,
+        right: String,
+        op: String,
+    },
+    InvalidOperatorForType {
+        operand: String,
+        operator: String,
+    },
     WrongTypeInFunctionArg,
     FailedToResolveNameLookup,
     ConditionalMustEvaluateToBool,
@@ -62,6 +75,51 @@ pub enum GbError {
     FunctionMayNotBeMutated,
     DotLookupOnlyApplicableToIdentifiers,
     AttemptedToCallNonFunctionType,
+}
+
+impl fmt::Display for GbError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GbError::MisplacedReturn => write!(
+                f,
+                "Misplaced Return: Return is only allowed within a function"
+            ),
+            GbError::InvalidOperatorForTypes { left, right, op } => write!(
+                f,
+                "Invalid Operator: Cannot perform \"{}\" between {} and {}",
+                op, left, right
+            ),
+            GbError::InvalidOperatorForType { operand, operator } => write!(
+                f,
+                "Invalid Operator: Cannot perform \"{}\" on {}",
+                operator, operand,
+            ),
+            GbError::WrongTypeInFunctionArg => {
+                write!(f, "Wrong type in function argument")
+            }
+            GbError::FailedToResolveNameLookup => {
+                write!(f, "Failed to resolve name lookup")
+            }
+            GbError::ConditionalMustEvaluateToBool => {
+                write!(f, "Conditional must evaluate to bool")
+            }
+            GbError::VariableUsedBeforeDeclaration => {
+                write!(f, "Variable used before declaration")
+            }
+            GbError::VariableCannotBeAssignedToType => {
+                write!(f, "Variable cannot be assigned to type")
+            }
+            GbError::FunctionMayNotBeMutated => {
+                write!(f, "Function types may not be mutated")
+            }
+            GbError::DotLookupOnlyApplicableToIdentifiers => {
+                write!(f, "Dot lookup only applicable to identifiers")
+            }
+            GbError::AttemptedToCallNonFunctionType => {
+                write!(f, "Attempted to call non function type")
+            }
+        }
+    }
 }
 
 impl GbType {
@@ -95,22 +153,22 @@ impl GbType {
     }
 }
 
-impl PartialEq for GbType {
-    fn eq(&self, other: &Self) -> bool {
-        // function types should never evaluate as equal to each other
-        match (self, other) {
-            (_, GbType::Function(_)) => false,
-            (GbType::Function(_), _) => false,
-            (GbType::Integer(l), GbType::Integer(r)) => l.eq(r),
-            (GbType::Name(l), GbType::Name(r)) => l.eq(r),
-            (GbType::Float(l), GbType::Float(r)) => l.eq(r),
-            (GbType::String(l), GbType::String(r)) => l.eq(r),
-            (GbType::Boolean(l), GbType::Boolean(r)) => l.eq(r),
-            (GbType::None, GbType::None) => true,
-            (GbType::Empty, GbType::Empty) => true,
-            (GbType::Error(_), GbType::Error(_)) => false,
-            _ => false,
-        }
+pub fn gb_eq(left: GbType, right: GbType) -> Result<bool, GbError> {
+    // function types should never evaluate as equal to each other
+    match (&left, &right) {
+        (GbType::Integer(l), GbType::Integer(r)) => Ok(l.eq(r)),
+        (GbType::Name(l), GbType::Name(r)) => Ok(l.eq(r)),
+        (GbType::Float(l), GbType::Float(r)) => Ok(l.eq(r)),
+        (GbType::String(l), GbType::String(r)) => Ok(l.eq(r)),
+        (GbType::Boolean(l), GbType::Boolean(r)) => Ok(l.eq(r)),
+        (GbType::None, GbType::None) => Ok(true),
+        (GbType::Empty, GbType::Empty) => Ok(true),
+        (GbType::Error(_, _), GbType::Error(_, _)) => Ok(false),
+        _ => Err(GbError::InvalidOperatorForTypes {
+            left: left.to_string(),
+            right: right.to_string(),
+            op: String::from("=="),
+        }),
     }
 }
 
@@ -118,26 +176,29 @@ pub fn variant_eq<T>(a: &T, b: &T) -> bool {
     std::mem::discriminant(a) == std::mem::discriminant(b)
 }
 
-pub fn gb_pow(left: GbType, right: GbType) -> GbType {
-    match left {
-        GbType::Integer(x) => match right {
-            GbType::Integer(y) => GbType::Integer(i64::pow(x, y as u32)),
-            GbType::Float(y) => GbType::Float(f64::powf(x as f64, y)),
-            _ => GbType::Error(GbError::InvalidOperatorForTypes),
-        },
-        GbType::Float(x) => match right {
-            GbType::Integer(y) => GbType::Float(f64::powf(x, y as f64)),
-            GbType::Float(y) => GbType::Float(f64::powf(x, y)),
-            _ => GbType::Error(GbError::InvalidOperatorForTypes),
-        },
-        _ => GbType::Error(GbError::InvalidOperatorForTypes),
+pub fn gb_pow(left: GbType, right: GbType) -> Result<GbType, GbError> {
+    match (&left, &right) {
+        (GbType::Integer(x), GbType::Integer(y)) => {
+            Ok(GbType::Integer(i64::pow(*x, *y as u32)))
+        }
+        (GbType::Integer(x), GbType::Float(y)) => {
+            Ok(GbType::Float(f64::powf(*x as f64, *y)))
+        }
+        (GbType::Float(x), GbType::Float(y)) => Ok(GbType::Float(f64::powf(*x, *y))),
+        (GbType::Float(x), GbType::Integer(y)) => {
+            Ok(GbType::Float(f64::powf(*x, *y as f64)))
+        }
+        _ => Err(GbError::InvalidOperatorForTypes {
+            left: left.to_string(),
+            right: right.to_string(),
+            op: String::from("**"),
+        }),
     }
 }
 
 /// Converts an arbitrary GbType to GbType::Boolean
 pub fn gb_bool(x: GbType) -> GbType {
     match x {
-        GbType::Error(_) => GbType::Boolean(false),
         GbType::Integer(x) => {
             if x == 0 {
                 GbType::Boolean(false)
@@ -160,8 +221,7 @@ pub fn gb_bool(x: GbType) -> GbType {
                 GbType::Boolean(true)
             }
         }
-        GbType::None => GbType::Boolean(false),
-        _ => unreachable!(),
+        _ => GbType::Boolean(false),
     }
 }
 
@@ -170,7 +230,7 @@ pub fn gb_type_of(x: impl std::ops::Deref<Target = GbType>) -> String {
     match *x {
         GbType::Empty => "Empty",
         // TODO: Custom type representations for different errors
-        GbType::Error(_) => "Error",
+        GbType::Error(_, _) => "Error",
         GbType::None => "None",
         GbType::Integer(_) => "Integer",
         GbType::Float(_) => "Float",
@@ -185,126 +245,95 @@ pub fn gb_type_of(x: impl std::ops::Deref<Target = GbType>) -> String {
     .into()
 }
 
-impl Not for GbType {
-    type Output = GbType;
-
-    fn not(self) -> GbType {
-        let bool_ = gb_bool(self);
-        match bool_ {
-            GbType::Boolean(x) => GbType::Boolean(!x),
-            _ => unreachable!(),
-        }
+pub fn gb_not(operand: GbType) -> GbType {
+    let bool_ = gb_bool(operand);
+    match bool_ {
+        GbType::Boolean(x) => GbType::Boolean(!x),
+        _ => unreachable!(),
     }
 }
 
-impl PartialOrd for GbType {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        if !variant_eq(self, other) {
-            return None;
+pub fn gb_cmp(
+    left: GbType,
+    right: GbType,
+) -> Result<Option<std::cmp::Ordering>, GbError> {
+    match (&left, &right) {
+        (GbType::Integer(x), GbType::Integer(y)) => Ok(x.partial_cmp(y)),
+        (GbType::Integer(x), GbType::Float(y)) => {
+            let x = *x as f64;
+            Ok(x.partial_cmp(y))
         }
-
-        match (self, other) {
-            (GbType::Integer(x), GbType::Integer(y)) => x.partial_cmp(y),
-            (GbType::Integer(x), GbType::Float(y)) => {
-                let x = *x as f64;
-                x.partial_cmp(y)
-            }
-            (GbType::Float(x), GbType::Float(y)) => x.partial_cmp(y),
-            (GbType::Float(x), GbType::Integer(y)) => {
-                let y = *y as f64;
-                x.partial_cmp(&y)
-            }
-            _ => todo!(),
+        (GbType::Float(x), GbType::Float(y)) => Ok(x.partial_cmp(y)),
+        (GbType::Float(x), GbType::Integer(y)) => {
+            let y = *y as f64;
+            Ok(x.partial_cmp(&y))
         }
+        _ => Err(GbError::InvalidOperatorForTypes {
+            left: left.to_string(),
+            right: right.to_string(),
+            op: String::from("<>"),
+        }),
     }
 }
 
-impl std::ops::Add<GbType> for GbType {
-    type Output = GbType;
-
-    fn add(self, rhs: GbType) -> GbType {
-        match self {
-            GbType::Integer(x) => match rhs {
-                GbType::Integer(y) => GbType::Integer(x + y),
-                GbType::Float(y) => GbType::Float(x as f64 + y),
-                _ => todo!(),
-            },
-            GbType::Float(x) => match rhs {
-                GbType::Float(y) => GbType::Float(x + y),
-                GbType::Integer(y) => GbType::Float(x + y as f64),
-                _ => todo!(),
-            },
-            GbType::String(x) => match rhs {
-                GbType::String(y) => {
-                    let mut x = x.clone();
-                    x.push_str(&y);
-                    GbType::String(x)
-                }
-
-                _ => todo!(),
-            },
-            _ => todo!(),
-        }
+pub fn gb_add(left: GbType, right: GbType) -> Result<GbType, GbError> {
+    match (&left, &right) {
+        (GbType::Integer(x), GbType::Integer(y)) => Ok(GbType::Integer(x + y)),
+        (GbType::Integer(x), GbType::Float(y)) => Ok(GbType::Float(*x as f64 + y)),
+        (GbType::Float(x), GbType::Integer(y)) => Ok(GbType::Float(x + *y as f64)),
+        (GbType::Float(x), GbType::Float(y)) => Ok(GbType::Float(x + y)),
+        (GbType::String(x), GbType::String(y)) => Ok({
+            let mut x = x.clone();
+            x.push_str(y);
+            GbType::String(x)
+        }),
+        _ => Err(GbError::InvalidOperatorForTypes {
+            left: left.to_string(),
+            right: right.to_string(),
+            op: String::from("+"),
+        }),
     }
 }
 
-impl std::ops::Sub<GbType> for GbType {
-    type Output = GbType;
-
-    fn sub(self, rhs: GbType) -> GbType {
-        match self {
-            GbType::Integer(x) => match rhs {
-                GbType::Integer(y) => GbType::Integer(x - y),
-                GbType::Float(y) => GbType::Float(x as f64 - y),
-                _ => todo!(),
-            },
-            GbType::Float(x) => match rhs {
-                GbType::Float(y) => GbType::Float(x - y),
-                GbType::Integer(y) => GbType::Float(x - y as f64),
-                _ => todo!(),
-            },
-            _ => todo!(),
-        }
+pub fn gb_sub(left: GbType, right: GbType) -> Result<GbType, GbError> {
+    match (&left, &right) {
+        (GbType::Integer(x), GbType::Integer(y)) => Ok(GbType::Integer(x - y)),
+        (GbType::Integer(x), GbType::Float(y)) => Ok(GbType::Float(*x as f64 - y)),
+        (GbType::Float(x), GbType::Float(y)) => Ok(GbType::Float(x - y)),
+        (GbType::Float(x), GbType::Integer(y)) => Ok(GbType::Float(x - *y as f64)),
+        _ => Err(GbError::InvalidOperatorForTypes {
+            left: left.to_string(),
+            right: right.to_string(),
+            op: String::from("-"),
+        }),
     }
 }
 
-impl std::ops::Mul<GbType> for GbType {
-    type Output = GbType;
-
-    fn mul(self, rhs: GbType) -> GbType {
-        match self {
-            GbType::Integer(x) => match rhs {
-                GbType::Integer(y) => GbType::Integer(x * y),
-                GbType::Float(y) => GbType::Float(x as f64 * y),
-                _ => todo!(),
-            },
-            GbType::Float(x) => match rhs {
-                GbType::Float(y) => GbType::Float(x * y),
-                GbType::Integer(y) => GbType::Float(x * y as f64),
-                _ => todo!(),
-            },
-            _ => todo!(),
-        }
+pub fn gb_mul(left: GbType, right: GbType) -> Result<GbType, GbError> {
+    match (&left, &right) {
+        (GbType::Integer(x), GbType::Integer(y)) => Ok(GbType::Integer(x * y)),
+        (GbType::Integer(x), GbType::Float(y)) => Ok(GbType::Float(*x as f64 * y)),
+        (GbType::Float(x), GbType::Integer(y)) => Ok(GbType::Float(x * *y as f64)),
+        (GbType::Float(x), GbType::Float(y)) => Ok(GbType::Float(x * y)),
+        _ => Err(GbError::InvalidOperatorForTypes {
+            left: left.to_string(),
+            right: right.to_string(),
+            op: String::from("*"),
+        }),
     }
 }
 
-impl std::ops::Div<GbType> for GbType {
-    type Output = GbType;
-
-    fn div(self, rhs: GbType) -> GbType {
-        match self {
-            GbType::Integer(x) => match rhs {
-                GbType::Integer(y) => GbType::Integer(x / y),
-                GbType::Float(y) => GbType::Float(x as f64 / y),
-                _ => todo!(),
-            },
-            GbType::Float(x) => match rhs {
-                GbType::Float(y) => GbType::Float(x / y),
-                GbType::Integer(y) => GbType::Float(x / y as f64),
-                _ => todo!(),
-            },
-            _ => todo!(),
-        }
+pub fn gb_div(left: GbType, right: GbType) -> Result<GbType, GbError> {
+    match (&left, &right) {
+        (GbType::Integer(x), GbType::Integer(y)) => Ok(GbType::Integer(x / y)),
+        (GbType::Integer(x), GbType::Float(y)) => Ok(GbType::Float(*x as f64 / y)),
+        (GbType::Float(x), GbType::Integer(y)) => Ok(GbType::Float(x / *y as f64)),
+        (GbType::Float(x), GbType::Float(y)) => Ok(GbType::Float(x / y)),
+        _ => Err(GbError::InvalidOperatorForTypes {
+            left: left.to_string(),
+            right: right.to_string(),
+            op: String::from("/"),
+        }),
     }
 }
 
@@ -320,7 +349,7 @@ impl std::fmt::Display for GbType {
                 GbType::Boolean(x) => x.to_string(),
                 GbType::None => "None".to_string(),
                 GbType::Function(x) => format!("Function Object: {:?}", x),
-                GbType::Error(e) => format!("{:?}", e),
+                GbType::Error(_tok, e) => format!("{:?}", e),
                 GbType::Name(x) => x.to_string(),
                 i => {
                     format!("No string formatter for {:?}", i)

@@ -14,9 +14,11 @@ use crate::{
         InfixExpression, LetStatement, Node, PrefixExpression, Statement,
         WhileExpression,
     },
+    error::ErrorHandler,
     parser::error::ParserError,
+    token::Token,
 };
-use gb_type::{gb_pow, GbError, GbFunc, GbType};
+use gb_type::*;
 use std::collections::HashMap;
 
 pub trait InterpreterStrategy {
@@ -33,50 +35,82 @@ pub trait InterpreterStrategy {
 pub struct Interpreter<T: InterpreterStrategy> {
     strategy: T,
     ast: Node,
+    error_handler: Box<dyn ErrorHandler>,
 }
 
 impl<T: InterpreterStrategy> Interpreter<T> {
     pub fn new(strategy: T, input: String) -> Result<Self, ParserError> {
         let mut p = crate::parser::Parser::new(
             crate::lexer::Lexer::from(input.as_bytes()),
-            Box::new(crate::parser::error::DefaultErrorHandler {
+            Box::new(crate::error::DefaultErrorHandler {
                 input: input.to_string(),
             }),
             false,
         );
         let ast = p.parse()?;
-        Ok(Self { strategy, ast })
+        Ok(Self {
+            strategy,
+            ast,
+            error_handler: Box::new(crate::error::DefaultErrorHandler { input }),
+        })
     }
 
     pub fn new_lazy(strategy: T) -> Self {
         Self {
             strategy,
             ast: Node::Empty,
+            error_handler: Box::new(crate::error::DefaultErrorHandler {
+                input: String::from(""),
+            }),
         }
     }
 
-    pub fn evaluate(&mut self) -> GbType {
-        self.strategy.eval(&self.ast, false, true)
+    pub fn evaluate(&mut self) -> Result<GbType, GbError> {
+        let res = self.strategy.eval(&self.ast, false, true);
+        if let GbType::Error(ref tok, ref e) = res {
+            println!(
+                "{}",
+                self.error_handler.runtime_error(e.clone(), tok.clone())
+            );
+            return Err(e.clone());
+        }
+        Ok(res)
     }
 
-    pub fn new_input<S>(&mut self, input: S) -> Result<(), ParserError>
+    pub fn eval_new_input<S>(&mut self, input: S) -> Result<(), ParserError>
     where
         S: AsRef<str>,
     {
         let mut p = crate::parser::Parser::new(
             crate::lexer::Lexer::from(input.as_ref().as_bytes()),
-            Box::new(crate::parser::error::DefaultErrorHandler {
+            Box::new(crate::error::DefaultErrorHandler {
                 input: input.as_ref().to_string(),
             }),
             false,
         );
+        self.error_handler.new_input(input.as_ref().to_string());
         let ast = p.parse()?;
         self.ast = ast;
         Ok(())
     }
 
+    pub fn new_input<S>(&mut self, input: S)
+    where
+        S: AsRef<str>,
+    {
+        self.error_handler.new_input(input.as_ref().to_string());
+    }
+
     pub fn eval_ast(&mut self, ast: &Node, auto_main: bool) -> GbType {
-        self.strategy.eval(ast, false, auto_main)
+        let res = self.strategy.eval(ast, false, auto_main);
+        if let GbType::Error(ref tok, ref e) = res {
+            println!(
+                "{}",
+                self.error_handler.runtime_error(e.clone(), tok.clone())
+            );
+            return GbType::None;
+        }
+        res
     }
 }
 
@@ -154,6 +188,10 @@ impl TreeWalking {
         }
     }
 
+    fn runtime_error(&self, token: Token, err: GbError) -> GbType {
+        GbType::Error(token, err)
+    }
+
     fn lookup<T: Into<Rc<str>>>(&self, key: T) -> Option<&GbType> {
         let key = key.into();
         let mut idx = self.stack.len() - 1;
@@ -190,9 +228,10 @@ impl TreeWalking {
         &mut self,
         parent: impl AsRef<str>,
         child: impl AsRef<str>,
+        token: &Token,
     ) -> GbType {
         match self.lookup(parent.as_ref()) {
-            Some(item) => self.namespace_lookup(item, parent, child),
+            Some(item) => self.namespace_lookup(token, item, parent, child),
             None => {
                 let folder_name = parent.as_ref();
                 let file_name = format!("{}.gb", parent.as_ref());
@@ -204,7 +243,13 @@ impl TreeWalking {
                         .expect("Failed to read file");
                     let mut i = Interpreter::new(TreeWalking::default(), contents)
                         .expect("Failed to create sub interpreter");
-                    i.evaluate();
+                    let res = i.evaluate();
+                    if res.is_err() {
+                        return self.runtime_error(
+                            token.clone(),
+                            GbError::FailedToResolveNameLookup,
+                        );
+                    }
 
                     self.loaded_files.push(file_name.clone());
                     let mut ns = HashMap::new();
@@ -215,7 +260,7 @@ impl TreeWalking {
                     self.top_env()
                         .insert(parent.as_ref().to_string(), GbType::Namespace(ns));
 
-                    self.dot_lookup(parent, child)
+                    self.dot_lookup(parent, child, token)
                 } else if std::fs::exists(folder_name).unwrap() {
                     tracing::error!("Folders are not yet supported");
                     todo!()
@@ -225,7 +270,10 @@ impl TreeWalking {
                         child.as_ref(),
                         parent.as_ref()
                     );
-                    return GbType::Error(GbError::FailedToResolveNameLookup);
+                    return self.runtime_error(
+                        token.clone(),
+                        GbError::FailedToResolveNameLookup,
+                    );
                 }
             }
         }
@@ -233,6 +281,7 @@ impl TreeWalking {
 
     fn namespace_lookup(
         &self,
+        token: &Token,
         item: &GbType,
         parent: impl AsRef<str>,
         child: impl AsRef<str>,
@@ -250,7 +299,7 @@ impl TreeWalking {
                     parent.as_ref(),
                     child.as_ref()
                 );
-                GbType::Error(GbError::FailedToResolveNameLookup)
+                GbType::Error(token.clone(), GbError::FailedToResolveNameLookup)
             }
         }
     }
@@ -297,7 +346,7 @@ impl TreeWalking {
             tracing::trace!("Found main function");
             // TODO:
             //     auto parse cli args as main args
-            last_result = main.execute(s, &[]);
+            last_result = main.execute(s, &[], Token::eof());
         }
 
         last_result
@@ -309,7 +358,8 @@ impl TreeWalking {
             Statement::LetStatement(ls) => self.eval_let_stmt(ls, function_context),
             Statement::ReturnStatement(rs) => {
                 if !function_context {
-                    return GbType::Error(GbError::MisplacedReturn);
+                    return self
+                        .runtime_error(rs.token.clone(), GbError::MisplacedReturn);
                 }
                 self.eval_expr(&rs.return_value, function_context)
             }
@@ -396,7 +446,10 @@ impl TreeWalking {
             tracing::trace!("Variable {:?} has value {:?}", input.token.literal, &val);
             val.clone()
         } else {
-            return GbType::Error(GbError::VariableUsedBeforeDeclaration);
+            return self.runtime_error(
+                input.token.clone(),
+                GbError::VariableUsedBeforeDeclaration,
+            );
         }
     }
 
@@ -407,8 +460,17 @@ impl TreeWalking {
         function_context: bool,
     ) -> GbType {
         match expr.operator.as_str() {
-            "-" => GbType::Integer(-1) * self.eval_expr(&expr.right, function_context),
-            "!" => !self.eval_expr(&expr.right, function_context),
+            "-" => {
+                let res = gb_mul(
+                    GbType::Integer(-1),
+                    self.eval_expr(&expr.right, function_context),
+                );
+                match res {
+                    Ok(val) => val,
+                    Err(e) => self.runtime_error(expr.token.clone(), e),
+                }
+            }
+            "!" => gb_not(self.eval_expr(&expr.right, function_context)),
             _ => unreachable!(),
         }
     }
@@ -422,79 +484,202 @@ impl TreeWalking {
         tracing::trace!("Doing {:?}", expr.operator.as_str());
         match expr.operator.as_str() {
             "+" => {
-                self.eval_expr(&expr.left, function_context)
-                    + self.eval_expr(&expr.right, function_context)
+                let res = gb_add(
+                    self.eval_expr(&expr.left, function_context),
+                    self.eval_expr(&expr.right, function_context),
+                );
+                if let Err(e) = res {
+                    self.runtime_error(expr.token.clone(), e.clone());
+                    GbType::Error(expr.token.clone(), e.clone())
+                } else {
+                    res.unwrap()
+                }
             }
             "*" => {
-                self.eval_expr(&expr.left, function_context)
-                    * self.eval_expr(&expr.right, function_context)
+                let res = gb_mul(
+                    self.eval_expr(&expr.left, function_context),
+                    self.eval_expr(&expr.right, function_context),
+                );
+                if let Err(e) = res {
+                    self.runtime_error(expr.token.clone(), e.clone());
+                    GbType::Error(expr.token.clone(), e.clone())
+                } else {
+                    res.unwrap()
+                }
             }
             "-" => {
-                self.eval_expr(&expr.left, function_context)
-                    - self.eval_expr(&expr.right, function_context)
+                let res = gb_sub(
+                    self.eval_expr(&expr.left, function_context),
+                    self.eval_expr(&expr.right, function_context),
+                );
+                if let Err(e) = res {
+                    self.runtime_error(expr.token.clone(), e.clone());
+                    GbType::Error(expr.token.clone(), e.clone())
+                } else {
+                    res.unwrap()
+                }
             }
             "/" => {
-                self.eval_expr(&expr.left, function_context)
-                    / self.eval_expr(&expr.right, function_context)
+                let res = gb_div(
+                    self.eval_expr(&expr.left, function_context),
+                    self.eval_expr(&expr.right, function_context),
+                );
+                if let Err(e) = res {
+                    self.runtime_error(expr.token.clone(), e.clone());
+                    GbType::Error(expr.token.clone(), e.clone())
+                } else {
+                    res.unwrap()
+                }
             }
-            ">" => GbType::Boolean(
-                self.eval_expr(&expr.left, function_context)
-                    > self.eval_expr(&expr.right, function_context),
-            ),
-            "<" => GbType::Boolean(
-                self.eval_expr(&expr.left, function_context)
-                    < self.eval_expr(&expr.right, function_context),
-            ),
-            "==" => GbType::Boolean(
-                self.eval_expr(&expr.left, function_context)
-                    == self.eval_expr(&expr.right, function_context),
-            ),
-            "!=" => GbType::Boolean(
-                self.eval_expr(&expr.left, function_context)
-                    != self.eval_expr(&expr.right, function_context),
-            ),
-            "**" => gb_pow(
-                self.eval_expr(&expr.left, function_context),
-                self.eval_expr(&expr.right, function_context),
-            ),
+            ">" => {
+                let res = gb_cmp(
+                    self.eval_expr(&expr.left, function_context),
+                    self.eval_expr(&expr.right, function_context),
+                );
+                match res {
+                    Ok(ordering) => GbType::Boolean(matches!(
+                        ordering,
+                        Some(std::cmp::Ordering::Greater)
+                    )),
+                    Err(e) => {
+                        self.runtime_error(expr.token.clone(), e.clone());
+                        GbType::Error(expr.token.clone(), e.clone())
+                    }
+                }
+            }
+            "<" => {
+                let res = gb_cmp(
+                    self.eval_expr(&expr.left, function_context),
+                    self.eval_expr(&expr.right, function_context),
+                );
+                match res {
+                    Ok(ordering) => GbType::Boolean(matches!(
+                        ordering,
+                        Some(std::cmp::Ordering::Less)
+                    )),
+                    Err(e) => {
+                        self.runtime_error(expr.token.clone(), e.clone());
+                        GbType::Error(expr.token.clone(), e.clone())
+                    }
+                }
+            }
+            "==" => {
+                let res = gb_eq(
+                    self.eval_expr(&expr.left, function_context),
+                    self.eval_expr(&expr.right, function_context),
+                );
+                match res {
+                    Ok(equal) => GbType::Boolean(equal),
+                    Err(e) => {
+                        self.runtime_error(expr.token.clone(), e.clone());
+                        GbType::Error(expr.token.clone(), e.clone())
+                    }
+                }
+            }
+            "!=" => {
+                let res = gb_eq(
+                    self.eval_expr(&expr.left, function_context),
+                    self.eval_expr(&expr.right, function_context),
+                );
+                match res {
+                    Ok(equal) => GbType::Boolean(!equal),
+                    Err(e) => {
+                        self.runtime_error(expr.token.clone(), e.clone());
+                        GbType::Error(expr.token.clone(), e.clone())
+                    }
+                }
+            }
+            "**" => {
+                let res = gb_pow(
+                    self.eval_expr(&expr.left, function_context),
+                    self.eval_expr(&expr.right, function_context),
+                );
+                if let Err(e) = res {
+                    self.runtime_error(expr.token.clone(), e.clone());
+                    GbType::Error(expr.token.clone(), e.clone())
+                } else {
+                    res.unwrap()
+                }
+            }
             "=" => {
                 let Expression::Identifier(ref key) = *expr.left else {
-                    return GbType::Error(GbError::VariableCannotBeAssignedToType);
+                    return self.runtime_error(
+                        expr.left.token(),
+                        GbError::VariableCannotBeAssignedToType,
+                    );
                 };
 
                 let Some(env_location) = self.lookup_name_location(key.value()) else {
-                    return GbType::Error(GbError::VariableUsedBeforeDeclaration);
+                    return self.runtime_error(
+                        key.token.clone(),
+                        GbError::VariableUsedBeforeDeclaration,
+                    );
                 };
                 let current_value = self.lookup(key.value()).unwrap();
                 if let GbType::Function(_) = current_value {
-                    return GbType::Error(GbError::FunctionMayNotBeMutated);
+                    return self.runtime_error(
+                        key.token.clone(),
+                        GbError::FunctionMayNotBeMutated,
+                    );
                 }
 
+                let curr = current_value.clone();
                 let value = self.eval_expr(&expr.right, function_context);
+                if !variant_eq(&curr, &value) {
+                    return self.runtime_error(
+                        expr.right.token(),
+                        GbError::VariableCannotBeAssignedToType,
+                    );
+                }
                 self.stack[env_location].insert(key.value(), value);
 
                 GbType::None
             }
-            ">=" => GbType::Boolean(
-                self.eval_expr(&expr.left, function_context)
-                    >= self.eval_expr(&expr.right, function_context),
-            ),
-            "<=" => GbType::Boolean(
-                self.eval_expr(&expr.left, function_context)
-                    <= self.eval_expr(&expr.right, function_context),
-            ),
+            ">=" => {
+                let res = gb_cmp(
+                    self.eval_expr(&expr.left, function_context),
+                    self.eval_expr(&expr.right, function_context),
+                );
+                match res {
+                    Ok(ordering) => GbType::Boolean(matches!(
+                        ordering,
+                        Some(std::cmp::Ordering::Greater)
+                            | Some(std::cmp::Ordering::Equal)
+                    )),
+                    Err(e) => self.runtime_error(expr.token.clone(), e),
+                }
+            }
+            "<=" => {
+                let res = gb_cmp(
+                    self.eval_expr(&expr.left, function_context),
+                    self.eval_expr(&expr.right, function_context),
+                );
+                match res {
+                    Ok(ordering) => GbType::Boolean(matches!(
+                        ordering,
+                        Some(std::cmp::Ordering::Less)
+                            | Some(std::cmp::Ordering::Equal)
+                    )),
+                    Err(e) => {
+                        self.runtime_error(expr.token.clone(), e.clone());
+                        GbType::Error(expr.token.clone(), e.clone())
+                    }
+                }
+            }
             "." => {
                 let Expression::Identifier(ref parent) = *expr.left else {
-                    return GbType::Error(
+                    return self.runtime_error(
+                        expr.token.clone(),
                         GbError::DotLookupOnlyApplicableToIdentifiers,
                     );
                 };
                 let Expression::Identifier(ref child) = *expr.right else {
-                    return GbType::Error(
+                    return self.runtime_error(
+                        expr.token.clone(),
                         GbError::DotLookupOnlyApplicableToIdentifiers,
                     );
                 };
-                self.dot_lookup(parent.to_string(), child.to_string())
+                self.dot_lookup(parent.to_string(), child.to_string(), &expr.token)
             }
             _ => unreachable!(),
         }
@@ -509,7 +694,10 @@ impl TreeWalking {
 
         let GbType::Boolean(cond) = self.eval_expr(&input.condition, function_context)
         else {
-            return GbType::Error(GbError::ConditionalMustEvaluateToBool);
+            return self.runtime_error(
+                input.token.clone(),
+                GbError::ConditionalMustEvaluateToBool,
+            );
         };
 
         if cond {
@@ -550,7 +738,10 @@ impl TreeWalking {
         let (func, gb_func) = match *input.function {
             Expression::Identifier(ref key) => {
                 let Some(GbType::Function(gb_func)) = self.lookup(key.value()) else {
-                    return GbType::Error(GbError::AttemptedToCallNonFunctionType);
+                    return self.runtime_error(
+                        input.token.clone(),
+                        GbError::AttemptedToCallNonFunctionType,
+                    );
                 };
                 // SAFETY:
                 // functions will not be able to access their own entry in the symbol table
@@ -561,14 +752,20 @@ impl TreeWalking {
             Expression::InfixExpression(ref ie) => {
                 let val = self.eval_infix_expr(ie, function_context);
                 let GbType::Function(gb_func) = val else {
-                    return GbType::Error(GbError::AttemptedToCallNonFunctionType);
+                    return self.runtime_error(
+                        input.token.clone(),
+                        GbError::AttemptedToCallNonFunctionType,
+                    );
                 };
                 (ie.to_string(), unsafe {
                     &*(&*gb_func as *const dyn GbFunc)
                 })
             }
             _ => {
-                return GbType::Error(GbError::AttemptedToCallNonFunctionType);
+                return self.runtime_error(
+                    input.token.clone(),
+                    GbError::AttemptedToCallNonFunctionType,
+                );
             }
         };
 
@@ -578,7 +775,9 @@ impl TreeWalking {
         }
 
         tracing::trace!("Calling function {:?} with args {:?}", func, &args);
-        gb_func.execute(self, &args).unwrap_return()
+        gb_func
+            .execute(self, &args, input.token.clone())
+            .unwrap_return()
     }
 
     #[instrument(skip_all)]
@@ -587,9 +786,13 @@ impl TreeWalking {
         input: &WhileExpression,
         function_context: bool,
     ) -> GbType {
-        while self.eval_expr(&input.condition, function_context)
-            == GbType::Boolean(true)
-        {
+        while matches!(
+            gb_eq(
+                self.eval_expr(&input.condition, function_context),
+                GbType::Boolean(true)
+            ),
+            Ok(true)
+        ) {
             return_if_return!(self.eval_block_stmt(&input.body, false));
         }
 

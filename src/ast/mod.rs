@@ -2,6 +2,8 @@ mod node;
 
 pub use node::*;
 
+use crate::token::Token;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Node {
     Program(Program),
@@ -76,6 +78,24 @@ pub enum Expression {
     FunctionLiteral(FunctionLiteral),
     CallExpression(CallExpression),
     WhileExpression(WhileExpression),
+}
+
+impl Expression {
+    pub fn token(&self) -> Token {
+        match self {
+            Expression::Identifier(a) => a.token.clone(),
+            Expression::IntegerLiteral(a) => a.token.clone(),
+            Expression::FloatLiteral(a) => a.token.clone(),
+            Expression::StringLiteral(a) => a.token.clone(),
+            Expression::PrefixExpression(a) => a.token.clone(),
+            Expression::InfixExpression(a) => a.token.clone(),
+            Expression::BooleanLiteral(a) => a.token.clone(),
+            Expression::IfExpression(a) => a.token.clone(),
+            Expression::FunctionLiteral(a) => a.token.clone(),
+            Expression::CallExpression(a) => a.token.clone(),
+            Expression::WhileExpression(a) => a.token.clone(),
+        }
+    }
 }
 
 impl IntoNode for Expression {
