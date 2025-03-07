@@ -81,6 +81,8 @@ fn repl() -> Result<()> {
         std::io::stdout().flush().unwrap();
         stdin.read_line(&mut buf)?;
         let mut balanced = check_balanced(&buf, &mut delimiters);
+        // TODO: each "section" needs to be parsed as it's completed
+        // rather than waiting for the entire block to be balanced
         while !delimiters.is_empty() {
             if balanced.is_err() {
                 // this means that an unexpected closer occurred
