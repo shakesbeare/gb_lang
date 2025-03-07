@@ -33,7 +33,10 @@ fn main() -> Result<()> {
     match args.filename {
         Some(f) => {
             let input = std::fs::read_to_string(f)?;
-            let mut i = interpreter::Interpreter::new(interpreter::TreeWalking::default(), input)?;
+            let mut i = interpreter::Interpreter::new(
+                interpreter::TreeWalking::default(),
+                input,
+            )?;
             i.evaluate();
             Ok(())
         }
@@ -46,16 +49,48 @@ fn main() -> Result<()> {
     }
 }
 
+#[derive(Debug)]
+enum Delimiter {
+    Paren,
+    Brace,
+    Bracket,
+}
+
+impl From<Delimiter> for char {
+    fn from(val: Delimiter) -> Self {
+        match val {
+            Delimiter::Paren => ')',
+            Delimiter::Brace => '}',
+            Delimiter::Bracket => ']',
+        }
+    }
+}
+
 fn repl() -> Result<()> {
     let mut i = interpreter::Interpreter::new_lazy(interpreter::TreeWalking::default());
     let mut buf = String::new();
+    let mut delimiters: Vec<Delimiter> = vec![];
+
     let stdin = std::io::stdin();
     loop {
         buf.clear();
+        delimiters.clear();
         stdin.read_line(&mut buf)?;
-        match i.new_input(&buf) {
-            Ok(_) => {
-                let result = i.evaluate();
+        let mut balanced = check_balanced(&buf, &mut delimiters);
+        while !delimiters.is_empty() {
+            if balanced.is_err() {
+                // this means that an unexpected closer occurred
+                break;
+            }
+            // continue reading, hopefully they balance out eventually
+            stdin.read_line(&mut buf)?;
+            delimiters.clear();
+            balanced = check_balanced(&buf, &mut delimiters);
+        }
+        match parser::quick_parse(&buf) {
+            Ok(ast) => {
+                while !delimiters.is_empty() {}
+                let result = i.eval_ast(&ast);
                 if result.is_gb_none() {
                     continue;
                 }
@@ -65,5 +100,34 @@ fn repl() -> Result<()> {
                 eprintln!("{:?}", e);
             }
         }
+    }
+}
+
+fn check_balanced<S: AsRef<str>>(input: S, delimiters: &mut Vec<Delimiter>) -> Result<(), char> {
+    for c in input.as_ref().chars() {
+        match c {
+            '(' => delimiters.push(Delimiter::Paren),
+            '{' => delimiters.push(Delimiter::Brace),
+            '[' => delimiters.push(Delimiter::Bracket),
+            c if [')', '}', ']'].contains(&c) => check_matches(c, delimiters)?,
+            _ => ()
+        }
+    }
+
+    Ok(())
+}
+
+fn check_matches(c: char, delimiters: &mut Vec<Delimiter>) -> Result<(), char> {
+    let last = delimiters.pop();
+    match last {
+        Some(delim) => {
+            let delim = delim.into();
+            if c == delim {
+                return Ok(());
+            } else {
+                return Err(c);
+            }
+        }
+        None => return Err(c),
     }
 }

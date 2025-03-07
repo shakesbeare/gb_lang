@@ -72,6 +72,10 @@ impl<T: InterpreterStrategy> Interpreter<T> {
         self.ast = ast;
         Ok(())
     }
+
+    pub fn eval_ast(&mut self, ast: &Node) -> GbType {
+        self.strategy.eval(ast, false)
+    }
 }
 
 #[derive(Debug)]

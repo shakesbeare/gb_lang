@@ -14,7 +14,8 @@ use crate::{lexer::Lexer, token::Token};
 use self::error::{ErrorHandler, ParserError};
 
 type PrefixParseFn<'a, R> = fn(&mut Parser<'a, R>) -> Result<Expression, ParserError>;
-type InfixParseFn<'a, R> = fn(&mut Parser<'a, R>, Expression) -> Result<Expression, ParserError>;
+type InfixParseFn<'a, R> =
+    fn(&mut Parser<'a, R>, Expression) -> Result<Expression, ParserError>;
 
 #[allow(dead_code)]
 #[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Clone, Copy)]
@@ -47,7 +48,11 @@ pub struct Parser<'a, R: Read> {
 }
 
 impl<'a, R: Read> Parser<'a, R> {
-    pub fn new(mut lexer: Lexer<R>, error_handler: Box<dyn ErrorHandler>, verbose: bool) -> Self {
+    pub fn new(
+        mut lexer: Lexer<R>,
+        error_handler: Box<dyn ErrorHandler>,
+        verbose: bool,
+    ) -> Self {
         let LexStatus::Reading { token } = lexer.lex() else {
             panic!("Failed to read first token");
         };
@@ -331,14 +336,18 @@ impl<'a, R: Read> Parser<'a, R> {
         }))
     }
 
-    fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, ParserError> {
+    fn parse_expression(
+        &mut self,
+        precedence: Precedence,
+    ) -> Result<Expression, ParserError> {
         let Some(prefix) = self.prefix_parse_fns.get(&self.cur_token.kind) else {
             return Err(self.syntax_error(self.cur_token.deref().clone()));
         };
 
         let mut left_exp = prefix(self);
 
-        while !self.peek_token.has_kind(TokenKind::Semicolon) && precedence < self.peek_precedence()
+        while !self.peek_token.has_kind(TokenKind::Semicolon)
+            && precedence < self.peek_precedence()
         {
             let p_self = unsafe {
                 // SAFETY:
@@ -397,7 +406,10 @@ impl<'a, R: Read> Parser<'a, R> {
         }))
     }
 
-    fn parse_infix_expression(&mut self, left: Expression) -> Result<Expression, ParserError> {
+    fn parse_infix_expression(
+        &mut self,
+        left: Expression,
+    ) -> Result<Expression, ParserError> {
         let token = self.cur_token.as_ref().clone();
         let op = token.literal.clone();
         let precedence = self.cur_precedence();
@@ -548,7 +560,10 @@ impl<'a, R: Read> Parser<'a, R> {
         Ok(identifiers)
     }
 
-    fn parse_call_expression(&mut self, function: Expression) -> Result<Expression, ParserError> {
+    fn parse_call_expression(
+        &mut self,
+        function: Expression,
+    ) -> Result<Expression, ParserError> {
         let token = self.cur_token.as_ref().clone();
         let arguments = self.parse_call_arguments()?;
         Ok(Expression::CallExpression(CallExpression {
@@ -592,4 +607,15 @@ impl<'a, R: Read> Parser<'a, R> {
             body,
         }))
     }
+}
+
+pub fn quick_parse<S: AsRef<str>>(input: S) -> Result<crate::ast::Node, ParserError> {
+    let mut p = Parser::new(
+        crate::lexer::Lexer::from(input.as_ref().as_bytes()),
+        Box::new(crate::parser::error::DefaultErrorHandler {
+            input: input.as_ref().to_string(),
+        }),
+        false,
+    );
+    p.parse()
 }
