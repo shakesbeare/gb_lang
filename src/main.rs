@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use anyhow::Result;
 use clap::Parser;
 use gb_lang::*;
@@ -41,8 +43,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         None => {
-            println!("REPL mode");
-            println!("It currently sucks");
+            println!("Gb v{}", env!("CARGO_PKG_VERSION"));
             println!("-----------------------");
             repl()
         }
@@ -75,14 +76,21 @@ fn repl() -> Result<()> {
     loop {
         buf.clear();
         delimiters.clear();
+        print!(">>> ");
+        std::io::stdout().flush().unwrap();
         stdin.read_line(&mut buf)?;
         let mut balanced = check_balanced(&buf, &mut delimiters);
         while !delimiters.is_empty() {
             if balanced.is_err() {
                 // this means that an unexpected closer occurred
+                // we can rely on the parsing step to emit
+                // a nice error message
                 break;
             }
-            // continue reading, hopefully they balance out eventually
+            let depth = delimiters.len();
+            let tabs: String = "    ".repeat(depth);
+            print!("... {}", tabs);
+            std::io::stdout().flush().unwrap();
             stdin.read_line(&mut buf)?;
             delimiters.clear();
             balanced = check_balanced(&buf, &mut delimiters);
