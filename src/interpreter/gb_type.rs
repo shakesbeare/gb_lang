@@ -12,7 +12,7 @@ pub trait GbFunc: std::fmt::Debug {
         strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
         token: Token,
-        env: Option<Environment>
+        env: Option<Environment>,
     ) -> Result<GbType, GbError>;
 }
 
@@ -24,7 +24,7 @@ impl GbFunc for FunctionLiteral {
         strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
         _token: Token,
-        env: Option<Environment>
+        env: Option<Environment>,
     ) -> Result<GbType, GbError> {
         strategy.push_env();
         let new_env = strategy.top_env();
@@ -269,8 +269,8 @@ pub fn gb_not(operand: GbType) -> Result<GbType, GbError> {
             kind: GbErrorKind::InvalidOperatorForType {
                 operand: "!".to_string(),
                 operator: gb_type_of(&operand),
-            }
-        })
+            },
+        }),
     }
 }
 

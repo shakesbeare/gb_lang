@@ -35,10 +35,7 @@ fn main() -> Result<()> {
     match args.filename {
         Some(f) => {
             let input = std::fs::read_to_string(f)?;
-            let mut i = interpreter::Interpreter::new(
-                interpreter::TreeWalking::default(),
-                input,
-            )?;
+            let mut i = interpreter::Interpreter::new(interpreter::TreeWalking::default(), input)?;
             let _ = i.evaluate();
 
             Ok(())
@@ -69,7 +66,10 @@ impl From<Delimiter> for char {
 }
 
 fn repl() -> Result<()> {
-    let mut i = interpreter::Interpreter::new_lazy(interpreter::TreeWalking::default());
+    let mut i = interpreter::Interpreter::new_lazy(
+        interpreter::TreeWalking::default(),
+        gb_lang::error::REPLErrorHandler::default(),
+    );
     let mut buf = String::new();
     let mut delimiters: Vec<Delimiter> = vec![];
 
@@ -102,11 +102,12 @@ fn repl() -> Result<()> {
         match parser::quick_parse(&buf) {
             Ok(ast) => {
                 while !delimiters.is_empty() {}
-                let result = i.eval_ast(&ast, false)?;
-                if result.is_gb_none() {
-                    continue;
+                if let Ok(v) = i.eval_ast(&ast, false) {
+                    if v.is_gb_none() {
+                        continue;
+                    }
+                    println!("{}", v);
                 }
-                println!("{}", result);
             }
             Err(e) => {
                 println!("{}", e);
@@ -115,10 +116,7 @@ fn repl() -> Result<()> {
     }
 }
 
-fn check_balanced<S: AsRef<str>>(
-    input: S,
-    delimiters: &mut Vec<Delimiter>,
-) -> Result<(), char> {
+fn check_balanced<S: AsRef<str>>(input: S, delimiters: &mut Vec<Delimiter>) -> Result<(), char> {
     for c in input.as_ref().chars() {
         match c {
             '(' => delimiters.push(Delimiter::Paren),

@@ -61,12 +61,8 @@ fn test_identifier(exp: Expression, expected: &str) {
 }
 
 #[cfg(test)]
-fn test_infix_expression<T>(
-    exp: Expression,
-    expected_left: T,
-    operator: &str,
-    expected_right: T,
-) where
+fn test_infix_expression<T>(exp: Expression, expected_left: T, operator: &str, expected_right: T)
+where
     T: std::fmt::Debug + PartialEq + std::fmt::Display,
 {
     if let Expression::InfixExpression(ref infix) = exp {
@@ -233,8 +229,7 @@ fn float_literal_expression() {
         let children = ast.into_program().statements;
         assert_eq!(children.len(), 1);
 
-        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0]
-        else {
+        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0] else {
             panic!("Expected ExpressionStatement, got {:?}", children[0]);
         };
         test_float_literal((*stmt.expression).clone(), expected);
@@ -259,8 +254,7 @@ fn string_literal_expression() {
         let children = ast.into_program().statements;
         assert_eq!(children.len(), 1);
 
-        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0]
-        else {
+        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0] else {
             panic!("Expected ExpressionStatement, got {:?}", children[0]);
         };
         test_string_literal((*stmt.expression).clone(), expected);
@@ -283,8 +277,7 @@ fn prefix_expression_1() {
         let children = ast.into_program().statements;
         parser.check_parser_errors();
         assert_eq!(children.len(), 1);
-        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0]
-        else {
+        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0] else {
             panic!("Expected ExpressionStatement, got {:?}", children[0]);
         };
         let Expression::PrefixExpression(ref prefix) = *stmt.expression else {
@@ -298,8 +291,7 @@ fn prefix_expression_1() {
 #[test]
 #[traced_test]
 fn prefix_expression_2() {
-    let input: Vec<(&str, &str, bool)> =
-        vec![("!true;", "!", true), ("!false", "!", false)];
+    let input: Vec<(&str, &str, bool)> = vec![("!true;", "!", true), ("!false", "!", false)];
 
     for (inp, op, boolean) in input {
         let mut parser = Parser::new(
@@ -313,8 +305,7 @@ fn prefix_expression_2() {
         let children = ast.into_program().statements;
         parser.check_parser_errors();
         assert_eq!(children.len(), 1);
-        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0]
-        else {
+        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0] else {
             panic!("Expected ExpressionStatement, got {:?}", children[0]);
         };
         let Expression::PrefixExpression(ref prefix) = *stmt.expression else {
@@ -352,8 +343,7 @@ fn infix_expression_1() {
         let children = ast.into_program().statements;
         parser.check_parser_errors();
         assert_eq!(children.len(), 1);
-        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0]
-        else {
+        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0] else {
             panic!("Expected ExpressionStatement, got {:?}", children[0]);
         };
 
@@ -382,8 +372,7 @@ fn infix_expression_2() {
         let children = ast.into_program().statements;
         parser.check_parser_errors();
         assert_eq!(children.len(), 1);
-        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0]
-        else {
+        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0] else {
             panic!("Expected ExpressionStatement, got {:?}", children[0]);
         };
 
@@ -421,8 +410,7 @@ fn infix_expression_3() {
         let children = ast.into_program().statements;
         parser.check_parser_errors();
         assert_eq!(children.len(), 1);
-        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0]
-        else {
+        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0] else {
             panic!("Expected ExpressionStatement, got {:?}", children[0]);
         };
 
@@ -536,9 +524,7 @@ fn if_expression() {
 
     test_infix_expression((*if_expr.condition).clone(), "x", "<", "y");
 
-    let Statement::ExpressionStatement(ref expr_stmt) =
-        *if_expr.consequence.statements[0]
-    else {
+    let Statement::ExpressionStatement(ref expr_stmt) = *if_expr.consequence.statements[0] else {
         panic!(
             "Expected ExpressionStatement, got {:?}",
             if_expr.consequence.statements[0]
@@ -579,9 +565,7 @@ fn if_else_expression() {
 
     test_infix_expression((*if_expr.condition).clone(), "x", "<", "y");
 
-    let Statement::ExpressionStatement(ref expr_stmt) =
-        *if_expr.consequence.statements[0]
-    else {
+    let Statement::ExpressionStatement(ref expr_stmt) = *if_expr.consequence.statements[0] else {
         panic!(
             "Expected ExpressionStatement, got {:?}",
             if_expr.consequence.statements[0]
@@ -627,9 +611,7 @@ fn if_else_continuation() {
 
     test_infix_expression((*if_expr.condition).clone(), "x", "<", "y");
 
-    let Statement::ExpressionStatement(ref expr_stmt) =
-        *if_expr.consequence.statements[0]
-    else {
+    let Statement::ExpressionStatement(ref expr_stmt) = *if_expr.consequence.statements[0] else {
         panic!(
             "Expected ExpressionStatement, got {:?}",
             if_expr.consequence.statements[0]
@@ -648,8 +630,7 @@ fn if_else_continuation() {
         panic!("Expected if expression, got {:?}", second_cond)
     };
 
-    let Statement::ExpressionStatement(ref expr_stmt) = *ie.consequence.statements[0]
-    else {
+    let Statement::ExpressionStatement(ref expr_stmt) = *ie.consequence.statements[0] else {
         panic!(
             "Expected ExpressionStatement, got {:?}",
             *ie.consequence.statements[0]
@@ -727,8 +708,7 @@ fn function_parameters() {
         let children = ast.into_program().statements;
         assert_eq!(children.len(), 1);
 
-        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0]
-        else {
+        let Node::Statement(Statement::ExpressionStatement(ref stmt)) = children[0] else {
             panic!("Expected ExpressionStatement, got {:?}", children[0]);
         };
 
@@ -805,8 +785,7 @@ fn function_literal_statement() {
     let children = ast.into_program().statements;
     assert_eq!(children.len(), 1);
 
-    let Node::Statement(Statement::FunctionLiteralStatement(ref func)) = children[0]
-    else {
+    let Node::Statement(Statement::FunctionLiteralStatement(ref func)) = children[0] else {
         panic!("Expected ExpressionStatement, got {:?}", children[0]);
     };
 
@@ -821,9 +800,7 @@ fn function_literal_statement() {
         assert_eq!(param.value(), expected_params[i]);
     }
 
-    let Statement::ExpressionStatement(ref expr_stmt) =
-        *func.literal.body.statements[0]
-    else {
+    let Statement::ExpressionStatement(ref expr_stmt) = *func.literal.body.statements[0] else {
         panic!(
             "Expected ExpressionStatement, got {:?}",
             func.literal.body.statements[0]
@@ -850,8 +827,7 @@ fn while_loop() {
     let children = ast.into_program().statements;
     assert_eq!(children.len(), 1);
 
-    let Node::Statement(Statement::ExpressionStatement(ref expr_stmt)) = children[0]
-    else {
+    let Node::Statement(Statement::ExpressionStatement(ref expr_stmt)) = children[0] else {
         panic!("Expected ExpressionStatement, got {:#?}", children[0]);
     };
 
@@ -887,8 +863,7 @@ fn assignment() {
     let children = ast.into_program().statements;
     assert_eq!(children.len(), 1);
 
-    let Node::Statement(Statement::ExpressionStatement(ref expr_stmt)) = children[0]
-    else {
+    let Node::Statement(Statement::ExpressionStatement(ref expr_stmt)) = children[0] else {
         panic!("Expected ExpressionStatement, got {:#?}", children[0]);
     };
 

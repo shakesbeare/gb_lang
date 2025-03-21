@@ -13,6 +13,43 @@ pub struct DefaultErrorHandler {
     pub input: String,
 }
 
+pub struct REPLErrorHandler {
+    input: String,
+    default: DefaultErrorHandler,
+}
+
+impl REPLErrorHandler {
+    pub fn new() -> Self {
+        Self {
+            input: String::new(),
+            default: DefaultErrorHandler {
+                input: String::new(),
+            },
+        }
+    }
+}
+
+impl Default for REPLErrorHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ErrorHandler for REPLErrorHandler {
+    fn syntax_error(&self, token: Token) -> String {
+        self.default.syntax_error(token)
+    }
+
+    fn runtime_error(&self, kind: GbError, token: Token) -> String {
+        self.default.runtime_error(kind, token)
+    }
+
+    fn new_input(&mut self, input: String) {
+        self.input.push_str(&input);
+        self.default.new_input(self.input.clone());
+    }
+}
+
 impl ErrorHandler for DefaultErrorHandler {
     fn new_input(&mut self, input: String) {
         self.input = input;

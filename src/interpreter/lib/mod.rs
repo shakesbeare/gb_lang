@@ -3,7 +3,9 @@ use std::rc::Rc;
 use crate::token::Token;
 
 use super::{
-    environment::Environment, gb_type::{GbError, GbFunc, GbType}, GbErrorKind, InterpreterStrategy
+    environment::Environment,
+    gb_type::{GbError, GbFunc, GbType},
+    GbErrorKind, InterpreterStrategy,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -29,7 +31,7 @@ impl GbFunc for GbPrint {
         _strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
         _token: Token,
-        _env: Option<Environment>
+        _env: Option<Environment>,
     ) -> Result<GbType, GbError> {
         self.print(args);
         Ok(GbType::None)
@@ -55,7 +57,7 @@ impl GbFunc for GbToString {
         _strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
         _token: Token,
-        _env: Option<Environment>
+        _env: Option<Environment>,
     ) -> Result<GbType, GbError> {
         if args.len() > 1 {
             panic!("Too many arguments");
@@ -86,7 +88,7 @@ impl GbFunc for GbDump {
         strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
         _token: Token,
-        _env: Option<Environment>
+        _env: Option<Environment>,
     ) -> Result<GbType, GbError> {
         if !args.is_empty() {
             panic!("Too many arguments");
@@ -122,7 +124,7 @@ impl GbFunc for GbExit {
         _strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
         token: Token,
-        _env: Option<Environment>
+        _env: Option<Environment>,
     ) -> Result<GbType, GbError> {
         if args.len() > 1 {
             panic!("Too many arguments");

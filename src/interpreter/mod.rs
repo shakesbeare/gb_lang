@@ -59,13 +59,11 @@ impl<T: InterpreterStrategy> Interpreter<T> {
         })
     }
 
-    pub fn new_lazy(strategy: T) -> Self {
+    pub fn new_lazy(strategy: T, error_handler: impl ErrorHandler + 'static) -> Self {
         Self {
             strategy,
             ast: Node::Empty,
-            error_handler: Box::new(crate::error::DefaultErrorHandler {
-                input: String::from(""),
-            }),
+            error_handler: Box::new(error_handler),
         }
     }
 
@@ -734,9 +732,11 @@ impl TreeWalking {
                 };
                 // SAFETY:
                 // functions will not be able to access their own entry in the symbol table
-                (key.to_string(), unsafe {
-                    &*(&**gb_func as *const dyn GbFunc)
-                }, env.clone())
+                (
+                    key.to_string(),
+                    unsafe { &*(&**gb_func as *const dyn GbFunc) },
+                    env.clone(),
+                )
             }
             Expression::InfixExpression(ref ie) => {
                 let val = self.eval_infix_expr(ie, function_context)?;
@@ -746,9 +746,11 @@ impl TreeWalking {
                         kind: GbErrorKind::AttemptedToCallNonFunctionType,
                     });
                 };
-                (ie.to_string(), unsafe {
-                    &*(&*gb_func as *const dyn GbFunc)
-                }, env)
+                (
+                    ie.to_string(),
+                    unsafe { &*(&*gb_func as *const dyn GbFunc) },
+                    env,
+                )
             }
             _ => {
                 return Err(GbError {
