@@ -10,9 +10,8 @@ use self::environment::Environment;
 use crate::{
     ast::{
         Alternative, BlockStatement, CallExpression, Expression, ExpressionStatement,
-        FunctionLiteral, FunctionLiteralStatement, Identifier, IfExpression,
-        InfixExpression, LetStatement, Node, PrefixExpression, Statement,
-        WhileExpression,
+        FunctionLiteral, FunctionLiteralStatement, Identifier, IfExpression, InfixExpression,
+        LetStatement, Node, PrefixExpression, Statement, WhileExpression,
     },
     error::ErrorHandler,
     parser::error::ParserError,
@@ -22,14 +21,19 @@ use gb_type::*;
 use std::collections::HashMap;
 
 pub trait InterpreterStrategy {
-    fn eval(&mut self, input: &Node, function_context: bool, auto_main: bool)
-        -> GbType;
+    fn eval(
+        &mut self,
+        input: &Node,
+        function_context: bool,
+        auto_main: bool,
+    ) -> Result<GbType, GbError>;
     fn push_env(&mut self);
     fn builtins_env(&mut self) -> &mut Environment;
     fn top_env(&mut self) -> &mut Environment;
     fn stack(&self) -> &[Environment];
     //TODO: Use a result instead
     fn pop_env(&mut self) -> Option<()>;
+    fn loose_envs(&self) -> &HashMap<Rc<str>, Environment>;
 }
 
 pub struct Interpreter<T: InterpreterStrategy> {
@@ -67,14 +71,15 @@ impl<T: InterpreterStrategy> Interpreter<T> {
 
     pub fn evaluate(&mut self) -> Result<GbType, GbError> {
         let res = self.strategy.eval(&self.ast, false, true);
-        if let GbType::Error(ref tok, ref e) = res {
+        if let Err(e) = res {
             println!(
                 "{}",
-                self.error_handler.runtime_error(e.clone(), tok.clone())
+                self.error_handler
+                    .runtime_error(e.clone(), e.token.clone().unwrap())
             );
             return Err(e.clone());
-        }
-        Ok(res)
+        };
+        res
     }
 
     pub fn eval_new_input<S>(&mut self, input: S) -> Result<(), ParserError>
@@ -101,14 +106,15 @@ impl<T: InterpreterStrategy> Interpreter<T> {
         self.error_handler.new_input(input.as_ref().to_string());
     }
 
-    pub fn eval_ast(&mut self, ast: &Node, auto_main: bool) -> GbType {
+    pub fn eval_ast(&mut self, ast: &Node, auto_main: bool) -> Result<GbType, GbError> {
         let res = self.strategy.eval(ast, false, auto_main);
-        if let GbType::Error(ref tok, ref e) = res {
+        if let Err(e) = res {
             println!(
                 "{}",
-                self.error_handler.runtime_error(e.clone(), tok.clone())
+                self.error_handler
+                    .runtime_error(e.clone(), e.token.clone().unwrap())
             );
-            return GbType::None;
+            return Err(e.clone());
         }
         res
     }
@@ -117,6 +123,7 @@ impl<T: InterpreterStrategy> Interpreter<T> {
 #[derive(Debug)]
 pub struct TreeWalking {
     stack: Vec<Environment>,
+    loose_envs: HashMap<Rc<str>, Environment>,
     loaded_files: Vec<String>,
 }
 
@@ -124,7 +131,8 @@ pub struct TreeWalking {
 macro_rules! return_if_return (
     ($s:ident.$f:ident($($args:tt)*)) => {
         match $s.$f($($args)*) {
-            GbType::ReturnValue(v) => return GbType::ReturnValue(v),
+            Ok(GbType::ReturnValue(v)) => return Ok(GbType::ReturnValue(v)),
+            Err(e) => return Err(e),
             x => x
         }
     }
@@ -137,16 +145,16 @@ impl InterpreterStrategy for TreeWalking {
         input: &Node,
         function_context: bool,
         auto_main: bool,
-    ) -> GbType {
-        match input {
+    ) -> Result<GbType, GbError> {
+        Ok(match input {
             Node::Program(p) => {
-                self.eval_prog(p.statements.as_slice(), function_context, auto_main)
+                self.eval_prog(p.statements.as_slice(), function_context, auto_main)?
             }
-            Node::Statement(s) => self.eval_stmt(s, function_context),
-            Node::Expression(e) => self.eval_expr(e, function_context),
+            Node::Statement(s) => self.eval_stmt(s, function_context)?,
+            Node::Expression(e) => self.eval_expr(e, function_context)?,
             Node::Empty => GbType::Empty,
         }
-        .unwrap_return()
+        .unwrap_return())
     }
 
     fn push_env(&mut self) {
@@ -163,6 +171,10 @@ impl InterpreterStrategy for TreeWalking {
 
     fn stack(&self) -> &[Environment] {
         &self.stack
+    }
+
+    fn loose_envs(&self) -> &HashMap<Rc<str>, Environment> {
+        &self.loose_envs
     }
 
     fn pop_env(&mut self) -> Option<()> {
@@ -185,11 +197,8 @@ impl TreeWalking {
         Self {
             stack,
             loaded_files: vec![],
+            loose_envs: HashMap::new(),
         }
-    }
-
-    fn runtime_error(&self, token: Token, err: GbError) -> GbType {
-        GbType::Error(token, err)
     }
 
     fn lookup<T: Into<Rc<str>>>(&self, key: T) -> Option<&GbType> {
@@ -229,27 +238,19 @@ impl TreeWalking {
         parent: impl AsRef<str>,
         child: impl AsRef<str>,
         token: &Token,
-    ) -> GbType {
+    ) -> Result<GbType, GbError> {
         match self.lookup(parent.as_ref()) {
             Some(item) => self.namespace_lookup(token, item, parent, child),
             None => {
                 let folder_name = parent.as_ref();
                 let file_name = format!("{}.gb", parent.as_ref());
-                if std::fs::exists(&file_name).unwrap()
-                    && !self.loaded_files.contains(&file_name)
-                {
+                if std::fs::exists(&file_name).unwrap() && !self.loaded_files.contains(&file_name) {
                     tracing::trace!("Found file");
-                    let contents = std::fs::read_to_string(&file_name)
-                        .expect("Failed to read file");
+                    let contents =
+                        std::fs::read_to_string(&file_name).expect("Failed to read file");
                     let mut i = Interpreter::new(TreeWalking::default(), contents)
                         .expect("Failed to create sub interpreter");
-                    let res = i.evaluate();
-                    if res.is_err() {
-                        return self.runtime_error(
-                            token.clone(),
-                            GbError::FailedToResolveNameLookup,
-                        );
-                    }
+                    i.evaluate()?;
 
                     self.loaded_files.push(file_name.clone());
                     let mut ns = HashMap::new();
@@ -270,10 +271,10 @@ impl TreeWalking {
                         child.as_ref(),
                         parent.as_ref()
                     );
-                    return self.runtime_error(
-                        token.clone(),
-                        GbError::FailedToResolveNameLookup,
-                    );
+                    return Err(GbError {
+                        token: Some(token.clone()),
+                        kind: GbErrorKind::FailedToResolveNameLookup,
+                    });
                 }
             }
         }
@@ -285,21 +286,20 @@ impl TreeWalking {
         item: &GbType,
         parent: impl AsRef<str>,
         child: impl AsRef<str>,
-    ) -> GbType {
+    ) -> Result<GbType, GbError> {
         tracing::trace!(
             "Looking for attr {:?} in {:?}",
             child.as_ref(),
             parent.as_ref()
         );
         match item.get_attr(child.as_ref()) {
-            Some(v) => (*v).clone(),
+            Some(v) => Ok((*v).clone()),
             None => {
-                tracing::error!(
-                    "{} has no attribute {}",
-                    parent.as_ref(),
-                    child.as_ref()
-                );
-                GbType::Error(token.clone(), GbError::FailedToResolveNameLookup)
+                tracing::error!("{} has no attribute {}", parent.as_ref(), child.as_ref());
+                Err(GbError {
+                    token: Some(token.clone()),
+                    kind: GbErrorKind::FailedToResolveNameLookup,
+                })
             }
         }
     }
@@ -320,13 +320,13 @@ impl TreeWalking {
         input: &[Node],
         function_context: bool,
         auto_main: bool,
-    ) -> GbType {
+    ) -> Result<GbType, GbError> {
         let mut last_result = GbType::None;
         for node in input {
             match node {
                 Node::Program(_) => unreachable!(),
                 Node::Statement(statement) => {
-                    last_result = self.eval_stmt(statement, function_context)
+                    last_result = self.eval_stmt(statement, function_context)?
                 }
                 Node::Expression(_) => unreachable!(),
                 Node::Empty => {
@@ -336,36 +336,36 @@ impl TreeWalking {
         }
 
         if !auto_main {
-            return last_result;
+            return Ok(last_result);
         }
 
         // SAFETY
         //     Function objects cannot be mutated
         let s = unsafe { &mut *(self as *mut Self) };
-        if let Some(GbType::Function(main)) = self.top_env().get("main") {
+        if let Some(GbType::Function(main, _)) = self.top_env().get("main") {
             tracing::trace!("Found main function");
             // TODO:
             //     auto parse cli args as main args
-            last_result = main.execute(s, &[], Token::eof());
+            last_result = main.execute(s, &[], Token::eof(), None)?;
         }
 
-        last_result
+        Ok(last_result)
     }
 
     #[instrument(skip_all)]
-    fn eval_stmt(&mut self, input: &Statement, function_context: bool) -> GbType {
+    fn eval_stmt(&mut self, input: &Statement, function_context: bool) -> Result<GbType, GbError> {
         match input {
             Statement::LetStatement(ls) => self.eval_let_stmt(ls, function_context),
             Statement::ReturnStatement(rs) => {
                 if !function_context {
-                    return self
-                        .runtime_error(rs.token.clone(), GbError::MisplacedReturn);
+                    return Err(GbError {
+                        token: Some(rs.token.clone()),
+                        kind: GbErrorKind::MisplacedReturn,
+                    });
                 }
                 self.eval_expr(&rs.return_value, function_context)
             }
-            Statement::ExpressionStatement(es) => {
-                self.eval_expr_stmt(es, function_context)
-            }
+            Statement::ExpressionStatement(es) => self.eval_expr_stmt(es, function_context),
             Statement::BlockStatement(bs) => {
                 return_if_return!(self.eval_block_stmt(bs, function_context))
             }
@@ -378,21 +378,21 @@ impl TreeWalking {
         &mut self,
         input: &BlockStatement,
         function_context: bool,
-    ) -> GbType {
+    ) -> Result<GbType, GbError> {
         let mut last = GbType::None;
         for stmt in input.statements.iter() {
-            last = self.eval_stmt(stmt, function_context);
+            last = self.eval_stmt(stmt, function_context)?;
             if function_context {
                 if stmt.is_return_stmt() {
                     tracing::trace!("Returning value");
-                    return GbType::ReturnValue(last.into());
+                    return Ok(GbType::ReturnValue(last.into()));
                 } else if gb_type::gb_type_of(&last) == "Return Value" {
                     tracing::trace!("Hoisting returned value");
-                    return last.unwrap_return();
+                    return Ok(last.unwrap_return());
                 }
             }
         }
-        last
+        Ok(last)
     }
 
     #[instrument(skip_all)]
@@ -400,7 +400,7 @@ impl TreeWalking {
         &mut self,
         input: &ExpressionStatement,
         function_context: bool,
-    ) -> GbType {
+    ) -> Result<GbType, GbError> {
         // this function exists in case an expression statement should
         // evaluate to something other than the result of its expression
         self.eval_expr(&input.expression, function_context)
@@ -411,45 +411,39 @@ impl TreeWalking {
         &mut self,
         input: &LetStatement,
         function_context: bool,
-    ) -> GbType {
-        let value = self.eval_expr(&input.value, function_context);
+    ) -> Result<GbType, GbError> {
+        let value = self.eval_expr(&input.value, function_context)?;
         self.top_env().insert(input.name.value(), value);
-        GbType::Name(input.name.value().to_string())
+        Ok(GbType::Name(input.name.value().to_string()))
     }
 
     #[instrument(skip_all)]
-    fn eval_expr(&mut self, input: &Expression, function_context: bool) -> GbType {
+    fn eval_expr(&mut self, input: &Expression, function_context: bool) -> Result<GbType, GbError> {
         match input {
             Expression::Identifier(id) => self.eval_ident(id),
-            Expression::IntegerLiteral(i) => GbType::Integer(i.value),
-            Expression::FloatLiteral(f) => GbType::Float(f.value),
-            Expression::StringLiteral(st) => GbType::String(st.value.clone()),
-            Expression::PrefixExpression(pe) => {
-                self.eval_prefix_expr(pe, function_context)
-            }
-            Expression::InfixExpression(ie) => {
-                self.eval_infix_expr(ie, function_context)
-            }
-            Expression::BooleanLiteral(b) => GbType::Boolean(b.value),
+            Expression::IntegerLiteral(i) => Ok(GbType::Integer(i.value)),
+            Expression::FloatLiteral(f) => Ok(GbType::Float(f.value)),
+            Expression::StringLiteral(st) => Ok(GbType::String(st.value.clone())),
+            Expression::PrefixExpression(pe) => self.eval_prefix_expr(pe, function_context),
+            Expression::InfixExpression(ie) => self.eval_infix_expr(ie, function_context),
+            Expression::BooleanLiteral(b) => Ok(GbType::Boolean(b.value)),
             Expression::IfExpression(ie) => self.eval_if_expr(ie, function_context),
             Expression::FunctionLiteral(fl) => self.eval_fn_lit(fl),
             Expression::CallExpression(fc) => self.eval_fn_call(fc, function_context),
-            Expression::WhileExpression(we) => {
-                self.eval_while_expr(we, function_context)
-            }
+            Expression::WhileExpression(we) => self.eval_while_expr(we, function_context),
         }
     }
 
     #[instrument(skip_all)]
-    fn eval_ident(&mut self, input: &Identifier) -> GbType {
+    fn eval_ident(&mut self, input: &Identifier) -> Result<GbType, GbError> {
         if let Some(val) = self.lookup(input.value()) {
             tracing::trace!("Variable {:?} has value {:?}", input.token.literal, &val);
-            val.clone()
+            Ok(val.clone())
         } else {
-            return self.runtime_error(
-                input.token.clone(),
-                GbError::VariableUsedBeforeDeclaration,
-            );
+            return Err(GbError {
+                token: Some(input.token.clone()),
+                kind: GbErrorKind::VariableUsedBeforeDeclaration,
+            });
         }
     }
 
@@ -458,19 +452,13 @@ impl TreeWalking {
         &mut self,
         expr: &PrefixExpression,
         function_context: bool,
-    ) -> GbType {
+    ) -> Result<GbType, GbError> {
         match expr.operator.as_str() {
-            "-" => {
-                let res = gb_mul(
-                    GbType::Integer(-1),
-                    self.eval_expr(&expr.right, function_context),
-                );
-                match res {
-                    Ok(val) => val,
-                    Err(e) => self.runtime_error(expr.token.clone(), e),
-                }
-            }
-            "!" => gb_not(self.eval_expr(&expr.right, function_context)),
+            "-" => gb_mul(
+                GbType::Integer(-1),
+                self.eval_expr(&expr.right, function_context)?,
+            ),
+            "!" => gb_not(self.eval_expr(&expr.right, function_context)?),
             _ => unreachable!(),
         }
     }
@@ -480,204 +468,200 @@ impl TreeWalking {
         &mut self,
         expr: &InfixExpression,
         function_context: bool,
-    ) -> GbType {
+    ) -> Result<GbType, GbError> {
         tracing::trace!("Doing {:?}", expr.operator.as_str());
         match expr.operator.as_str() {
             "+" => {
                 let res = gb_add(
-                    self.eval_expr(&expr.left, function_context),
-                    self.eval_expr(&expr.right, function_context),
+                    self.eval_expr(&expr.left, function_context)?,
+                    self.eval_expr(&expr.right, function_context)?,
                 );
-                if let Err(e) = res {
-                    self.runtime_error(expr.token.clone(), e.clone());
-                    GbType::Error(expr.token.clone(), e.clone())
-                } else {
-                    res.unwrap()
+                if let Err(mut e) = res {
+                    let _ = e.token.insert(expr.token.clone());
+                    return Err(e);
                 }
+                res
             }
             "*" => {
                 let res = gb_mul(
-                    self.eval_expr(&expr.left, function_context),
-                    self.eval_expr(&expr.right, function_context),
+                    self.eval_expr(&expr.left, function_context)?,
+                    self.eval_expr(&expr.right, function_context)?,
                 );
-                if let Err(e) = res {
-                    self.runtime_error(expr.token.clone(), e.clone());
-                    GbType::Error(expr.token.clone(), e.clone())
-                } else {
-                    res.unwrap()
+                if let Err(mut e) = res {
+                    let _ = e.token.insert(expr.token.clone());
+                    return Err(e);
                 }
+                res
             }
             "-" => {
                 let res = gb_sub(
-                    self.eval_expr(&expr.left, function_context),
-                    self.eval_expr(&expr.right, function_context),
+                    self.eval_expr(&expr.left, function_context)?,
+                    self.eval_expr(&expr.right, function_context)?,
                 );
-                if let Err(e) = res {
-                    self.runtime_error(expr.token.clone(), e.clone());
-                    GbType::Error(expr.token.clone(), e.clone())
-                } else {
-                    res.unwrap()
+                if let Err(mut e) = res {
+                    let _ = e.token.insert(expr.token.clone());
+                    return Err(e);
                 }
+                res
             }
             "/" => {
                 let res = gb_div(
-                    self.eval_expr(&expr.left, function_context),
-                    self.eval_expr(&expr.right, function_context),
+                    self.eval_expr(&expr.left, function_context)?,
+                    self.eval_expr(&expr.right, function_context)?,
                 );
-                if let Err(e) = res {
-                    self.runtime_error(expr.token.clone(), e.clone());
-                    GbType::Error(expr.token.clone(), e.clone())
-                } else {
-                    res.unwrap()
+                if let Err(mut e) = res {
+                    let _ = e.token.insert(expr.token.clone());
+                    return Err(e);
                 }
+                res
             }
             ">" => {
                 let res = gb_cmp(
-                    self.eval_expr(&expr.left, function_context),
-                    self.eval_expr(&expr.right, function_context),
+                    self.eval_expr(&expr.left, function_context)?,
+                    self.eval_expr(&expr.right, function_context)?,
                 );
                 match res {
-                    Ok(ordering) => GbType::Boolean(matches!(
+                    Ok(ordering) => Ok(GbType::Boolean(matches!(
                         ordering,
                         Some(std::cmp::Ordering::Greater)
-                    )),
-                    Err(e) => {
-                        self.runtime_error(expr.token.clone(), e.clone());
-                        GbType::Error(expr.token.clone(), e.clone())
+                    ))),
+                    Err(mut e) => {
+                        let _ = e.token.insert(expr.token.clone());
+                        Err(e)
                     }
                 }
             }
             "<" => {
                 let res = gb_cmp(
-                    self.eval_expr(&expr.left, function_context),
-                    self.eval_expr(&expr.right, function_context),
+                    self.eval_expr(&expr.left, function_context)?,
+                    self.eval_expr(&expr.right, function_context)?,
                 );
                 match res {
-                    Ok(ordering) => GbType::Boolean(matches!(
+                    Ok(ordering) => Ok(GbType::Boolean(matches!(
                         ordering,
                         Some(std::cmp::Ordering::Less)
-                    )),
-                    Err(e) => {
-                        self.runtime_error(expr.token.clone(), e.clone());
-                        GbType::Error(expr.token.clone(), e.clone())
+                    ))),
+                    Err(mut e) => {
+                        let _ = e.token.insert(expr.token.clone());
+                        Err(e)
                     }
                 }
             }
             "==" => {
                 let res = gb_eq(
-                    self.eval_expr(&expr.left, function_context),
-                    self.eval_expr(&expr.right, function_context),
+                    self.eval_expr(&expr.left, function_context)?,
+                    self.eval_expr(&expr.right, function_context)?,
                 );
                 match res {
-                    Ok(equal) => GbType::Boolean(equal),
-                    Err(e) => {
-                        self.runtime_error(expr.token.clone(), e.clone());
-                        GbType::Error(expr.token.clone(), e.clone())
+                    Ok(equal) => Ok(GbType::Boolean(equal)),
+                    Err(mut e) => {
+                        let _ = e.token.insert(expr.token.clone());
+                        Err(e)
                     }
                 }
             }
             "!=" => {
                 let res = gb_eq(
-                    self.eval_expr(&expr.left, function_context),
-                    self.eval_expr(&expr.right, function_context),
+                    self.eval_expr(&expr.left, function_context)?,
+                    self.eval_expr(&expr.right, function_context)?,
                 );
                 match res {
-                    Ok(equal) => GbType::Boolean(!equal),
-                    Err(e) => {
-                        self.runtime_error(expr.token.clone(), e.clone());
-                        GbType::Error(expr.token.clone(), e.clone())
+                    Ok(equal) => Ok(GbType::Boolean(!equal)),
+                    Err(mut e) => {
+                        let _ = e.token.insert(expr.token.clone());
+                        Err(e)
                     }
                 }
             }
             "**" => {
                 let res = gb_pow(
-                    self.eval_expr(&expr.left, function_context),
-                    self.eval_expr(&expr.right, function_context),
+                    self.eval_expr(&expr.left, function_context)?,
+                    self.eval_expr(&expr.right, function_context)?,
                 );
-                if let Err(e) = res {
-                    self.runtime_error(expr.token.clone(), e.clone());
-                    GbType::Error(expr.token.clone(), e.clone())
-                } else {
-                    res.unwrap()
+                if let Err(mut e) = res {
+                    let _ = e.token.insert(expr.token.clone());
+                    return Err(e);
                 }
+                res
             }
             "=" => {
                 let Expression::Identifier(ref key) = *expr.left else {
-                    return self.runtime_error(
-                        expr.left.token(),
-                        GbError::VariableCannotBeAssignedToType,
-                    );
+                    return Err(GbError {
+                        token: Some(expr.left.token()),
+                        kind: GbErrorKind::VariableCannotBeAssignedToType,
+                    });
                 };
 
                 let Some(env_location) = self.lookup_name_location(key.value()) else {
-                    return self.runtime_error(
-                        key.token.clone(),
-                        GbError::VariableUsedBeforeDeclaration,
-                    );
+                    return Err(GbError {
+                        token: Some(key.token.clone()),
+                        kind: GbErrorKind::VariableUsedBeforeDeclaration,
+                    });
                 };
                 let current_value = self.lookup(key.value()).unwrap();
-                if let GbType::Function(_) = current_value {
-                    return self.runtime_error(
-                        key.token.clone(),
-                        GbError::FunctionMayNotBeMutated,
-                    );
+                if let GbType::Function(_, _) = current_value {
+                    return Err(GbError {
+                        token: Some(key.token.clone()),
+                        kind: GbErrorKind::FunctionMayNotBeMutated,
+                    });
                 }
 
                 let curr = current_value.clone();
-                let value = self.eval_expr(&expr.right, function_context);
+                let value = self.eval_expr(&expr.right, function_context)?;
                 if !variant_eq(&curr, &value) {
-                    return self.runtime_error(
-                        expr.right.token(),
-                        GbError::VariableCannotBeAssignedToType,
-                    );
+                    return Err(GbError {
+                        token: Some(expr.right.token()),
+                        kind: GbErrorKind::VariableCannotBeAssignedToType,
+                    });
                 }
                 self.stack[env_location].insert(key.value(), value);
 
-                GbType::None
+                Ok(GbType::None)
             }
             ">=" => {
                 let res = gb_cmp(
-                    self.eval_expr(&expr.left, function_context),
-                    self.eval_expr(&expr.right, function_context),
+                    self.eval_expr(&expr.left, function_context)?,
+                    self.eval_expr(&expr.right, function_context)?,
                 );
                 match res {
-                    Ok(ordering) => GbType::Boolean(matches!(
+                    Ok(ordering) => Ok(GbType::Boolean(matches!(
                         ordering,
-                        Some(std::cmp::Ordering::Greater)
-                            | Some(std::cmp::Ordering::Equal)
-                    )),
-                    Err(e) => self.runtime_error(expr.token.clone(), e),
+                        Some(std::cmp::Ordering::Greater) | Some(std::cmp::Ordering::Equal)
+                    ))),
+                    Err(mut e) => {
+                        let _ = e.token.insert(expr.token.clone());
+                        Err(e)
+                    }
                 }
             }
             "<=" => {
                 let res = gb_cmp(
-                    self.eval_expr(&expr.left, function_context),
-                    self.eval_expr(&expr.right, function_context),
+                    self.eval_expr(&expr.left, function_context)?,
+                    self.eval_expr(&expr.right, function_context)?,
                 );
                 match res {
-                    Ok(ordering) => GbType::Boolean(matches!(
+                    Ok(ordering) => Ok(GbType::Boolean(matches!(
                         ordering,
-                        Some(std::cmp::Ordering::Less)
-                            | Some(std::cmp::Ordering::Equal)
-                    )),
-                    Err(e) => {
-                        self.runtime_error(expr.token.clone(), e.clone());
-                        GbType::Error(expr.token.clone(), e.clone())
+                        Some(std::cmp::Ordering::Less) | Some(std::cmp::Ordering::Equal)
+                    ))),
+                    Err(mut e) => {
+                        let _ = e.token.insert(expr.token.clone());
+                        Err(e)
                     }
                 }
             }
             "." => {
                 let Expression::Identifier(ref parent) = *expr.left else {
-                    return self.runtime_error(
-                        expr.token.clone(),
-                        GbError::DotLookupOnlyApplicableToIdentifiers,
-                    );
+                    return Err(GbError {
+                        token: Some(expr.token.clone()),
+                        kind: GbErrorKind::DotLookupOnlyApplicableToIdentifiers,
+                    });
                 };
                 let Expression::Identifier(ref child) = *expr.right else {
-                    return self.runtime_error(
-                        expr.token.clone(),
-                        GbError::DotLookupOnlyApplicableToIdentifiers,
-                    );
+                    return Err(GbError {
+                        token: Some(expr.token.clone()),
+                        kind: GbErrorKind::DotLookupOnlyApplicableToIdentifiers,
+                    });
                 };
                 self.dot_lookup(parent.to_string(), child.to_string(), &expr.token)
             }
@@ -686,18 +670,21 @@ impl TreeWalking {
     }
 
     #[instrument(skip_all)]
-    fn eval_if_expr(&mut self, input: &IfExpression, function_context: bool) -> GbType {
+    fn eval_if_expr(
+        &mut self,
+        input: &IfExpression,
+        function_context: bool,
+    ) -> Result<GbType, GbError> {
         // pub token: Token,
         // pub condition: Rc<Expression>,
         // pub consequence: BlockStatement,
         // pub alternative: Option<BlockStatement>,
 
-        let GbType::Boolean(cond) = self.eval_expr(&input.condition, function_context)
-        else {
-            return self.runtime_error(
-                input.token.clone(),
-                GbError::ConditionalMustEvaluateToBool,
-            );
+        let GbType::Boolean(cond) = self.eval_expr(&input.condition, function_context)? else {
+            return Err(GbError {
+                token: Some(input.token.clone()),
+                kind: GbErrorKind::ConditionalMustEvaluateToBool,
+            });
         };
 
         if cond {
@@ -710,23 +697,25 @@ impl TreeWalking {
                 Alternative::BlockStatement(bs) => {
                     return_if_return!(self.eval_block_stmt(bs, function_context))
                 }
-                Alternative::None => GbType::None,
+                Alternative::None => Ok(GbType::None),
             }
         }
     }
 
     #[instrument(skip_all)]
-    fn eval_fn_lit_stmt(&mut self, input: &FunctionLiteralStatement) -> GbType {
+    fn eval_fn_lit_stmt(&mut self, input: &FunctionLiteralStatement) -> Result<GbType, GbError> {
         let key: Rc<str> = input.identifier.value().into();
-        let value = GbType::Function(Rc::new(input.literal.clone()));
+        let top_env = self.top_env().clone();
+        let value = GbType::Function(Rc::new(input.literal.clone()), Some(top_env));
         self.top_env().insert(key.clone(), value);
         tracing::trace!("Created Function: {:?}", key);
-        GbType::None
+        Ok(GbType::None)
     }
 
     #[instrument(skip_all)]
-    fn eval_fn_lit(&mut self, input: &FunctionLiteral) -> GbType {
-        GbType::Function(Rc::new(input.clone()))
+    fn eval_fn_lit(&mut self, input: &FunctionLiteral) -> Result<GbType, GbError> {
+        let top_env = self.top_env().clone();
+        Ok(GbType::Function(Rc::new(input.clone()), Some(top_env)))
     }
 
     #[instrument(skip_all)]
@@ -734,50 +723,50 @@ impl TreeWalking {
         &mut self,
         input: &CallExpression,
         function_context: bool,
-    ) -> GbType {
-        let (func, gb_func) = match *input.function {
+    ) -> Result<GbType, GbError> {
+        let (func, gb_func, env) = match *input.function {
             Expression::Identifier(ref key) => {
-                let Some(GbType::Function(gb_func)) = self.lookup(key.value()) else {
-                    return self.runtime_error(
-                        input.token.clone(),
-                        GbError::AttemptedToCallNonFunctionType,
-                    );
+                let Some(GbType::Function(gb_func, env)) = self.lookup(key.value()) else {
+                    return Err(GbError {
+                        token: Some(input.token.clone()),
+                        kind: GbErrorKind::AttemptedToCallNonFunctionType,
+                    });
                 };
                 // SAFETY:
                 // functions will not be able to access their own entry in the symbol table
                 (key.to_string(), unsafe {
                     &*(&**gb_func as *const dyn GbFunc)
-                })
+                }, env.clone())
             }
             Expression::InfixExpression(ref ie) => {
-                let val = self.eval_infix_expr(ie, function_context);
-                let GbType::Function(gb_func) = val else {
-                    return self.runtime_error(
-                        input.token.clone(),
-                        GbError::AttemptedToCallNonFunctionType,
-                    );
+                let val = self.eval_infix_expr(ie, function_context)?;
+                let GbType::Function(gb_func, env) = val else {
+                    return Err(GbError {
+                        token: Some(input.token.clone()),
+                        kind: GbErrorKind::AttemptedToCallNonFunctionType,
+                    });
                 };
                 (ie.to_string(), unsafe {
                     &*(&*gb_func as *const dyn GbFunc)
-                })
+                }, env)
             }
             _ => {
-                return self.runtime_error(
-                    input.token.clone(),
-                    GbError::AttemptedToCallNonFunctionType,
-                );
+                return Err(GbError {
+                    token: Some(input.token.clone()),
+                    kind: GbErrorKind::AttemptedToCallNonFunctionType,
+                });
             }
         };
 
         let mut args = vec![];
         for arg in input.arguments.iter() {
-            args.push(self.eval_expr(arg, function_context));
+            args.push(self.eval_expr(arg, function_context)?);
         }
 
         tracing::trace!("Calling function {:?} with args {:?}", func, &args);
-        gb_func
-            .execute(self, &args, input.token.clone())
-            .unwrap_return()
+        Ok(gb_func
+            .execute(self, &args, input.token.clone(), env)?
+            .unwrap_return())
     }
 
     #[instrument(skip_all)]
@@ -785,17 +774,17 @@ impl TreeWalking {
         &mut self,
         input: &WhileExpression,
         function_context: bool,
-    ) -> GbType {
+    ) -> Result<GbType, GbError> {
         while matches!(
             gb_eq(
-                self.eval_expr(&input.condition, function_context),
+                self.eval_expr(&input.condition, function_context)?,
                 GbType::Boolean(true)
             ),
             Ok(true)
         ) {
-            return_if_return!(self.eval_block_stmt(&input.body, false));
+            let _ = return_if_return!(self.eval_block_stmt(&input.body, false));
         }
 
-        GbType::None
+        Ok(GbType::None)
     }
 }

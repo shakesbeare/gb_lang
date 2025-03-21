@@ -102,7 +102,7 @@ fn repl() -> Result<()> {
         match parser::quick_parse(&buf) {
             Ok(ast) => {
                 while !delimiters.is_empty() {}
-                let result = i.eval_ast(&ast, false);
+                let result = i.eval_ast(&ast, false)?;
                 if result.is_gb_none() {
                     continue;
                 }

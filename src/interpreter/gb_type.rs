@@ -1,4 +1,4 @@
-use super::InterpreterStrategy;
+use super::{environment::Environment, InterpreterStrategy};
 use crate::{
     ast::{FunctionLiteral, IntoNode},
     token::Token,
@@ -12,7 +12,8 @@ pub trait GbFunc: std::fmt::Debug {
         strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
         token: Token,
-    ) -> GbType;
+        env: Option<Environment>
+    ) -> Result<GbType, GbError>;
 }
 
 impl GbFunc for FunctionLiteral {
@@ -23,9 +24,15 @@ impl GbFunc for FunctionLiteral {
         strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
         _token: Token,
-    ) -> GbType {
+        env: Option<Environment>
+    ) -> Result<GbType, GbError> {
         strategy.push_env();
         let new_env = strategy.top_env();
+        if let Some(env) = env {
+            for (k, v) in env.iter() {
+                new_env.insert(k.clone(), v.clone());
+            }
+        }
         for (param, arg) in self.parameters.iter().zip(args) {
             new_env.insert(param.value(), arg.clone());
         }
@@ -38,8 +45,6 @@ impl GbFunc for FunctionLiteral {
 #[derive(Debug, Clone)]
 pub enum GbType {
     Empty,
-    /// Represents an error that has occurred
-    Error(Token, GbError),
     None,
     /// Exits the program when returned. This should only be accessible through `std.exit()` or
     /// `exit()`
@@ -50,13 +55,25 @@ pub enum GbType {
     Float(f64),
     Boolean(bool),
     String(String),
-    Function(Rc<dyn GbFunc>),
+    Function(Rc<dyn GbFunc>, Option<Environment>),
     Namespace(HashMap<String, Rc<GbType>>),
     ReturnValue(Box<GbType>),
 }
 
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+pub struct GbError {
+    pub token: Option<Token>,
+    pub kind: GbErrorKind,
+}
+
+impl std::fmt::Display for GbError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.kind)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub enum GbError {
+pub enum GbErrorKind {
     MisplacedReturn,
     InvalidOperatorForTypes {
         left: String,
@@ -77,45 +94,45 @@ pub enum GbError {
     AttemptedToCallNonFunctionType,
 }
 
-impl fmt::Display for GbError {
+impl fmt::Display for GbErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GbError::MisplacedReturn => write!(
+            GbErrorKind::MisplacedReturn => write!(
                 f,
                 "Misplaced Return: Return is only allowed within a function"
             ),
-            GbError::InvalidOperatorForTypes { left, right, op } => write!(
+            GbErrorKind::InvalidOperatorForTypes { left, right, op } => write!(
                 f,
                 "Invalid Operator: Cannot perform \"{}\" between {} and {}",
                 op, left, right
             ),
-            GbError::InvalidOperatorForType { operand, operator } => write!(
+            GbErrorKind::InvalidOperatorForType { operand, operator } => write!(
                 f,
                 "Invalid Operator: Cannot perform \"{}\" on {}",
                 operator, operand,
             ),
-            GbError::WrongTypeInFunctionArg => {
+            GbErrorKind::WrongTypeInFunctionArg => {
                 write!(f, "Wrong type in function argument")
             }
-            GbError::FailedToResolveNameLookup => {
+            GbErrorKind::FailedToResolveNameLookup => {
                 write!(f, "Failed to resolve name lookup")
             }
-            GbError::ConditionalMustEvaluateToBool => {
+            GbErrorKind::ConditionalMustEvaluateToBool => {
                 write!(f, "Conditional must evaluate to bool")
             }
-            GbError::VariableUsedBeforeDeclaration => {
+            GbErrorKind::VariableUsedBeforeDeclaration => {
                 write!(f, "Variable used before declaration")
             }
-            GbError::VariableCannotBeAssignedToType => {
+            GbErrorKind::VariableCannotBeAssignedToType => {
                 write!(f, "Variable cannot be assigned to type")
             }
-            GbError::FunctionMayNotBeMutated => {
+            GbErrorKind::FunctionMayNotBeMutated => {
                 write!(f, "Function types may not be mutated")
             }
-            GbError::DotLookupOnlyApplicableToIdentifiers => {
+            GbErrorKind::DotLookupOnlyApplicableToIdentifiers => {
                 write!(f, "Dot lookup only applicable to identifiers")
             }
-            GbError::AttemptedToCallNonFunctionType => {
+            GbErrorKind::AttemptedToCallNonFunctionType => {
                 write!(f, "Attempted to call non function type")
             }
         }
@@ -163,11 +180,13 @@ pub fn gb_eq(left: GbType, right: GbType) -> Result<bool, GbError> {
         (GbType::Boolean(l), GbType::Boolean(r)) => Ok(l.eq(r)),
         (GbType::None, GbType::None) => Ok(true),
         (GbType::Empty, GbType::Empty) => Ok(true),
-        (GbType::Error(_, _), GbType::Error(_, _)) => Ok(false),
-        _ => Err(GbError::InvalidOperatorForTypes {
-            left: left.to_string(),
-            right: right.to_string(),
-            op: String::from("=="),
+        _ => Err(GbError {
+            token: None,
+            kind: GbErrorKind::InvalidOperatorForTypes {
+                left: left.to_string(),
+                right: right.to_string(),
+                op: String::from("=="),
+            },
         }),
     }
 }
@@ -178,20 +197,17 @@ pub fn variant_eq<T>(a: &T, b: &T) -> bool {
 
 pub fn gb_pow(left: GbType, right: GbType) -> Result<GbType, GbError> {
     match (&left, &right) {
-        (GbType::Integer(x), GbType::Integer(y)) => {
-            Ok(GbType::Integer(i64::pow(*x, *y as u32)))
-        }
-        (GbType::Integer(x), GbType::Float(y)) => {
-            Ok(GbType::Float(f64::powf(*x as f64, *y)))
-        }
+        (GbType::Integer(x), GbType::Integer(y)) => Ok(GbType::Integer(i64::pow(*x, *y as u32))),
+        (GbType::Integer(x), GbType::Float(y)) => Ok(GbType::Float(f64::powf(*x as f64, *y))),
         (GbType::Float(x), GbType::Float(y)) => Ok(GbType::Float(f64::powf(*x, *y))),
-        (GbType::Float(x), GbType::Integer(y)) => {
-            Ok(GbType::Float(f64::powf(*x, *y as f64)))
-        }
-        _ => Err(GbError::InvalidOperatorForTypes {
-            left: left.to_string(),
-            right: right.to_string(),
-            op: String::from("**"),
+        (GbType::Float(x), GbType::Integer(y)) => Ok(GbType::Float(f64::powf(*x, *y as f64))),
+        _ => Err(GbError {
+            token: None,
+            kind: GbErrorKind::InvalidOperatorForTypes {
+                left: left.to_string(),
+                right: right.to_string(),
+                op: String::from("**"),
+            },
         }),
     }
 }
@@ -230,14 +246,13 @@ pub fn gb_type_of(x: impl std::ops::Deref<Target = GbType>) -> String {
     match *x {
         GbType::Empty => "Empty",
         // TODO: Custom type representations for different errors
-        GbType::Error(_, _) => "Error",
         GbType::None => "None",
         GbType::Integer(_) => "Integer",
         GbType::Float(_) => "Float",
         GbType::Boolean(_) => "Boolean",
         GbType::String(_) => "String",
         GbType::Name(_) => "Name",
-        GbType::Function(_) => "Function",
+        GbType::Function(_, _) => "Function",
         GbType::ReturnValue(_) => "Return Value",
         GbType::Namespace(_) => "Namespace",
         GbType::ExitSignal(_) => "ExitSignal",
@@ -245,18 +260,21 @@ pub fn gb_type_of(x: impl std::ops::Deref<Target = GbType>) -> String {
     .into()
 }
 
-pub fn gb_not(operand: GbType) -> GbType {
-    let bool_ = gb_bool(operand);
+pub fn gb_not(operand: GbType) -> Result<GbType, GbError> {
+    let bool_ = gb_bool(operand.clone());
     match bool_ {
-        GbType::Boolean(x) => GbType::Boolean(!x),
-        _ => unreachable!(),
+        GbType::Boolean(x) => Ok(GbType::Boolean(!x)),
+        _ => Err(GbError {
+            token: None,
+            kind: GbErrorKind::InvalidOperatorForType {
+                operand: "!".to_string(),
+                operator: gb_type_of(&operand),
+            }
+        })
     }
 }
 
-pub fn gb_cmp(
-    left: GbType,
-    right: GbType,
-) -> Result<Option<std::cmp::Ordering>, GbError> {
+pub fn gb_cmp(left: GbType, right: GbType) -> Result<Option<std::cmp::Ordering>, GbError> {
     match (&left, &right) {
         (GbType::Integer(x), GbType::Integer(y)) => Ok(x.partial_cmp(y)),
         (GbType::Integer(x), GbType::Float(y)) => {
@@ -268,10 +286,13 @@ pub fn gb_cmp(
             let y = *y as f64;
             Ok(x.partial_cmp(&y))
         }
-        _ => Err(GbError::InvalidOperatorForTypes {
-            left: left.to_string(),
-            right: right.to_string(),
-            op: String::from("<>"),
+        _ => Err(GbError {
+            token: None,
+            kind: GbErrorKind::InvalidOperatorForTypes {
+                left: left.to_string(),
+                right: right.to_string(),
+                op: String::from("<>"),
+            },
         }),
     }
 }
@@ -287,10 +308,13 @@ pub fn gb_add(left: GbType, right: GbType) -> Result<GbType, GbError> {
             x.push_str(y);
             GbType::String(x)
         }),
-        _ => Err(GbError::InvalidOperatorForTypes {
-            left: left.to_string(),
-            right: right.to_string(),
-            op: String::from("+"),
+        _ => Err(GbError {
+            token: None,
+            kind: GbErrorKind::InvalidOperatorForTypes {
+                left: left.to_string(),
+                right: right.to_string(),
+                op: String::from("+"),
+            },
         }),
     }
 }
@@ -301,10 +325,13 @@ pub fn gb_sub(left: GbType, right: GbType) -> Result<GbType, GbError> {
         (GbType::Integer(x), GbType::Float(y)) => Ok(GbType::Float(*x as f64 - y)),
         (GbType::Float(x), GbType::Float(y)) => Ok(GbType::Float(x - y)),
         (GbType::Float(x), GbType::Integer(y)) => Ok(GbType::Float(x - *y as f64)),
-        _ => Err(GbError::InvalidOperatorForTypes {
-            left: left.to_string(),
-            right: right.to_string(),
-            op: String::from("-"),
+        _ => Err(GbError {
+            token: None,
+            kind: GbErrorKind::InvalidOperatorForTypes {
+                left: left.to_string(),
+                right: right.to_string(),
+                op: String::from("-"),
+            },
         }),
     }
 }
@@ -315,10 +342,13 @@ pub fn gb_mul(left: GbType, right: GbType) -> Result<GbType, GbError> {
         (GbType::Integer(x), GbType::Float(y)) => Ok(GbType::Float(*x as f64 * y)),
         (GbType::Float(x), GbType::Integer(y)) => Ok(GbType::Float(x * *y as f64)),
         (GbType::Float(x), GbType::Float(y)) => Ok(GbType::Float(x * y)),
-        _ => Err(GbError::InvalidOperatorForTypes {
-            left: left.to_string(),
-            right: right.to_string(),
-            op: String::from("*"),
+        _ => Err(GbError {
+            token: None,
+            kind: GbErrorKind::InvalidOperatorForTypes {
+                left: left.to_string(),
+                right: right.to_string(),
+                op: String::from("*"),
+            },
         }),
     }
 }
@@ -329,10 +359,13 @@ pub fn gb_div(left: GbType, right: GbType) -> Result<GbType, GbError> {
         (GbType::Integer(x), GbType::Float(y)) => Ok(GbType::Float(*x as f64 / y)),
         (GbType::Float(x), GbType::Integer(y)) => Ok(GbType::Float(x / *y as f64)),
         (GbType::Float(x), GbType::Float(y)) => Ok(GbType::Float(x / y)),
-        _ => Err(GbError::InvalidOperatorForTypes {
-            left: left.to_string(),
-            right: right.to_string(),
-            op: String::from("/"),
+        _ => Err(GbError {
+            token: None,
+            kind: GbErrorKind::InvalidOperatorForTypes {
+                left: left.to_string(),
+                right: right.to_string(),
+                op: String::from("/"),
+            },
         }),
     }
 }
@@ -348,8 +381,7 @@ impl std::fmt::Display for GbType {
                 GbType::String(x) => x.to_string(),
                 GbType::Boolean(x) => x.to_string(),
                 GbType::None => "None".to_string(),
-                GbType::Function(x) => format!("Function Object: {:?}", x),
-                GbType::Error(_tok, e) => format!("{:?}", e),
+                GbType::Function(_, _) => "Function Object".to_string(),
                 GbType::Name(x) => x.to_string(),
                 i => {
                     format!("No string formatter for {:?}", i)

@@ -35,7 +35,14 @@ Unexpected {:?}
     }
 
     fn runtime_error(&self, kind: GbError, token: Token) -> String {
-        let line = self.input.split('\n').nth(token.location.line - 1).unwrap();
+        let line = match self.input.split('\n').nth(token.location.line - 1) {
+            Some(l) => l,
+            None => {
+                tracing::error!("An error occurred: {}", kind);
+                tracing::error!("Failed to format the error: Line number could not be found in the input\n\t\tInput: {}\n\t\tLine: {}", self.input, token.location.line - 1);
+                std::process::exit(1);
+            }
+        };
         let padding = " ".repeat(token.location.col - 1);
         format!(
             "\

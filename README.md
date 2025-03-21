@@ -105,6 +105,21 @@ Outputs:
 > 55
 ```
 
+## Closures
+```
+fn foo() {
+    let x = 7;
+    return fn() {
+        return x + 1;
+    }
+}
+
+fn main() {
+    let a = foo();
+    print(a); // prints "8"
+}
+```
+
 ## Optional Main Function
 
 Gb will automatically execute any top-level function named `main`, but this is

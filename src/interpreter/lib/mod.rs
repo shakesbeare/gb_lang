@@ -3,8 +3,7 @@ use std::rc::Rc;
 use crate::token::Token;
 
 use super::{
-    gb_type::{GbError, GbFunc, GbType},
-    InterpreterStrategy,
+    environment::Environment, gb_type::{GbError, GbFunc, GbType}, GbErrorKind, InterpreterStrategy
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -20,7 +19,7 @@ impl GbPrint {
     }
 
     pub(super) fn export(self) -> GbType {
-        GbType::Function(Rc::new(self))
+        GbType::Function(Rc::new(self), None)
     }
 }
 
@@ -30,9 +29,10 @@ impl GbFunc for GbPrint {
         _strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
         _token: Token,
-    ) -> GbType {
+        _env: Option<Environment>
+    ) -> Result<GbType, GbError> {
         self.print(args);
-        GbType::None
+        Ok(GbType::None)
     }
 }
 
@@ -45,7 +45,7 @@ impl GbToString {
     }
 
     pub(super) fn export(self) -> GbType {
-        GbType::Function(Rc::new(self))
+        GbType::Function(Rc::new(self), None)
     }
 }
 
@@ -55,11 +55,12 @@ impl GbFunc for GbToString {
         _strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
         _token: Token,
-    ) -> GbType {
+        _env: Option<Environment>
+    ) -> Result<GbType, GbError> {
         if args.len() > 1 {
             panic!("Too many arguments");
         }
-        self.to_string(&args[0])
+        Ok(self.to_string(&args[0]))
     }
 }
 
@@ -75,7 +76,7 @@ impl GbDump {
     }
 
     pub(super) fn export(self) -> GbType {
-        GbType::Function(Rc::new(self))
+        GbType::Function(Rc::new(self), None)
     }
 }
 
@@ -85,11 +86,12 @@ impl GbFunc for GbDump {
         strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
         _token: Token,
-    ) -> GbType {
+        _env: Option<Environment>
+    ) -> Result<GbType, GbError> {
         if !args.is_empty() {
             panic!("Too many arguments");
         }
-        self.dump(strategy)
+        Ok(self.dump(strategy))
     }
 }
 
@@ -99,17 +101,18 @@ pub(super) struct GbExit {}
 impl GbExit {
     /// Exits the program gracefully
     /// Panics if the provided exit code is not representable as an i32
-    pub(super) fn exit(&self, _token: Token, code: GbType) -> GbType {
+    pub(super) fn exit(&self, token: Token, code: GbType) -> Result<GbType, GbError> {
         match code {
-            GbType::Integer(i) => {
-                GbType::ReturnValue(Box::new(GbType::ExitSignal(i as i32)))
-            }
-            _ => GbType::Error(Token::eof(), GbError::WrongTypeInFunctionArg),
+            GbType::Integer(i) => Ok(GbType::ReturnValue(Box::new(GbType::ExitSignal(i as i32)))),
+            _ => Err(GbError {
+                token: Some(token),
+                kind: GbErrorKind::WrongTypeInFunctionArg,
+            }),
         }
     }
 
     pub(super) fn export(self) -> GbType {
-        GbType::Function(Rc::new(self))
+        GbType::Function(Rc::new(self), None)
     }
 }
 
@@ -119,7 +122,8 @@ impl GbFunc for GbExit {
         _strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
         token: Token,
-    ) -> GbType {
+        _env: Option<Environment>
+    ) -> Result<GbType, GbError> {
         if args.len() > 1 {
             panic!("Too many arguments");
         } else if args.is_empty() {

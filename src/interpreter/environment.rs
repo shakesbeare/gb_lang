@@ -37,6 +37,10 @@ impl Environment {
         }
         out
     }
+
+    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, Rc<str>, GbType> {
+        self.symbol_table.iter()
+    }
 }
 
 impl Default for Environment {

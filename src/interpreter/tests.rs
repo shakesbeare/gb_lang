@@ -176,14 +176,15 @@ fn function_literal_statement() {
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate().unwrap();
     let map = &i.strategy.top_env();
-    let GbType::Function(ptr) = map.get("foo").unwrap().clone() else {
+    let GbType::Function(ptr, _) = map.get("foo").unwrap().clone() else {
         panic!("Expected GbType::Function, got {:?}", res);
     };
     let actual = ptr.execute(
         &mut i.strategy,
         &[GbType::Integer(3), GbType::Integer(4)],
         Token::eof(),
-    );
+        None,
+    ).unwrap();
     assert!(matches!(actual, GbType::Integer(7)));
 }
 
@@ -193,14 +194,15 @@ fn function_literal() {
     let input = "fn (x, y) { x + y }";
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let res = i.evaluate().unwrap();
-    let GbType::Function(ptr) = res else {
+    let GbType::Function(ptr, _) = res else {
         panic!("Expected GbType::Function, got {:?}", res);
     };
     let actual = ptr.execute(
         &mut i.strategy,
         &[GbType::Integer(3), GbType::Integer(4)],
         Token::eof(),
-    );
+        None,
+    ).unwrap();
     assert!(matches!(actual, GbType::Integer(7)));
 }
 
@@ -379,3 +381,53 @@ fn dot_lookup() {
     let res = i.evaluate().unwrap();
     assert!(gb_type_of(&res) == "Function");
 }
+
+#[test]
+#[traced_test]
+fn global_variables() {
+    let input = r#"
+    let x = 7;
+    fn main() {
+        x = x + 1;
+    }
+    "#;
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let _ = i.evaluate().unwrap();
+}
+
+#[test]
+#[traced_test]
+fn closure() {
+    let input = r#"
+    fn foo() {
+        let x = 7;
+        fn bar() {
+            return x + 1;
+        }
+        let y = bar();
+
+        return bar;
+    }
+
+    fn baz() {
+        let x = 7;
+
+        return fn() {
+            return x + 1;
+        }
+    }
+
+    fn main() {
+        let bar = foo()
+        let a = bar();
+
+        let b = baz();
+        let c = b();
+    }
+        "#;
+
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let _ = i.evaluate().unwrap();
+}
+
+
