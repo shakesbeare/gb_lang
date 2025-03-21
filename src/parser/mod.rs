@@ -99,6 +99,7 @@ impl<'a, R: Read> Parser<'a, R> {
         p.register_prefix(TokenKind::FloatLiteral, Parser::parse_float_literal);
         p.register_prefix(TokenKind::StringLiteral, Parser::parse_string_literal);
         p.register_prefix(TokenKind::Bang, Parser::parse_prefix_expression);
+        p.register_prefix(TokenKind::Ref, Parser::parse_prefix_expression);
         p.register_prefix(TokenKind::Subtract, Parser::parse_prefix_expression);
         p.register_prefix(TokenKind::True, Parser::parse_boolean);
         p.register_prefix(TokenKind::False, Parser::parse_boolean);

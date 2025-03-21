@@ -54,6 +54,7 @@ impl Default for Environment {
         );
         r#std.insert("print".into(), super::lib::GbPrint {}.export().into());
         r#std.insert("exit".into(), super::lib::GbExit {}.export().into());
+        r#std.insert("assert".into(), super::lib::GbAssert {}.export().into());
 
         stable.insert("None".into(), GbType::None);
         stable.insert("exit".into(), super::lib::GbExit {}.export());

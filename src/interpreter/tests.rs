@@ -425,3 +425,58 @@ fn closure() {
     let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
     let _ = i.evaluate().unwrap();
 }
+
+#[test]
+#[traced_test]
+#[should_panic]
+fn cant_take_ref_to_non_ref() {
+    let input = r#"
+    let x = 7;
+    let y = &x;
+    "#;
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let _ = i.evaluate().unwrap();
+}
+
+#[test]
+#[traced_test]
+fn ref_modify_in_place() {
+    let input = r#"
+    let x = &7;
+    let y = &x;
+    y = 1;
+    std.assert(x == 1);
+    "#;
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let _ = i.evaluate().unwrap();
+}
+
+#[test]
+#[traced_test]
+fn ref_insane_aliasing() {
+    let input = r#"
+    let x = &7;
+    let y = &x;
+    y = y + 1;
+    std.assert(x == 8);
+    "#;
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let _ = i.evaluate().unwrap();
+}
+
+#[test]
+#[traced_test]
+#[should_panic]
+fn assert_false() {
+    let input = r#"std.assert(false);"#;
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let _ = i.evaluate().unwrap();
+}
+
+#[test]
+#[traced_test]
+fn assert_true() {
+    let input = r#"std.assert(true);"#;
+    let mut i = Interpreter::new(TreeWalking::default(), input.to_string()).unwrap();
+    let _ = i.evaluate().unwrap();
+}

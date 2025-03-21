@@ -20,6 +20,11 @@ use crate::{
 use gb_type::*;
 use std::collections::HashMap;
 
+pub enum NameLocation {
+    Stack(usize),
+    Heap(Rc<str>),
+}
+
 pub trait InterpreterStrategy {
     fn eval(
         &mut self,
@@ -33,7 +38,7 @@ pub trait InterpreterStrategy {
     fn stack(&self) -> &[Environment];
     //TODO: Use a result instead
     fn pop_env(&mut self) -> Option<()>;
-    fn loose_envs(&self) -> &HashMap<Rc<str>, Environment>;
+    fn heap(&mut self) -> &mut Environment;
 }
 
 pub struct Interpreter<T: InterpreterStrategy> {
@@ -121,7 +126,7 @@ impl<T: InterpreterStrategy> Interpreter<T> {
 #[derive(Debug)]
 pub struct TreeWalking {
     stack: Vec<Environment>,
-    loose_envs: HashMap<Rc<str>, Environment>,
+    heap: Environment,
     loaded_files: Vec<String>,
 }
 
@@ -171,8 +176,8 @@ impl InterpreterStrategy for TreeWalking {
         &self.stack
     }
 
-    fn loose_envs(&self) -> &HashMap<Rc<str>, Environment> {
-        &self.loose_envs
+    fn heap(&mut self) -> &mut Environment {
+        &mut self.heap
     }
 
     fn pop_env(&mut self) -> Option<()> {
@@ -195,7 +200,7 @@ impl TreeWalking {
         Self {
             stack,
             loaded_files: vec![],
-            loose_envs: HashMap::new(),
+            heap: Environment::new(HashMap::new()),
         }
     }
 
@@ -210,25 +215,56 @@ impl TreeWalking {
             } else if idx > 0 {
                 idx -= 1;
             } else {
-                return None;
+                break;
             }
         }
+
+        if let Some(val) = self.heap.get(key) {
+            return Some(val);
+        }
+
+        None
     }
 
-    fn lookup_name_location<T: Into<Rc<str>>>(&mut self, key: T) -> Option<usize> {
+    fn lookup_name_location<T: Into<Rc<str>>>(&self, key: T) -> Option<NameLocation> {
         let key = key.into();
         let mut idx = self.stack.len() - 1;
         loop {
             let env = self.stack.get(idx).unwrap();
             let value = env.get(key.clone());
             if value.is_some() {
-                return Some(idx);
+                return Some(NameLocation::Stack(idx));
             } else if idx > 0 {
                 idx -= 1;
             } else {
-                return None;
+                break;
             }
         }
+
+        if self.heap.get(key.clone()).is_some() {
+            return Some(NameLocation::Heap(key));
+        }
+
+        None
+    }
+
+    pub fn gb_deref(&self, item: GbType) -> GbType {
+        let mut item = item;
+        if let GbType::Name(x) = item {
+            item = self.lookup(x).unwrap().clone();
+        }
+        while let GbType::Reference(inner) = item {
+            match inner {
+                GbReference::Name(n) => {
+                    item = self.lookup(n).unwrap().clone();
+                }
+                GbReference::Value(val) => {
+                    item = *val;
+                }
+            }
+        }
+
+        item
     }
 
     fn dot_lookup(
@@ -411,8 +447,21 @@ impl TreeWalking {
         function_context: bool,
     ) -> Result<GbType, GbError> {
         let value = self.eval_expr(&input.value, function_context)?;
-        self.top_env().insert(input.name.value(), value);
-        Ok(GbType::Name(input.name.value().to_string()))
+
+        if gb_type_of(&value)[0..1] == *"&" {
+            if let Expression::PrefixExpression(x) = input.value.as_ref().clone() {
+                if let Expression::Identifier(ref x) = x.right.as_ref() {
+                    // we are assigning this variable to a reference to another variable
+                    self.top_env()
+                        .insert(input.name.value(), GbType::Name(x.value().into()));
+                    return Ok(GbType::Reference(GbReference::Name(x.value().into())));
+                }
+            }
+            self.heap.insert(input.name.value(), value);
+        } else {
+            self.top_env().insert(input.name.value(), value);
+        }
+        Ok(GbType::Name(input.name.value().into()))
     }
 
     #[instrument(skip_all)]
@@ -457,6 +506,23 @@ impl TreeWalking {
                 self.eval_expr(&expr.right, function_context)?,
             ),
             "!" => gb_not(self.eval_expr(&expr.right, function_context)?),
+            "&" => {
+                let rhs = self.eval_expr(&expr.right, function_context)?;
+                // if the rhs is an identifier, we need to check if the
+                // value behind it is a reference type
+                if let Expression::Identifier(i) = expr.right.as_ref() {
+                    if let GbType::Reference(_) = rhs {
+                        return Ok(GbType::Reference(GbReference::Name(i.value().into())));
+                    }
+                    return Err(GbError {
+                        token: Some(expr.token.clone()),
+                        kind: GbErrorKind::CantTakeReferenceToNonReferenceType,
+                    });
+                }
+
+                // otherwise, take the reference as normal
+                Ok(GbType::Reference(GbReference::Value(Box::new(rhs))))
+            }
             _ => unreachable!(),
         }
     }
@@ -470,10 +536,9 @@ impl TreeWalking {
         tracing::trace!("Doing {:?}", expr.operator.as_str());
         match expr.operator.as_str() {
             "+" => {
-                let res = gb_add(
-                    self.eval_expr(&expr.left, function_context)?,
-                    self.eval_expr(&expr.right, function_context)?,
-                );
+                let left = self.eval_expr(&expr.left, function_context)?;
+                let right = self.eval_expr(&expr.right, function_context)?;
+                let res = gb_add(self.gb_deref(left), self.gb_deref(right));
                 if let Err(mut e) = res {
                     let _ = e.token.insert(expr.token.clone());
                     return Err(e);
@@ -481,10 +546,9 @@ impl TreeWalking {
                 res
             }
             "*" => {
-                let res = gb_mul(
-                    self.eval_expr(&expr.left, function_context)?,
-                    self.eval_expr(&expr.right, function_context)?,
-                );
+                let left = self.eval_expr(&expr.left, function_context)?;
+                let right = self.eval_expr(&expr.right, function_context)?;
+                let res = gb_mul(self.gb_deref(left), self.gb_deref(right));
                 if let Err(mut e) = res {
                     let _ = e.token.insert(expr.token.clone());
                     return Err(e);
@@ -492,10 +556,9 @@ impl TreeWalking {
                 res
             }
             "-" => {
-                let res = gb_sub(
-                    self.eval_expr(&expr.left, function_context)?,
-                    self.eval_expr(&expr.right, function_context)?,
-                );
+                let left = self.eval_expr(&expr.left, function_context)?;
+                let right = self.eval_expr(&expr.right, function_context)?;
+                let res = gb_sub(self.gb_deref(left), self.gb_deref(right));
                 if let Err(mut e) = res {
                     let _ = e.token.insert(expr.token.clone());
                     return Err(e);
@@ -503,10 +566,9 @@ impl TreeWalking {
                 res
             }
             "/" => {
-                let res = gb_div(
-                    self.eval_expr(&expr.left, function_context)?,
-                    self.eval_expr(&expr.right, function_context)?,
-                );
+                let left = self.eval_expr(&expr.left, function_context)?;
+                let right = self.eval_expr(&expr.right, function_context)?;
+                let res = gb_div(self.gb_deref(left), self.gb_deref(right));
                 if let Err(mut e) = res {
                     let _ = e.token.insert(expr.token.clone());
                     return Err(e);
@@ -514,10 +576,9 @@ impl TreeWalking {
                 res
             }
             ">" => {
-                let res = gb_cmp(
-                    self.eval_expr(&expr.left, function_context)?,
-                    self.eval_expr(&expr.right, function_context)?,
-                );
+                let left = self.eval_expr(&expr.left, function_context)?;
+                let right = self.eval_expr(&expr.right, function_context)?;
+                let res = gb_cmp(self.gb_deref(left), self.gb_deref(right));
                 match res {
                     Ok(ordering) => Ok(GbType::Boolean(matches!(
                         ordering,
@@ -530,10 +591,9 @@ impl TreeWalking {
                 }
             }
             "<" => {
-                let res = gb_cmp(
-                    self.eval_expr(&expr.left, function_context)?,
-                    self.eval_expr(&expr.right, function_context)?,
-                );
+                let left = self.eval_expr(&expr.left, function_context)?;
+                let right = self.eval_expr(&expr.right, function_context)?;
+                let res = gb_cmp(self.gb_deref(left), self.gb_deref(right));
                 match res {
                     Ok(ordering) => Ok(GbType::Boolean(matches!(
                         ordering,
@@ -546,10 +606,9 @@ impl TreeWalking {
                 }
             }
             "==" => {
-                let res = gb_eq(
-                    self.eval_expr(&expr.left, function_context)?,
-                    self.eval_expr(&expr.right, function_context)?,
-                );
+                let left = self.eval_expr(&expr.left, function_context)?;
+                let right = self.eval_expr(&expr.right, function_context)?;
+                let res = gb_eq(self.gb_deref(left), self.gb_deref(right));
                 match res {
                     Ok(equal) => Ok(GbType::Boolean(equal)),
                     Err(mut e) => {
@@ -559,10 +618,9 @@ impl TreeWalking {
                 }
             }
             "!=" => {
-                let res = gb_eq(
-                    self.eval_expr(&expr.left, function_context)?,
-                    self.eval_expr(&expr.right, function_context)?,
-                );
+                let left = self.eval_expr(&expr.left, function_context)?;
+                let right = self.eval_expr(&expr.right, function_context)?;
+                let res = gb_eq(self.gb_deref(left), self.gb_deref(right));
                 match res {
                     Ok(equal) => Ok(GbType::Boolean(!equal)),
                     Err(mut e) => {
@@ -572,10 +630,9 @@ impl TreeWalking {
                 }
             }
             "**" => {
-                let res = gb_pow(
-                    self.eval_expr(&expr.left, function_context)?,
-                    self.eval_expr(&expr.right, function_context)?,
-                );
+                let left = self.eval_expr(&expr.left, function_context)?;
+                let right = self.eval_expr(&expr.right, function_context)?;
+                let res = gb_pow(self.gb_deref(left), self.gb_deref(right));
                 if let Err(mut e) = res {
                     let _ = e.token.insert(expr.token.clone());
                     return Err(e);
@@ -590,12 +647,6 @@ impl TreeWalking {
                     });
                 };
 
-                let Some(env_location) = self.lookup_name_location(key.value()) else {
-                    return Err(GbError {
-                        token: Some(key.token.clone()),
-                        kind: GbErrorKind::VariableUsedBeforeDeclaration,
-                    });
-                };
                 let current_value = self.lookup(key.value()).unwrap();
                 if let GbType::Function(_, _) = current_value {
                     return Err(GbError {
@@ -604,23 +655,48 @@ impl TreeWalking {
                     });
                 }
 
-                let curr = current_value.clone();
+                let env_location = if let GbType::Name(target) = current_value {
+                    self.lookup_name_location(target.clone())
+                } else {
+                    self.lookup_name_location(key.value())
+                };
+
+                let env_location = match env_location {
+                    Some(v) => v,
+                    None => {
+                        return Err(GbError {
+                            token: Some(key.token.clone()),
+                            kind: GbErrorKind::VariableUsedBeforeDeclaration,
+                        })
+                    }
+                };
+
+                let mut curr = current_value.clone();
                 let value = self.eval_expr(&expr.right, function_context)?;
-                if !variant_eq(&curr, &value) {
+                if let GbType::Name(ref name) = curr {
+                    curr = self.lookup(name.clone()).unwrap().clone();
+                }
+                if !variant_eq(&self.gb_deref(curr), &value) {
                     return Err(GbError {
                         token: Some(expr.right.token()),
                         kind: GbErrorKind::VariableCannotBeAssignedToType,
                     });
                 }
-                self.stack[env_location].insert(key.value(), value);
+                match env_location {
+                    NameLocation::Stack(idx) => {
+                        self.stack[idx].insert(key.value(), value);
+                    }
+                    NameLocation::Heap(key) => {
+                        *self.heap.get_mut(key).unwrap() = value;
+                    }
+                }
 
                 Ok(GbType::None)
             }
             ">=" => {
-                let res = gb_cmp(
-                    self.eval_expr(&expr.left, function_context)?,
-                    self.eval_expr(&expr.right, function_context)?,
-                );
+                let left = self.eval_expr(&expr.left, function_context)?;
+                let right = self.eval_expr(&expr.right, function_context)?;
+                let res = gb_cmp(self.gb_deref(left), self.gb_deref(right));
                 match res {
                     Ok(ordering) => Ok(GbType::Boolean(matches!(
                         ordering,
@@ -633,10 +709,9 @@ impl TreeWalking {
                 }
             }
             "<=" => {
-                let res = gb_cmp(
-                    self.eval_expr(&expr.left, function_context)?,
-                    self.eval_expr(&expr.right, function_context)?,
-                );
+                let left = self.eval_expr(&expr.left, function_context)?;
+                let right = self.eval_expr(&expr.right, function_context)?;
+                let res = gb_cmp(self.gb_deref(left), self.gb_deref(right));
                 match res {
                     Ok(ordering) => Ok(GbType::Boolean(matches!(
                         ordering,

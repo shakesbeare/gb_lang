@@ -50,7 +50,7 @@ pub enum GbType {
     /// `exit()`
     ExitSignal(i32),
     /// Represents the name of an object
-    Name(String),
+    Name(Rc<str>),
     Integer(i64),
     Float(f64),
     Boolean(bool),
@@ -58,6 +58,13 @@ pub enum GbType {
     Function(Rc<dyn GbFunc>, Option<Environment>),
     Namespace(HashMap<String, Rc<GbType>>),
     ReturnValue(Box<GbType>),
+    Reference(GbReference),
+}
+
+#[derive(Debug, Clone)]
+pub enum GbReference {
+    Name(Rc<str>),
+    Value(Box<GbType>),
 }
 
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
@@ -92,6 +99,12 @@ pub enum GbErrorKind {
     FunctionMayNotBeMutated,
     DotLookupOnlyApplicableToIdentifiers,
     AttemptedToCallNonFunctionType,
+    WrongNumberOfArgs {
+        actual: usize,
+        expected: usize,
+    },
+    AssertionError,
+    CantTakeReferenceToNonReferenceType,
 }
 
 impl fmt::Display for GbErrorKind {
@@ -135,6 +148,15 @@ impl fmt::Display for GbErrorKind {
             GbErrorKind::AttemptedToCallNonFunctionType => {
                 write!(f, "Attempted to call non function type")
             }
+            GbErrorKind::AssertionError => {
+                write!(f, "Assertion Error")
+            }
+            GbErrorKind::WrongNumberOfArgs { actual, expected } => {
+                write!(f, "Function expected {} args but got {}", expected, actual)
+            }
+            GbErrorKind::CantTakeReferenceToNonReferenceType => {
+                write!(f, "Can't take reference to non reference type")
+            }
         }
     }
 }
@@ -170,6 +192,10 @@ impl GbType {
     }
 }
 
+pub fn variant_eq<T>(a: &T, b: &T) -> bool {
+    std::mem::discriminant(a) == std::mem::discriminant(b)
+}
+
 pub fn gb_eq(left: GbType, right: GbType) -> Result<bool, GbError> {
     // function types should never evaluate as equal to each other
     match (&left, &right) {
@@ -190,11 +216,6 @@ pub fn gb_eq(left: GbType, right: GbType) -> Result<bool, GbError> {
         }),
     }
 }
-
-pub fn variant_eq<T>(a: &T, b: &T) -> bool {
-    std::mem::discriminant(a) == std::mem::discriminant(b)
-}
-
 pub fn gb_pow(left: GbType, right: GbType) -> Result<GbType, GbError> {
     match (&left, &right) {
         (GbType::Integer(x), GbType::Integer(y)) => Ok(GbType::Integer(i64::pow(*x, *y as u32))),
@@ -239,25 +260,6 @@ pub fn gb_bool(x: GbType) -> GbType {
         }
         _ => GbType::Boolean(false),
     }
-}
-
-/// Returns a string representation of the type of the input
-pub fn gb_type_of(x: impl std::ops::Deref<Target = GbType>) -> String {
-    match *x {
-        GbType::Empty => "Empty",
-        // TODO: Custom type representations for different errors
-        GbType::None => "None",
-        GbType::Integer(_) => "Integer",
-        GbType::Float(_) => "Float",
-        GbType::Boolean(_) => "Boolean",
-        GbType::String(_) => "String",
-        GbType::Name(_) => "Name",
-        GbType::Function(_, _) => "Function",
-        GbType::ReturnValue(_) => "Return Value",
-        GbType::Namespace(_) => "Namespace",
-        GbType::ExitSignal(_) => "ExitSignal",
-    }
-    .into()
 }
 
 pub fn gb_not(operand: GbType) -> Result<GbType, GbError> {
@@ -370,6 +372,28 @@ pub fn gb_div(left: GbType, right: GbType) -> Result<GbType, GbError> {
     }
 }
 
+/// Returns a string representation of the type of the input
+pub fn gb_type_of(x: impl std::ops::Deref<Target = GbType>) -> String {
+    match *x {
+        GbType::Empty => "Empty".to_string(),
+        // TODO: Custom type representations for different errors
+        GbType::None => "None".to_string(),
+        GbType::Integer(_) => "Integer".to_string(),
+        GbType::Float(_) => "Float".to_string(),
+        GbType::Boolean(_) => "Boolean".to_string(),
+        GbType::String(_) => "String".to_string(),
+        GbType::Name(_) => "Name".to_string(),
+        GbType::Function(_, _) => "Function".to_string(),
+        GbType::ReturnValue(_) => "Return Value".to_string(),
+        GbType::Namespace(_) => "Namespace".to_string(),
+        GbType::ExitSignal(_) => "ExitSignal".to_string(),
+        GbType::Reference(ref target) => match target {
+            GbReference::Name(v) => format!("&{}", v),
+            GbReference::Value(v) => format!("&{}", v.as_ref()),
+        },
+    }
+}
+
 impl std::fmt::Display for GbType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -383,6 +407,10 @@ impl std::fmt::Display for GbType {
                 GbType::None => "None".to_string(),
                 GbType::Function(_, _) => "Function Object".to_string(),
                 GbType::Name(x) => x.to_string(),
+                GbType::Reference(ref target) => match target {
+                    GbReference::Name(_) => "&Variable".to_string(),
+                    GbReference::Value(v) => format!("&{}", gb_type_of(v.clone())),
+                },
                 i => {
                     format!("No string formatter for {:?}", i)
                 }

@@ -263,7 +263,7 @@ fn string_literal_expression() {
 #[test]
 #[traced_test]
 fn prefix_expression_1() {
-    let input: Vec<(&str, &str, i64)> = vec![("!5;", "!", 5), ("-15;", "-", 15)];
+    let input: Vec<(&str, &str, i64)> = vec![("!5;", "!", 5), ("-15;", "-", 15), ("&15", "&", 15)];
 
     for (inp, op, int) in input {
         let mut parser = Parser::new(

@@ -4,6 +4,7 @@ use crate::token::Token;
 
 use super::{
     environment::Environment,
+    gb_bool,
     gb_type::{GbError, GbFunc, GbType},
     GbErrorKind, InterpreterStrategy,
 };
@@ -56,11 +57,17 @@ impl GbFunc for GbToString {
         &self,
         _strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
-        _token: Token,
+        token: Token,
         _env: Option<Environment>,
     ) -> Result<GbType, GbError> {
         if args.len() > 1 {
-            panic!("Too many arguments");
+            return Err(GbError {
+                token: Some(token),
+                kind: GbErrorKind::WrongNumberOfArgs {
+                    actual: args.len(),
+                    expected: 1,
+                },
+            });
         }
         Ok(self.to_string(&args[0]))
     }
@@ -87,11 +94,17 @@ impl GbFunc for GbDump {
         &self,
         strategy: &mut dyn InterpreterStrategy,
         args: &[GbType],
-        _token: Token,
+        token: Token,
         _env: Option<Environment>,
     ) -> Result<GbType, GbError> {
         if !args.is_empty() {
-            panic!("Too many arguments");
+            return Err(GbError {
+                token: Some(token),
+                kind: GbErrorKind::WrongNumberOfArgs {
+                    actual: args.len(),
+                    expected: 0,
+                },
+            });
         }
         Ok(self.dump(strategy))
     }
@@ -126,12 +139,60 @@ impl GbFunc for GbExit {
         token: Token,
         _env: Option<Environment>,
     ) -> Result<GbType, GbError> {
-        if args.len() > 1 {
-            panic!("Too many arguments");
-        } else if args.is_empty() {
-            self.exit(token, GbType::Integer(0))
+        if args.len() != 1 {
+            Err(GbError {
+                token: Some(token),
+                kind: GbErrorKind::WrongNumberOfArgs {
+                    actual: args.len(),
+                    expected: 1,
+                },
+            })
         } else {
             self.exit(token, args[0].clone())
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct GbAssert {}
+
+impl GbAssert {
+    /// Asserts that the argument is true
+    /// Crashes the program if the arg is false
+    pub(super) fn assert(&self, token: Token, arg: GbType) -> Result<GbType, GbError> {
+        if matches!(gb_bool(arg.clone()), GbType::Boolean(false)) {
+            return Err(GbError {
+                token: Some(token),
+                kind: GbErrorKind::AssertionError,
+            });
+        }
+
+        Ok(GbType::None)
+    }
+
+    pub(super) fn export(self) -> GbType {
+        GbType::Function(Rc::new(self), None)
+    }
+}
+
+impl GbFunc for GbAssert {
+    fn execute(
+        &self,
+        _strategy: &mut dyn InterpreterStrategy,
+        args: &[GbType],
+        token: Token,
+        _env: Option<Environment>,
+    ) -> Result<GbType, GbError> {
+        if args.len() != 1 {
+            Err(GbError {
+                token: Some(token),
+                kind: GbErrorKind::WrongNumberOfArgs {
+                    actual: args.len(),
+                    expected: 1,
+                },
+            })
+        } else {
+            self.assert(token, args[0].clone())
         }
     }
 }
