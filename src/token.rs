@@ -80,6 +80,8 @@ pub enum TokenKind {
     LBracket,
     RBracket,
 
+    Ref,
+
     Comma,
     Semicolon,
     Eol,

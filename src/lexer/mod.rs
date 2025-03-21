@@ -293,6 +293,13 @@ impl<T: Read> Lexer<T> {
                     token: self.next_token.clone().unwrap(),
                 }
             }
+            '&' => {
+                let token = Token::new(char_read, TokenKind::Ref, (self.line, self.col));
+                self.next_token = Some(token);
+                LexStatus::Reading {
+                    token: self.next_token.clone().unwrap(),
+                }
+            }
             ';' => {
                 let token = Token::new(char_read, TokenKind::Semicolon, (self.line, self.col));
                 self.next_token = Some(token);
