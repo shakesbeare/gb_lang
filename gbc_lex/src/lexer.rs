@@ -124,6 +124,21 @@ impl<'a> Lexer<'a> {
             },
         })
     }
+
+    fn lex_comment(&mut self) -> Token<'a> {
+        let start = self.iter.get_position() - 1;
+        let col = self.iter.get_col() - 1;
+        self.read_until('\n', None);
+        let end = self.iter.get_position();
+        Token {
+            literal: self.iter.get_slice(start, end),
+            kind: TokenKind::Comment,
+            location: Location {
+                line: self.iter.get_line(),
+                col,
+            },
+        }
+    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
@@ -133,13 +148,14 @@ impl<'a> Iterator for Lexer<'a> {
         let char_read = self.iter.next()?;
         let peek = self.iter.peek();
 
-        let tok = match char_read {
-            c if c == '0' && peek.is_some() && *peek.unwrap() == 'x' => {
+        let tok = match (char_read, peek) {
+            (c, _) if c == '0' && peek.is_some() && *peek.unwrap() == 'x' => {
                 self.lex_hexadecimal()?
             }
-            c if c.is_numeric() => self.lex_decimal(),
-            c if c.is_alphabetic() || c == '_' => self.lex_identifier(),
-            '"' => self.lex_string_literal()?,
+            (c, _) if c.is_numeric() => self.lex_decimal(),
+            (c, _) if c.is_alphabetic() || c == '_' => self.lex_identifier(),
+            ('"', _) => self.lex_string_literal()?,
+            ('/', Some('/')) => self.lex_comment(),
             _ => todo!(),
         };
 
@@ -212,6 +228,15 @@ mod tests {
         let tok = Lexer::new(input).next().unwrap();
         assert_eq!(tok.literal, input);
         assert_eq!(tok.kind, TokenKind::StringLiteral);
+        assert_eq!(tok.location, Location { line: 0, col: 0 })
+    }
+
+    #[test]
+    fn lex_comment() {
+        let input = "// this is a comment";
+        let tok = Lexer::new(input).next().unwrap();
+        assert_eq!(tok.literal, input);
+        assert_eq!(tok.kind, TokenKind::Comment);
         assert_eq!(tok.location, Location { line: 0, col: 0 })
     }
 }

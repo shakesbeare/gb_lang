@@ -32,6 +32,7 @@ pub enum TokenKind {
     HexadecimalLiteral,
     StringLiteral,
     Identifier,
+    Comment,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
