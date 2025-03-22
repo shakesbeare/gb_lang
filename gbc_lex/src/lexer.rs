@@ -22,7 +22,7 @@ impl<'a> Lexer<'a> {
         self.print_errors = state;
     }
 
-    fn syntax_error(&mut self, message: &'static str) {
+    fn syntax_error(&mut self, message: &'static str) -> SyntaxError {
         let e = SyntaxError {
             location: Location {
                 line: self.iter.get_line(),
@@ -33,7 +33,8 @@ impl<'a> Lexer<'a> {
         if self.print_errors {
             println!("{}", e);
         }
-        self.errors.push(e);
+        self.errors.push(e.clone());
+        e
     }
 
     fn read_until(&mut self, needle: char, second: Option<char>) -> Option<()> {
@@ -82,7 +83,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn lex_hexadecimal(&mut self) -> Option<Token<'a>> {
+    fn lex_hexadecimal(&mut self) -> Result<Token<'a>, SyntaxError> {
         let start = self.iter.get_position() - 1;
         let col = self.iter.get_col() - 1;
         let line = self.iter.get_line();
@@ -93,10 +94,9 @@ impl<'a> Lexer<'a> {
         ) {}
         let end = self.iter.get_position();
         if end - start <= 2 {
-            self.syntax_error("Malformed Hexadecimal Literal");
-            return None;
+            return Err(self.syntax_error("Malformed Hexadecimal Literal"));
         }
-        Some(Token {
+        Ok(Token {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::HexadecimalLiteral,
             location: Location { line, col },
@@ -119,16 +119,15 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn lex_string_literal(&mut self) -> Option<Token<'a>> {
+    fn lex_string_literal(&mut self) -> Result<Token<'a>, SyntaxError> {
         let start = self.iter.get_position() - 1;
         let col = self.iter.get_col() - 1;
         let line = self.iter.get_line();
         if self.read_until('"', None).is_none() {
-            self.syntax_error("Unterminated string literal");
-            return None;
+            return Err(self.syntax_error("Unterminated string literal"));
         }
         let end = self.iter.get_position();
-        Some(Token {
+        Ok(Token {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::StringLiteral,
             location: Location { line, col },
@@ -163,35 +162,40 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Token<'a>;
+    type Item = Result<Token<'a>, SyntaxError>;
 
     /// Currently, returning None means `both` to stop iterating and that a syntax error occurred
     fn next(&mut self) -> Option<Self::Item> {
         let char_read = self.iter.next()?;
         let peek = self.iter.peek();
 
-        let tok = match (char_read, peek) {
+        // All infallible tokens must be wrapped in Ok()
+        // fallible lexing functions must return Result<Token<'a>, SyntaxError>
+        //     and need not be wrapped in Ok()
+        let lex_result = match (char_read, peek) {
             (c, _) if c.is_whitespace() => self.next()?,
             (c, _) if c == '0' && peek.is_some() && *peek.unwrap() == 'x' => {
-                self.lex_hexadecimal()?
+                self.lex_hexadecimal()
             }
-            (c, _) if c.is_numeric() => self.lex_decimal(),
-            (c, _) if c.is_alphabetic() || c == '_' => self.lex_identifier(),
-            ('"', _) => self.lex_string_literal()?,
-            ('/', Some('/')) => self.lex_comment(),
-            ('/', Some('*')) => self.lex_block_comment(),
-            ('(', None) => self.lex_single(TokenKind::LParen),
-            (')', None) => self.lex_single(TokenKind::RParen),
-            ('{', None) => self.lex_single(TokenKind::LBrace),
-            ('}', None) => self.lex_single(TokenKind::RBrace),
-            ('[', None) => self.lex_single(TokenKind::LBracket),
-            (']', None) => self.lex_single(TokenKind::RBracket),
+            (c, _) if c.is_numeric() => Ok(self.lex_decimal()),
+            (c, _) if c.is_alphabetic() || c == '_' => Ok(self.lex_identifier()),
+            ('"', _) => self.lex_string_literal(),
+            ('/', Some('/')) => Ok(self.lex_comment()),
+            ('/', Some('*')) => Ok(self.lex_block_comment()),
+            ('(', None) => Ok(self.lex_single(TokenKind::LParen)),
+            (')', None) => Ok(self.lex_single(TokenKind::RParen)),
+            ('{', None) => Ok(self.lex_single(TokenKind::LBrace)),
+            ('}', None) => Ok(self.lex_single(TokenKind::RBrace)),
+            ('[', None) => Ok(self.lex_single(TokenKind::LBracket)),
+            (']', None) => Ok(self.lex_single(TokenKind::RBracket)),
             _ => todo!(),
         };
 
-        Some(tok)
+        Some(lex_result)
     }
 }
+
+impl<'a> std::iter::FusedIterator for Lexer<'a> {}
 
 /// Returns the appropriate keyword token if the &str matches a keyword
 /// Otherwise, returns `TokenKind::Identifier`
@@ -216,7 +220,7 @@ mod tests {
     use super::*;
 
     fn simple_lex_test(input: &str, expected: TokenKind) {
-        let tok = Lexer::new(input).next().unwrap();
+        let tok = Lexer::new(input).next().unwrap().unwrap();
         assert_eq!(tok.literal, input);
         assert_eq!(tok.kind, expected);
         assert_eq!(tok.location, Location { line: 0, col: 0 })
@@ -279,8 +283,8 @@ mod tests {
     fn skip_whitespace() {
         let input = "    word     \n\t\r1234";
         let mut l = Lexer::new(input);
-        let first = l.next().unwrap();
-        let second = l.next().unwrap();
+        let first = l.next().unwrap().unwrap();
+        let second = l.next().unwrap().unwrap();
         assert_eq!(first.kind, TokenKind::Identifier);
         assert_eq!(second.kind, TokenKind::DecimalLiteral);
     }

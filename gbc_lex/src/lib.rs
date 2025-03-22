@@ -5,8 +5,6 @@ mod position_chars;
 // 2) define patterns with regex-like syntax
 // 3) output a sequence of tokens
 
-use position_chars::PositionChars;
-
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("{msg} at {location}")]
 pub struct SyntaxError {
@@ -28,6 +26,9 @@ impl std::fmt::Display for Location {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TokenKind {
+    /// An invalid token, constructed as part of an error
+    Invalid,
+
     DecimalLiteral,
     HexadecimalLiteral,
     StringLiteral,
