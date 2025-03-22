@@ -30,7 +30,8 @@ impl std::fmt::Display for Location {
 pub enum TokenKind {
     DecimalLiteral,
     HexadecimalLiteral,
-    Identifier
+    StringLiteral,
+    Identifier,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

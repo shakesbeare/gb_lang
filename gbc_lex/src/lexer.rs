@@ -36,6 +36,23 @@ impl<'a> Lexer<'a> {
         self.errors.push(e);
     }
 
+    fn read_until(&mut self, needle: char, second: Option<char>) -> Option<()> {
+        loop {
+            if second.is_some() {
+                let peek = self.iter.peek()?;
+                if second.unwrap() != *peek {
+                    continue;
+                }
+            }
+            let char_read = self.iter.next()?;
+            if needle == char_read {
+                break;
+            }
+        }
+
+        Some(())
+    }
+
     fn lex_decimal(&mut self) -> Token<'a> {
         // must account for the initially read character
         let start = self.iter.get_position() - 1;
@@ -92,6 +109,21 @@ impl<'a> Lexer<'a> {
             },
         }
     }
+
+    fn lex_string_literal(&mut self) -> Option<Token<'a>> {
+        let start = self.iter.get_position() - 1;
+        let col = self.iter.get_col() - 1;
+        self.read_until('"', None);
+        let end = self.iter.get_position();
+        Some(Token {
+            literal: self.iter.get_slice(start, end),
+            kind: TokenKind::StringLiteral,
+            location: Location {
+                line: self.iter.get_line(),
+                col,
+            },
+        })
+    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
@@ -106,7 +138,8 @@ impl<'a> Iterator for Lexer<'a> {
                 self.lex_hexadecimal()?
             }
             c if c.is_numeric() => self.lex_decimal(),
-            c if c.is_alphabetic() => self.lex_identifier(),
+            c if c.is_alphabetic() || c == '_' => self.lex_identifier(),
+            '"' => self.lex_string_literal()?,
             _ => todo!(),
         };
 
@@ -166,10 +199,19 @@ mod tests {
 
     #[test]
     fn lex_identifier() {
-        let input = "word123";
+        let input = "_word123";
         let tok = Lexer::new(input).next().unwrap();
         assert_eq!(tok.literal, input);
         assert_eq!(tok.kind, TokenKind::Identifier);
+        assert_eq!(tok.location, Location { line: 0, col: 0 })
+    }
+
+    #[test]
+    fn lex_string_literal() {
+        let input = "\"Hello, World! #1234567890+[{(&=)}]*\"";
+        let tok = Lexer::new(input).next().unwrap();
+        assert_eq!(tok.literal, input);
+        assert_eq!(tok.kind, TokenKind::StringLiteral);
         assert_eq!(tok.location, Location { line: 0, col: 0 })
     }
 }
