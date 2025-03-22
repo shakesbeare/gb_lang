@@ -1,3 +1,3 @@
 #!/usr/bin/env sh
-cargo test --verbose --all
+cargo test --all
 exit $?
