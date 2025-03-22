@@ -8,33 +8,32 @@ fn simple_lex_test(input: &str, expected: TokenKind) {
     let tok = Lexer::new(input).next().unwrap().unwrap();
     assert_eq!(tok.literal, input);
     assert_eq!(tok.kind, expected);
-    assert_eq!(tok.location, Location { line: 0, col: 0 })
+    assert_eq!(tok.location, Location { offset: 0, line: 0, col: 0 })
 }
 
 #[test]
 fn lex_int_literal() {
-    simple_lex_test("12345", TokenKind::DecimalLiteral);
+    simple_lex_test("12345", TokenKind::NumericLiteral);
+}
+
+#[test]
+fn lex_binary_literal() {
+    simple_lex_test("0b101", TokenKind::NumericLiteral);
 }
 
 #[test]
 fn lex_float_literal() {
-    simple_lex_test("12.345", TokenKind::DecimalLiteral);
+    simple_lex_test("12.345", TokenKind::NumericLiteral);
 }
 
 #[test]
 fn lex_numeral_separators() {
-    simple_lex_test("12_345", TokenKind::DecimalLiteral);
+    simple_lex_test("12_345", TokenKind::NumericLiteral);
 }
 
 #[test]
 fn lex_hexadecimal_literal() {
-    simple_lex_test("0xff", TokenKind::HexadecimalLiteral);
-}
-
-#[test]
-#[should_panic]
-fn lex_invalid_hex() {
-    simple_lex_test("0x", TokenKind::HexadecimalLiteral);
+    simple_lex_test("0xff", TokenKind::NumericLiteral);
 }
 
 #[test]
@@ -62,16 +61,6 @@ fn lex_block_comment() {
             comment */",
         TokenKind::Comment,
     );
-}
-
-#[test]
-fn skip_whitespace() {
-    let input = "    word     \n\t\r1234";
-    let mut l = Lexer::new(input);
-    let first = l.next().unwrap().unwrap();
-    let second = l.next().unwrap().unwrap();
-    assert_eq!(first.kind, TokenKind::Identifier);
-    assert_eq!(second.kind, TokenKind::DecimalLiteral);
 }
 
 #[test]
@@ -155,17 +144,17 @@ fn lex_enum() {
 
 #[test]
 fn lex_assign() {
-    simple_lex_test("=", TokenKind::Assign);
+    simple_lex_test("=", TokenKind::Equal);
 }
 
 #[test]
 fn lex_add() {
-    simple_lex_test("+", TokenKind::Add);
+    simple_lex_test("+", TokenKind::Plus);
 }
 
 #[test]
 fn lex_subtract() {
-    simple_lex_test("-", TokenKind::Subtract);
+    simple_lex_test("-", TokenKind::Minus);
 }
 
 #[test]
@@ -189,38 +178,38 @@ fn lex_less_than() {
 }
 
 #[test]
-fn lex_greater_equals() {
-    simple_lex_test(">=", TokenKind::GreaterEquals);
+fn lex_bitwise_and() {
+    simple_lex_test("&", TokenKind::And);
 }
 
 #[test]
-fn lex_less_equals() {
-    simple_lex_test("<=", TokenKind::LessEquals);
+fn lex_bitwise_or() {
+    simple_lex_test("|", TokenKind::Pipe);
 }
 
 #[test]
-fn lex_equal() {
-    simple_lex_test("==", TokenKind::Equal);
-}
-
-#[test]
-fn lex_not_equal() {
-    simple_lex_test("!=", TokenKind::NotEqual);
+fn lex_bitwise_xor() {
+    simple_lex_test("^", TokenKind::Carat);
 }
 
 #[test]
 fn lex_not() {
-    simple_lex_test("!", TokenKind::Not);
+    simple_lex_test("!", TokenKind::Bang);
 }
 
 #[test]
 fn lex_ref() {
-    simple_lex_test("&", TokenKind::Ref);
+    simple_lex_test("&", TokenKind::And);
 }
 
 #[test]
-fn lex_deref() {
-    simple_lex_test("^", TokenKind::Deref);
+fn skip_whitespace() {
+    let input = "    word     \n\t\r1234";
+    let mut l = Lexer::new(input);
+    let first = l.next().unwrap().unwrap();
+    let second = l.next().unwrap().unwrap();
+    assert_eq!(first.kind, TokenKind::Identifier);
+    assert_eq!(second.kind, TokenKind::NumericLiteral);
 }
 
 #[test]

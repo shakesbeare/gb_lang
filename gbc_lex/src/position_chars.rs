@@ -10,6 +10,8 @@ pub struct PositionChars<'a> {
     line: usize,
     /// The human-readable column number of the current position
     col: usize,
+    /// The last char read and consumed by the iterator
+    pub(crate) last_char: char,
 }
 
 impl<'a> Iterator for PositionChars<'a> {
@@ -24,7 +26,7 @@ impl<'a> Iterator for PositionChars<'a> {
             self.line += 1;
             self.col = 0;
         }
-
+        self.last_char = char_read;
         Some(char_read)
     }
 }
@@ -38,6 +40,7 @@ impl<'a> From<&'a str> for PositionChars<'a> {
             original: value,
             line: 0,
             col: 0,
+            last_char: '\0',
         }
     }
 }

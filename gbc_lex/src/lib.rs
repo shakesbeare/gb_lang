@@ -16,6 +16,7 @@ pub struct SyntaxError {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Location {
+    offset: usize,
     line: usize,
     col: usize,
 }
@@ -32,8 +33,7 @@ pub enum TokenKind {
     Invalid,
 
     // Main Components
-    DecimalLiteral,
-    HexadecimalLiteral,
+    NumericLiteral,
     StringLiteral,
     Identifier,
     Comment,
@@ -58,32 +58,28 @@ pub enum TokenKind {
     Struct,
     Enum,
 
-    // Prefix Operators
-    Not,
-
-    // Postfix Operators
-    Ref,
+    Bang,
+    Carat,
+    And,
     Deref,
-
-    // Infix Operators
-    Assign,
-    Add,
-    Subtract,
+    Equal,
+    Plus,
+    Minus,
     Multiply,
     Divide,
     GreaterThan,
     LessThan,
-    GreaterEquals,
-    LessEquals,
-    Equal,
-    NotEqual,
+    AngleLeft,
+    AngleRight,
+    Pipe,
+
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Token<'a> {
-    literal: &'a str,
-    kind: TokenKind,
-    location: Location,
+    pub literal: &'a str,
+    pub kind: TokenKind,
+    pub location: Location,
 }
 
 pub trait GbLexer<'a> {

@@ -25,6 +25,7 @@ impl<'a> Lexer<'a> {
     fn syntax_error(&mut self, message: &'static str) -> SyntaxError {
         let e = SyntaxError {
             location: Location {
+                offset: self.iter.get_position(),
                 line: self.iter.get_line(),
                 col: self.iter.get_col(),
             },
@@ -63,58 +64,56 @@ impl<'a> Lexer<'a> {
                 .get_slice(self.iter.get_position() - 1, self.iter.get_position()),
             kind,
             location: Location {
+                offset: self.iter.get_position() - 1,
                 line: self.iter.get_line(),
                 col: self.iter.get_col() - 1,
             },
         }
     }
 
-    fn lex_double(&mut self, kind: TokenKind) -> Token<'a> {
-        self.iter.next();
-        Token {
-            literal: self
-                .iter
-                .get_slice(self.iter.get_position() - 2, self.iter.get_position()),
-            kind,
-            location: Location {
-                line: self.iter.get_line(),
-                col: self.iter.get_col() - 2,
-            },
-        }
-    }
-
-    fn lex_decimal(&mut self) -> Token<'a> {
-        // must account for the initially read character
+    fn lex_numeral(&mut self) -> Token<'a> {
         let start = self.iter.get_position() - 1;
         let col = self.iter.get_col() - 1;
         let line = self.iter.get_line();
-        while matches!(self.iter.next(), Some('0'..='9' | '.' | '_')) {}
+        if self.iter.last_char == '0' {
+            let Some(next) = self.iter.next() else {
+                return Token {
+                    literal: self.iter.get_slice(start, self.iter.get_position()),
+                    kind: TokenKind::NumericLiteral,
+                    location: Location { offset: start, line, col },
+                };
+            };
+
+            match next {
+                'b' => self.consume_binary_digits(),
+                'x' => self.consume_hexadecimal_digits(),
+                _=> self.consume_decimal_digits(),
+            }
+        } else {
+            self.consume_decimal_digits();
+        }
         let end = self.iter.get_position();
+
         Token {
             literal: self.iter.get_slice(start, end),
-            kind: TokenKind::DecimalLiteral,
-            location: Location { line, col },
+            kind: TokenKind::NumericLiteral,
+            location: Location { offset: start, line, col },
         }
     }
 
-    fn lex_hexadecimal(&mut self) -> Result<Token<'a>, SyntaxError> {
-        let start = self.iter.get_position() - 1;
-        let col = self.iter.get_col() - 1;
-        let line = self.iter.get_line();
-        self.iter.next();
+    fn consume_decimal_digits(&mut self) {
+        while matches!(self.iter.next(), Some('0'..='9' | '.' | '_')) {}
+    }
+
+    fn consume_binary_digits(&mut self){
+        while matches!(self.iter.next(), Some('0'..='1' | '.' | '_')) {}
+    }
+
+    fn consume_hexadecimal_digits(&mut self) {
         while matches!(
             self.iter.next(),
             Some('0'..='9' | 'a'..='f' | 'A'..='F' | '.' | '_')
         ) {}
-        let end = self.iter.get_position();
-        if end - start <= 2 {
-            return Err(self.syntax_error("Malformed Hexadecimal Literal"));
-        }
-        Ok(Token {
-            literal: self.iter.get_slice(start, end),
-            kind: TokenKind::HexadecimalLiteral,
-            location: Location { line, col },
-        })
     }
 
     fn lex_identifier(&mut self) -> Token<'a> {
@@ -126,10 +125,11 @@ impl<'a> Lexer<'a> {
             Some('a'..='z' | 'A'..='Z' | '_' | '0'..='9')
         ) {}
         let end = self.iter.get_position();
+        println!("{}", self.iter.get_slice(start, end));
         Token {
             literal: self.iter.get_slice(start, end),
             kind: try_keyword(self.iter.get_slice(start, end)),
-            location: Location { line, col },
+            location: Location { offset: start, line, col },
         }
     }
 
@@ -144,7 +144,7 @@ impl<'a> Lexer<'a> {
         Ok(Token {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::StringLiteral,
-            location: Location { line, col },
+            location: Location { offset: start, line, col },
         })
     }
 
@@ -157,7 +157,7 @@ impl<'a> Lexer<'a> {
         Token {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::Comment,
-            location: Location { line, col },
+            location: Location { offset: start, line, col },
         }
     }
 
@@ -170,7 +170,7 @@ impl<'a> Lexer<'a> {
         Token {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::Comment,
-            location: Location { line, col },
+            location: Location { offset: start, line, col },
         }
     }
 }
@@ -187,11 +187,13 @@ impl<'a> Iterator for Lexer<'a> {
         // fallible lexing functions must return Result<Token<'a>, SyntaxError>
         //     and need not be wrapped in Ok()
         let lex_result = match (char_read, peek) {
-            (c, _) if c.is_whitespace() => self.next()?,
-            (c, _) if c == '0' && peek.is_some() && *peek.unwrap() == 'x' => {
-                self.lex_hexadecimal()
-            }
-            (c, _) if c.is_numeric() => Ok(self.lex_decimal()),
+            (mut c, _) if c.is_whitespace() => {
+                while c.is_whitespace() {
+                    c = self.iter.next()?;
+                }
+                self.next()?
+            },
+            (c, _) if c.is_numeric() => Ok(self.lex_numeral()),
             (c, _) if c.is_alphabetic() || c == '_' => Ok(self.lex_identifier()),
             ('"', _) => self.lex_string_literal(),
             ('/', Some('/')) => Ok(self.lex_comment()),
@@ -202,21 +204,21 @@ impl<'a> Iterator for Lexer<'a> {
             ('}', None) => Ok(self.lex_single(TokenKind::RBrace)),
             ('[', None) => Ok(self.lex_single(TokenKind::LBracket)),
             (']', None) => Ok(self.lex_single(TokenKind::RBracket)),
-            ('!', None) => Ok(self.lex_single(TokenKind::Not)),
-            ('&', None) => Ok(self.lex_single(TokenKind::Ref)),
-            ('^', None) => Ok(self.lex_single(TokenKind::Deref)),
-            ('=', None) => Ok(self.lex_single(TokenKind::Assign)),
-            ('+', None) => Ok(self.lex_single(TokenKind::Add)),
-            ('-', None) => Ok(self.lex_single(TokenKind::Subtract)),
+            ('!', None) => Ok(self.lex_single(TokenKind::Bang)),
+            ('&', None) => Ok(self.lex_single(TokenKind::And)),
+            ('^', None) => Ok(self.lex_single(TokenKind::Carat)),
+            ('=', None) => Ok(self.lex_single(TokenKind::Equal)),
+            ('+', None) => Ok(self.lex_single(TokenKind::Plus)),
+            ('-', None) => Ok(self.lex_single(TokenKind::Minus)),
             ('*', None) => Ok(self.lex_single(TokenKind::Multiply)),
             ('/', None) => Ok(self.lex_single(TokenKind::Divide)),
             ('>', None) => Ok(self.lex_single(TokenKind::GreaterThan)),
             ('<', None) => Ok(self.lex_single(TokenKind::LessThan)),
-            ('>', Some('=')) => Ok(self.lex_double(TokenKind::GreaterEquals)),
-            ('<', Some('=')) => Ok(self.lex_double(TokenKind::LessEquals)),
-            ('=', Some('=')) => Ok(self.lex_double(TokenKind::Equal)),
-            ('!', Some('=')) => Ok(self.lex_double(TokenKind::NotEqual)),
-            _ => todo!(),
+            ('|', None) => Ok(self.lex_single(TokenKind::Pipe)),
+            _ => {
+                println!("\n{}", char_read);
+                todo!();
+            }
         };
 
         Some(lex_result)

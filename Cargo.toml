@@ -10,9 +10,9 @@ name = "gb"
 path = "src/main.rs"
 
 [dependencies]
-thiserror = "1.0.50"
+gbc_lex = { path = "./gbc_lex" }
 
 [workspace]
 resolver = "2"
-members = ["gbc_lex" 
+members = [ "gbc", "gbc_ast","gbc_lex" 
 , "gbc_parse"]
