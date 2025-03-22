@@ -5,7 +5,7 @@ mod position_chars;
 // 2) define patterns with regex-like syntax
 // 3) output a sequence of tokens
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 #[error("{msg} at {location}")]
 pub struct SyntaxError {
     location: Location,

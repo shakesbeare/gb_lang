@@ -217,6 +217,8 @@ fn try_keyword(literal: &str) -> TokenKind {
 
 #[cfg(test)]
 mod tests {
+    use crate::GbLexer as _;
+
     use super::*;
 
     fn simple_lex_test(input: &str, expected: TokenKind) {
@@ -366,5 +368,19 @@ mod tests {
     #[test]
     fn lex_enum() {
         simple_lex_test("enum", TokenKind::Enum);
+    }
+
+    #[test]
+    /// Any time the iterator behaves incorrectly, the failing case should be added to this test.
+    /// It should always have any fallible lexer function The iterator is expected to always return
+    /// None after returning None once.
+    ///
+    /// This test technically only guarantees that the first call after a None is also a None, but
+    /// that should be sufficient.
+    fn lex_iterator_behaves_correctly() {
+        let input = "0x \"";
+        let mut iter = input.lexer();
+        for _ in iter.by_ref() {}
+        assert_eq!(iter.next(), None);
     }
 }
