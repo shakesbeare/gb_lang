@@ -1,5 +1,7 @@
 mod lexer;
 mod position_chars;
+#[cfg(test)]
+mod tests;
 
 // 1) take in any kind of string to process
 // 2) define patterns with regex-like syntax
@@ -29,12 +31,14 @@ pub enum TokenKind {
     /// An invalid token, constructed as part of an error
     Invalid,
 
+    // Main Components
     DecimalLiteral,
     HexadecimalLiteral,
     StringLiteral,
     Identifier,
     Comment,
 
+    // Delimiters
     LParen,
     RParen,
     LBrace,
@@ -42,6 +46,7 @@ pub enum TokenKind {
     LBracket,
     RBracket,
 
+    // Keywords
     True,
     False,
     Return,
@@ -52,6 +57,26 @@ pub enum TokenKind {
     Break,
     Struct,
     Enum,
+
+    // Prefix Operators
+    Not,
+
+    // Postfix Operators
+    Ref,
+    Deref,
+
+    // Infix Operators
+    Assign,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    GreaterThan,
+    LessThan,
+    GreaterEquals,
+    LessEquals,
+    Equal,
+    NotEqual,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
