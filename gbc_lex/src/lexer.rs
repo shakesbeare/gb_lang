@@ -172,6 +172,7 @@ impl<'a> Iterator for Lexer<'a> {
         let peek = self.iter.peek();
 
         let tok = match (char_read, peek) {
+            (c, _) if c.is_whitespace() => self.next()?,
             (c, _) if c == '0' && peek.is_some() && *peek.unwrap() == 'x' => {
                 self.lex_hexadecimal()?
             }
@@ -249,5 +250,15 @@ mod tests {
             comment */",
             TokenKind::Comment,
         );
+    }
+
+    #[test]
+    fn skip_whitespace() {
+        let input = "    word     \n\t\r1234";
+        let mut l = Lexer::new(input);
+        let first = l.next().unwrap();
+        let second = l.next().unwrap();
+        assert_eq!(first.kind, TokenKind::Identifier);
+        assert_eq!(second.kind, TokenKind::DecimalLiteral);
     }
 }
