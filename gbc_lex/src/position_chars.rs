@@ -1,7 +1,4 @@
-use std::{
-    iter::Peekable,
-    str::Chars,
-};
+use std::{iter::Peekable, str::Chars};
 
 #[derive(Clone)]
 pub struct PositionChars<'a> {

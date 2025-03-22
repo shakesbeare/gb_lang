@@ -1,5 +1,5 @@
-mod position_chars;
 mod lexer;
+mod position_chars;
 
 // 1) take in any kind of string to process
 // 2) define patterns with regex-like syntax
@@ -42,3 +42,16 @@ pub struct Token<'a> {
     location: Location,
 }
 
+pub trait GbLexer<'a> {
+    fn lexer(&'a self) -> lexer::Lexer<'a>;
+}
+
+impl<'a, T> GbLexer<'a> for T
+where
+    T: AsRef<str> + 'a,
+{
+    fn lexer(&'a self) -> lexer::Lexer<'a> {
+        let input = self.as_ref();
+        lexer::Lexer::new(input)
+    }
+}

@@ -65,10 +65,7 @@ impl<'a> Lexer<'a> {
         Token {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::DecimalLiteral,
-            location: Location {
-                line,
-                col,
-            },
+            location: Location { line, col },
         }
     }
 
@@ -89,10 +86,7 @@ impl<'a> Lexer<'a> {
         Some(Token {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::HexadecimalLiteral,
-            location: Location {
-                line,
-                col,
-            },
+            location: Location { line, col },
         })
     }
 
@@ -108,10 +102,7 @@ impl<'a> Lexer<'a> {
         Token {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::Identifier,
-            location: Location {
-                line,
-                col,
-            },
+            location: Location { line, col },
         }
     }
 
@@ -124,10 +115,7 @@ impl<'a> Lexer<'a> {
         Some(Token {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::StringLiteral,
-            location: Location {
-                line,
-                col,
-            },
+            location: Location { line, col },
         })
     }
 
@@ -140,10 +128,7 @@ impl<'a> Lexer<'a> {
         Token {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::Comment,
-            location: Location {
-                line,
-                col,
-            },
+            location: Location { line, col },
         }
     }
 
@@ -156,10 +141,7 @@ impl<'a> Lexer<'a> {
         Token {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::Comment,
-            location: Location {
-                line,
-                col,
-            },
+            location: Location { line, col },
         }
     }
 }
