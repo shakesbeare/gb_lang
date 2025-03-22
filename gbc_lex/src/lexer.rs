@@ -38,13 +38,15 @@ impl<'a> Lexer<'a> {
 
     fn read_until(&mut self, needle: char, second: Option<char>) -> Option<()> {
         loop {
+            let char_read = self.iter.next()?;
             if second.is_some() {
                 let peek = self.iter.peek()?;
                 if second.unwrap() != *peek {
                     continue;
+                } else {
+                    self.iter.next();
                 }
             }
-            let char_read = self.iter.next()?;
             if needle == char_read {
                 break;
             }
@@ -57,13 +59,14 @@ impl<'a> Lexer<'a> {
         // must account for the initially read character
         let start = self.iter.get_position() - 1;
         let col = self.iter.get_col() - 1;
+        let line = self.iter.get_line();
         while matches!(self.iter.next(), Some('0'..='9' | '.' | '_')) {}
         let end = self.iter.get_position();
         Token {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::DecimalLiteral,
             location: Location {
-                line: self.iter.get_line(),
+                line,
                 col,
             },
         }
@@ -72,6 +75,7 @@ impl<'a> Lexer<'a> {
     fn lex_hexadecimal(&mut self) -> Option<Token<'a>> {
         let start = self.iter.get_position() - 1;
         let col = self.iter.get_col() - 1;
+        let line = self.iter.get_line();
         self.iter.next();
         while matches!(
             self.iter.next(),
@@ -86,7 +90,7 @@ impl<'a> Lexer<'a> {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::HexadecimalLiteral,
             location: Location {
-                line: self.iter.get_line(),
+                line,
                 col,
             },
         })
@@ -95,6 +99,7 @@ impl<'a> Lexer<'a> {
     fn lex_identifier(&mut self) -> Token<'a> {
         let start = self.iter.get_position() - 1;
         let col = self.iter.get_col() - 1;
+        let line = self.iter.get_line();
         while matches!(
             self.iter.next(),
             Some('a'..='z' | 'A'..='Z' | '_' | '0'..='9')
@@ -104,7 +109,7 @@ impl<'a> Lexer<'a> {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::Identifier,
             location: Location {
-                line: self.iter.get_line(),
+                line,
                 col,
             },
         }
@@ -113,13 +118,14 @@ impl<'a> Lexer<'a> {
     fn lex_string_literal(&mut self) -> Option<Token<'a>> {
         let start = self.iter.get_position() - 1;
         let col = self.iter.get_col() - 1;
+        let line = self.iter.get_line();
         self.read_until('"', None);
         let end = self.iter.get_position();
         Some(Token {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::StringLiteral,
             location: Location {
-                line: self.iter.get_line(),
+                line,
                 col,
             },
         })
@@ -128,13 +134,30 @@ impl<'a> Lexer<'a> {
     fn lex_comment(&mut self) -> Token<'a> {
         let start = self.iter.get_position() - 1;
         let col = self.iter.get_col() - 1;
+        let line = self.iter.get_line();
         self.read_until('\n', None);
         let end = self.iter.get_position();
         Token {
             literal: self.iter.get_slice(start, end),
             kind: TokenKind::Comment,
             location: Location {
-                line: self.iter.get_line(),
+                line,
+                col,
+            },
+        }
+    }
+
+    fn lex_block_comment(&mut self) -> Token<'a> {
+        let start = self.iter.get_position() - 1;
+        let col = self.iter.get_col() - 1;
+        let line = self.iter.get_line();
+        self.read_until('*', Some('/'));
+        let end = self.iter.get_position();
+        Token {
+            literal: self.iter.get_slice(start, end),
+            kind: TokenKind::Comment,
+            location: Location {
+                line,
                 col,
             },
         }
@@ -156,6 +179,7 @@ impl<'a> Iterator for Lexer<'a> {
             (c, _) if c.is_alphabetic() || c == '_' => self.lex_identifier(),
             ('"', _) => self.lex_string_literal()?,
             ('/', Some('/')) => self.lex_comment(),
+            ('/', Some('*')) => self.lex_block_comment(),
             _ => todo!(),
         };
 
@@ -167,76 +191,63 @@ impl<'a> Iterator for Lexer<'a> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn lex_int_literal() {
-        let input = "12345";
+    fn simple_lex_test(input: &str, expected: TokenKind) {
         let tok = Lexer::new(input).next().unwrap();
         assert_eq!(tok.literal, input);
-        assert_eq!(tok.kind, TokenKind::DecimalLiteral);
+        assert_eq!(tok.kind, expected);
         assert_eq!(tok.location, Location { line: 0, col: 0 })
+    }
+
+    #[test]
+    fn lex_int_literal() {
+        simple_lex_test("12345", TokenKind::DecimalLiteral);
     }
 
     #[test]
     fn lex_float_literal() {
-        let input = "123.45";
-        let tok = Lexer::new(input).next().unwrap();
-        assert_eq!(tok.literal, input);
-        assert_eq!(tok.kind, TokenKind::DecimalLiteral);
-        assert_eq!(tok.location, Location { line: 0, col: 0 });
+        simple_lex_test("12.345", TokenKind::DecimalLiteral);
     }
 
     #[test]
     fn lex_numeral_separators() {
-        let input = "123_45";
-        let tok = Lexer::new(input).next().unwrap();
-        assert_eq!(tok.literal, input);
-        assert_eq!(tok.kind, TokenKind::DecimalLiteral);
-        assert_eq!(tok.location, Location { line: 0, col: 0 })
+        simple_lex_test("12_345", TokenKind::DecimalLiteral);
     }
 
     #[test]
     fn lex_hexadecimal_literal() {
-        let input = "0xff";
-        let tok = Lexer::new(input).next().unwrap();
-        assert_eq!(tok.literal, input);
-        assert_eq!(tok.kind, TokenKind::HexadecimalLiteral);
-        assert_eq!(tok.location, Location { line: 0, col: 0 })
+        simple_lex_test("0xff", TokenKind::HexadecimalLiteral);
     }
 
     #[test]
     #[should_panic]
     fn lex_invalid_hex() {
-        let input = "0x";
-        let tok = Lexer::new(input).next().unwrap();
-        assert_eq!(tok.literal, input);
-        assert_eq!(tok.kind, TokenKind::HexadecimalLiteral);
-        assert_eq!(tok.location, Location { line: 0, col: 0 })
+        simple_lex_test("0x", TokenKind::HexadecimalLiteral);
     }
 
     #[test]
     fn lex_identifier() {
-        let input = "_word123";
-        let tok = Lexer::new(input).next().unwrap();
-        assert_eq!(tok.literal, input);
-        assert_eq!(tok.kind, TokenKind::Identifier);
-        assert_eq!(tok.location, Location { line: 0, col: 0 })
+        simple_lex_test("_word123", TokenKind::Identifier);
     }
 
     #[test]
     fn lex_string_literal() {
-        let input = "\"Hello, World! #1234567890+[{(&=)}]*\"";
-        let tok = Lexer::new(input).next().unwrap();
-        assert_eq!(tok.literal, input);
-        assert_eq!(tok.kind, TokenKind::StringLiteral);
-        assert_eq!(tok.location, Location { line: 0, col: 0 })
+        simple_lex_test(
+            "\"Hello, World! #1234567890+[{(&=)}]*\"",
+            TokenKind::StringLiteral,
+        );
     }
 
     #[test]
     fn lex_comment() {
-        let input = "// this is a comment";
-        let tok = Lexer::new(input).next().unwrap();
-        assert_eq!(tok.literal, input);
-        assert_eq!(tok.kind, TokenKind::Comment);
-        assert_eq!(tok.location, Location { line: 0, col: 0 })
+        simple_lex_test("// this is a comment", TokenKind::Comment);
+    }
+
+    #[test]
+    fn lex_block_comment() {
+        simple_lex_test(
+            "/* this is a block
+            comment */",
+            TokenKind::Comment,
+        );
     }
 }
