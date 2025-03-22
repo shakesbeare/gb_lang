@@ -114,7 +114,7 @@ impl<'a> Lexer<'a> {
         let end = self.iter.get_position();
         Token {
             literal: self.iter.get_slice(start, end),
-            kind: TokenKind::Identifier,
+            kind: try_keyword(self.iter.get_slice(start, end)),
             location: Location { line, col },
         }
     }
@@ -190,6 +190,24 @@ impl<'a> Iterator for Lexer<'a> {
         };
 
         Some(tok)
+    }
+}
+
+/// Returns the appropriate keyword token if the &str matches a keyword
+/// Otherwise, returns `TokenKind::Identifier`
+fn try_keyword(literal: &str) -> TokenKind {
+    match literal {
+        "true" => TokenKind::True,
+        "false" => TokenKind::False,
+        "return" => TokenKind::Return,
+        "fn" => TokenKind::Fn,
+        "while" => TokenKind::While,
+        "for" => TokenKind::For,
+        "continue" => TokenKind::Continue,
+        "break" => TokenKind::Break,
+        "struct" => TokenKind::Struct,
+        "enum" => TokenKind::Enum,
+        _ => TokenKind::Identifier,
     }
 }
 
@@ -294,5 +312,55 @@ mod tests {
     #[test]
     fn lex_r_bracket() {
         simple_lex_test("]", TokenKind::RBracket);
+    }
+
+    #[test]
+    fn lex_true() {
+        simple_lex_test("true", TokenKind::True);
+    }
+
+    #[test]
+    fn lex_false() {
+        simple_lex_test("false", TokenKind::False);
+    }
+
+    #[test]
+    fn lex_return() {
+        simple_lex_test("return", TokenKind::Return);
+    }
+
+    #[test]
+    fn lex_fn() {
+        simple_lex_test("fn", TokenKind::Fn);
+    }
+
+    #[test]
+    fn lex_while() {
+        simple_lex_test("while", TokenKind::While);
+    }
+
+    #[test]
+    fn lex_for() {
+        simple_lex_test("for", TokenKind::For);
+    }
+
+    #[test]
+    fn lex_continue() {
+        simple_lex_test("continue", TokenKind::Continue);
+    }
+
+    #[test]
+    fn lex_break() {
+        simple_lex_test("break", TokenKind::Break);
+    }
+
+    #[test]
+    fn lex_struct() {
+        simple_lex_test("struct", TokenKind::Struct);
+    }
+
+    #[test]
+    fn lex_enum() {
+        simple_lex_test("enum", TokenKind::Enum);
     }
 }

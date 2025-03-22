@@ -40,6 +40,17 @@ pub enum TokenKind {
     RBrace,
     LBracket,
     RBracket,
+
+    True,
+    False,
+    Return,
+    Fn,
+    While,
+    For,
+    Continue,
+    Break,
+    Struct,
+    Enum,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
