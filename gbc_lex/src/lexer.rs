@@ -55,6 +55,19 @@ impl<'a> Lexer<'a> {
         Some(())
     }
 
+    fn lex_single(&mut self, kind: TokenKind) -> Token<'a> {
+        Token {
+            literal: self
+                .iter
+                .get_slice(self.iter.get_position() - 1, self.iter.get_position()),
+            kind,
+            location: Location {
+                line: self.iter.get_line(),
+                col: self.iter.get_col() - 1,
+            },
+        }
+    }
+
     fn lex_decimal(&mut self) -> Token<'a> {
         // must account for the initially read character
         let start = self.iter.get_position() - 1;
@@ -110,7 +123,10 @@ impl<'a> Lexer<'a> {
         let start = self.iter.get_position() - 1;
         let col = self.iter.get_col() - 1;
         let line = self.iter.get_line();
-        self.read_until('"', None);
+        if self.read_until('"', None).is_none() {
+            self.syntax_error("Unterminated string literal");
+            return None;
+        }
         let end = self.iter.get_position();
         Some(Token {
             literal: self.iter.get_slice(start, end),
@@ -149,6 +165,7 @@ impl<'a> Lexer<'a> {
 impl<'a> Iterator for Lexer<'a> {
     type Item = Token<'a>;
 
+    /// Currently, returning None means `both` to stop iterating and that a syntax error occurred
     fn next(&mut self) -> Option<Self::Item> {
         let char_read = self.iter.next()?;
         let peek = self.iter.peek();
@@ -163,6 +180,12 @@ impl<'a> Iterator for Lexer<'a> {
             ('"', _) => self.lex_string_literal()?,
             ('/', Some('/')) => self.lex_comment(),
             ('/', Some('*')) => self.lex_block_comment(),
+            ('(', None) => self.lex_single(TokenKind::LParen),
+            (')', None) => self.lex_single(TokenKind::RParen),
+            ('{', None) => self.lex_single(TokenKind::LBrace),
+            ('}', None) => self.lex_single(TokenKind::RBrace),
+            ('[', None) => self.lex_single(TokenKind::LBracket),
+            (']', None) => self.lex_single(TokenKind::RBracket),
             _ => todo!(),
         };
 
@@ -242,5 +265,34 @@ mod tests {
         let second = l.next().unwrap();
         assert_eq!(first.kind, TokenKind::Identifier);
         assert_eq!(second.kind, TokenKind::DecimalLiteral);
+    }
+
+    #[test]
+    fn lex_l_paren() {
+        simple_lex_test("(", TokenKind::LParen);
+    }
+    #[test]
+    fn lex_r_paren() {
+        simple_lex_test(")", TokenKind::RParen);
+    }
+
+    #[test]
+    fn lex_l_brace() {
+        simple_lex_test("{", TokenKind::LBrace);
+    }
+
+    #[test]
+    fn lex_r_brace() {
+        simple_lex_test("}", TokenKind::RBrace);
+    }
+
+    #[test]
+    fn lex_l_bracket() {
+        simple_lex_test("[", TokenKind::LBracket);
+    }
+
+    #[test]
+    fn lex_r_bracket() {
+        simple_lex_test("]", TokenKind::RBracket);
     }
 }

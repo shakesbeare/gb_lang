@@ -33,6 +33,13 @@ pub enum TokenKind {
     StringLiteral,
     Identifier,
     Comment,
+
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    LBracket,
+    RBracket,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
