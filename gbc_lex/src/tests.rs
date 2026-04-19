@@ -8,7 +8,14 @@ fn simple_lex_test(input: &str, expected: TokenKind) {
     let tok = Lexer::new(input).next().unwrap().unwrap();
     assert_eq!(tok.literal, input);
     assert_eq!(tok.kind, expected);
-    assert_eq!(tok.location, Location { offset: 0, line: 0, col: 0 })
+    assert_eq!(
+        tok.location,
+        Location {
+            offset: 0,
+            line: 0,
+            col: 0
+        }
+    )
 }
 
 #[test]
@@ -159,12 +166,12 @@ fn lex_subtract() {
 
 #[test]
 fn lex_multiply() {
-    simple_lex_test("*", TokenKind::Multiply);
+    simple_lex_test("*", TokenKind::Star);
 }
 
 #[test]
 fn lex_divide() {
-    simple_lex_test("/", TokenKind::Divide);
+    simple_lex_test("/", TokenKind::ForwardSlash);
 }
 
 #[test]
@@ -198,8 +205,58 @@ fn lex_not() {
 }
 
 #[test]
-fn lex_ref() {
-    simple_lex_test("&", TokenKind::And);
+fn lex_double_equal() {
+    simple_lex_test("==", TokenKind::EqualEqual);
+}
+
+#[test]
+fn lex_double_and() {
+    simple_lex_test("&&", TokenKind::AndAnd);
+}
+
+#[test]
+fn lex_less_less() {
+    simple_lex_test("<<", TokenKind::LessLess);
+}
+
+#[test]
+fn lex_greater_greater() {
+    simple_lex_test(">>", TokenKind::GreaterGreater);
+}
+
+#[test]
+fn lex_plus_equal() {
+    simple_lex_test("+=", TokenKind::PlusEqual);
+}
+
+#[test]
+fn lex_minus_equal() {
+    simple_lex_test("-=", TokenKind::MinusEqual);
+}
+
+#[test]
+fn lex_star_equal() {
+    simple_lex_test("*=", TokenKind::StarEqual);
+}
+
+#[test]
+fn lex_forward_slash_equal() {
+    simple_lex_test("/=", TokenKind::ForwardSlashEqual);
+}
+
+#[test]
+fn lex_star_star() {
+    simple_lex_test("**", TokenKind::StarStar);
+}
+
+#[test]
+fn lex_pipe_pipe() {
+    simple_lex_test("||", TokenKind::PipePipe);
+}
+
+#[test]
+fn lex_back_slash() {
+    simple_lex_test("\\", TokenKind::BackSlash);
 }
 
 #[test]

@@ -3,6 +3,8 @@ mod position_chars;
 #[cfg(test)]
 mod tests;
 
+use gbc_lex_derive::TokenKindExt as TokenKindExtD;
+
 // 1) take in any kind of string to process
 // 2) define patterns with regex-like syntax
 // 3) output a sequence of tokens
@@ -27,7 +29,16 @@ impl std::fmt::Display for Location {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub trait TokenKindExt {
+    /// Returns true if the token is a symbol
+    fn is_symbol(&self) -> bool;
+    /// Returns true if the token is a symbol and is only one character
+    fn is_single_length(&self) -> bool;
+    /// Returns true if the token is a sybol and is two characters
+    fn is_double_length(&self) -> bool;
+}
+
+#[derive(TokenKindExtD, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TokenKind {
     /// An invalid token, constructed as part of an error
     Invalid,
@@ -58,24 +69,56 @@ pub enum TokenKind {
     Struct,
     Enum,
 
-    Bang,
-    Carat,
-    And,
-    Deref,
-    Equal,
-    Plus,
-    Minus,
-    Multiply,
-    Divide,
-    GreaterThan,
-    LessThan,
-    AngleLeft,
-    AngleRight,
-    Pipe,
+    // Double length symbols
+    #[symbol(double)]
+    AndAnd,
+    #[symbol(double)]
+    EqualEqual,
+    #[symbol(double)]
+    PlusEqual,
+    #[symbol(double)]
+    MinusEqual,
+    #[symbol(double)]
+    StarEqual,
+    #[symbol(double)]
+    StarStar,
+    #[symbol(double)]
+    ForwardSlashEqual,
+    #[symbol(double)]
+    GreaterGreater,
+    #[symbol(double)]
+    LessLess,
+    #[symbol(double)]
+    PipePipe,
 
+    // Single length symbols
+    #[symbol(single)]
+    Bang,
+    #[symbol(single)]
+    Carat,
+    #[symbol(single)]
+    And,
+    #[symbol(single)]
+    Equal,
+    #[symbol(single)]
+    Plus,
+    #[symbol(single)]
+    Minus,
+    #[symbol(single)]
+    Star,
+    #[symbol(single)]
+    ForwardSlash,
+    #[symbol(single)]
+    BackSlash,
+    #[symbol(single)]
+    GreaterThan,
+    #[symbol(single)]
+    LessThan,
+    #[symbol(single)]
+    Pipe,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(TokenKindExtD, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Token<'a> {
     pub literal: &'a str,
     pub kind: TokenKind,

@@ -2,6 +2,8 @@
 name = "gbc_lex"
 version = "0.1.0"
 edition = "2021"
+description = "Lexing for G♭."
 
 [dependencies]
 thiserror = "2.0.12"
+gbc_lex_derive = { path = "./gbc_lex_derive" }
