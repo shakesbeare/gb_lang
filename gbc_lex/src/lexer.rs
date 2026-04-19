@@ -210,7 +210,6 @@ impl<'a> Lexer<'a> {
 impl<'a> Iterator for Lexer<'a> {
     type Item = Result<Token<'a>, SyntaxError>;
 
-    /// Currently, returning None means `both` to stop iterating and that a syntax error occurred
     fn next(&mut self) -> Option<Self::Item> {
         let char_read = self.iter.next()?;
         let peek = self.iter.peek();
@@ -261,9 +260,12 @@ impl<'a> Iterator for Lexer<'a> {
             ('>',  _) => Ok(self.lex_symbol(TokenKind::GreaterThan)),
             ('<',  _) => Ok(self.lex_symbol(TokenKind::LessThan)),
             ('|',  _) => Ok(self.lex_symbol(TokenKind::Pipe)),
+
             _ => {
-                println!("\nFailed lex on: {}", char_read);
-                todo!();
+                // skipping forward to the next space gives us a pretty reasonable chance
+                // to recover lexing the rest of the file
+                self.read_until(' ', None);
+                Err(self.syntax_error("Unexpected character"))
             }
         };
 
