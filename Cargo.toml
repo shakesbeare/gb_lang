@@ -14,4 +14,4 @@ gbc_lex = { path = "./gbc_lex" }
 
 [workspace]
 resolver = "2"
-members = [ "gbc", "gbc_ast", "gbc_lex", "gbc_parse", "gbc_lex/gbc_lex_derive"]
+members = [ "gbc", "gbc_ast", "gbc_lex", "gbc_parse", "gbc_macros", "gbc_shared"]

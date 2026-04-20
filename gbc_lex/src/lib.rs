@@ -1,9 +1,12 @@
-mod lexer;
+extern crate self as gbc_lex;
+
+pub mod lexer;
 mod position_chars;
 #[cfg(test)]
 mod tests;
 
-use gbc_lex_derive::TokenKindExt as TokenKindExtD;
+use gbc_macros::TokenTypeExt as TokenTypeExtD;
+use gbc_shared::Location;
 
 // 1) take in any kind of string to process
 // 2) define patterns with regex-like syntax
@@ -11,25 +14,13 @@ use gbc_lex_derive::TokenKindExt as TokenKindExtD;
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 #[error("{msg} at {location}")]
+#[readonly::make]
 pub struct SyntaxError {
-    location: Location,
-    msg: &'static str,
+    pub location: Location,
+    pub msg: &'static str,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Location {
-    offset: usize,
-    line: usize,
-    col: usize,
-}
-
-impl std::fmt::Display for Location {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "line {}, col {}", self.line, self.col)
-    }
-}
-
-pub trait TokenKindExt {
+pub trait TokenTypeExt {
     /// Returns true if the token is a symbol
     fn is_symbol(&self) -> bool;
     /// Returns true if the token is a symbol and is only one character
@@ -38,8 +29,8 @@ pub trait TokenKindExt {
     fn is_double_length(&self) -> bool;
 }
 
-#[derive(TokenKindExtD, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum TokenKind {
+#[derive(TokenTypeExtD, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TokenType {
     /// An invalid token, constructed as part of an error
     Invalid,
 
@@ -118,22 +109,23 @@ pub enum TokenKind {
     Pipe,
 }
 
-#[derive(TokenKindExtD, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Token<'a> {
-    pub literal: &'a str,
-    pub kind: TokenKind,
+#[derive(TokenTypeExtD, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[readonly::make]
+pub struct Token<'input> {
+    pub literal: &'input str,
+    pub ty: TokenType,
     pub location: Location,
 }
 
-pub trait GbLexer<'a> {
-    fn lexer(&'a self) -> lexer::Lexer<'a>;
+pub trait GbLexer<'input> {
+    fn gb_lexer(&'input self) -> lexer::Lexer<'input>;
 }
 
-impl<'a, T> GbLexer<'a> for T
+impl<'input, T> GbLexer<'input> for T
 where
-    T: AsRef<str> + 'a,
+    T: AsRef<str> + 'input,
 {
-    fn lexer(&'a self) -> lexer::Lexer<'a> {
+    fn gb_lexer(&'input self) -> lexer::Lexer<'input> {
         let input = self.as_ref();
         lexer::Lexer::new(input)
     }

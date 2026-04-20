@@ -1,30 +1,23 @@
-use proc_macro::TokenStream;
-use quote::{format_ident, quote};
-use syn::{DeriveInput, Ident, parse_macro_input};
+use quote::quote;
+use syn::Ident;
+use synstructure::Structure;
+use proc_macro2::TokenStream;
 
-extern crate proc_macro;
-
-#[proc_macro_derive(TokenKindExt, attributes(symbol))]
-pub fn derive_token_kind_ext(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = input.ident;
-    let generics = input.generics;
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-    let expanded = match input.data {
-        syn::Data::Struct(data_struct) => {
+pub fn derive_token_type_ext(s: Structure) -> TokenStream {
+    match s.ast().data {
+        syn::Data::Struct(ref data_struct) => {
             let field = data_struct.fields.iter().find(|f| match f.ty {
-                syn::Type::Path(ref type_path) => type_path.path.is_ident("TokenKind"),
+                syn::Type::Path(ref type_path) => type_path.path.is_ident("TokenType"),
                 _ => false,
             });
             let Some(field) = field else {
-                panic!("Requires field with type `gbc_lex::TokenKind`");
+                panic!("Requires field with type `gbc_lex::TokenType`");
             };
 
             let field_name = &field.ident;
 
-            quote! {
-                impl #impl_generics crate::TokenKindExt for #name #ty_generics #where_clause {
+            s.gen_impl(quote! {
+                gen impl ::gbc_lex::TokenTypeExt for @Self {
                     fn is_symbol(&self) -> bool {
                         self.#field_name.is_symbol()
                     }
@@ -37,9 +30,9 @@ pub fn derive_token_kind_ext(input: TokenStream) -> TokenStream {
                         self.#field_name.is_double_length()
                     }
                 }
-            }
+            })
         }
-        syn::Data::Enum(data_enum) => {
+        syn::Data::Enum(ref data_enum) => {
             let singles: Vec<&Ident> = data_enum
                 .variants
                 .iter()
@@ -67,34 +60,32 @@ pub fn derive_token_kind_ext(input: TokenStream) -> TokenStream {
                 .collect();
 
 
-            quote! {
-                impl #impl_generics crate::TokenKindExt for #name #ty_generics #where_clause {
+            s.gen_impl(quote! {
+                gen impl ::gbc_lex::TokenTypeExt for @Self {
                     fn is_symbol(&self) -> bool {
                         match self {
-                            #(Self::#singles => true, )*
-                            #(Self::#doubles  => true, )*
+                            #(Self::#singles)|* => true,
+                            #(Self::#doubles)|*  => true,
                             _ => false,
                         }
                     }
 
                     fn is_single_length(&self) -> bool {
                         match self {
-                            #(Self::#singles => true, )*
+                            #(Self::#singles)|* => true,
                             _ => false
                         }
                     }
 
                     fn is_double_length(&self) -> bool {
                         match self {
-                            #(Self::#doubles => true, )*
+                            #(Self::#doubles)|* => true,
                             _ => false
                         }
                     }
                 }
-            }
+            })
         }
         syn::Data::Union(_) => panic!("Unsupported on unions"),
-    };
-
-    proc_macro::TokenStream::from(expanded)
+    }
 }

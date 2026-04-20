@@ -6,4 +6,6 @@ description = "Lexing for G♭."
 
 [dependencies]
 thiserror = "2.0.12"
-gbc_lex_derive = { path = "./gbc_lex_derive" }
+gbc_macros = { path = "../gbc_macros" }
+gbc_shared = { path = "../gbc_shared" }
+readonly = "0.2.13"

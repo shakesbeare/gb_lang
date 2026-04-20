@@ -4,3 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+gbc_lex = { path = "../gbc_lex" }
+gbc_shared = { path = "../gbc_shared" }
+serde = { version = "1.0.228", features = ["derive"] }

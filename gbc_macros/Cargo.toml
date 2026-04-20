@@ -1,5 +1,5 @@
 [package]
-name = "gbc_lex_derive"
+name = "gbc_macros"
 version = "0.1.0"
 edition = "2024"
 
@@ -7,5 +7,7 @@ edition = "2024"
 proc-macro = true
 
 [dependencies]
+proc-macro2 = "1.0.106"
 quote = "1.0.45"
 syn = "2.0.117"
+synstructure = "0.13.2"

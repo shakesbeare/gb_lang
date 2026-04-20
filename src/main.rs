@@ -7,9 +7,9 @@ fn main() {
     for & ! + [ { ( ) } ] * !
         "#;
 
-    for tok in input.lexer() {
+    for tok in input.gb_lexer() {
         let _ = tok.map(|t| {
-            print!("{:?} ", t.kind);
+            print!("{:?} ", t.ty);
         });
     }
     println!();
