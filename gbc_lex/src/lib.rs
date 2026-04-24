@@ -8,18 +8,6 @@ mod tests;
 use gbc_macros::TokenKindExt as TokenKindExtD;
 use gbc_shared::Span;
 
-// 1) take in any kind of string to process
-// 2) define patterns with regex-like syntax
-// 3) output a sequence of tokens
-
-#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
-#[error("{msg}")]
-#[readonly::make]
-pub struct SyntaxError {
-    pub span: Span,
-    pub msg: &'static str,
-}
-
 pub trait TokenTypeExt {
     /// Returns true if the token is a symbol
     fn is_symbol(&self) -> bool;
@@ -29,10 +17,10 @@ pub trait TokenTypeExt {
     fn is_double_length(&self) -> bool;
 }
 
-#[derive(TokenKindExtD, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(TokenKindExtD, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TokenKind {
     /// An invalid token, constructed as part of an error
-    Invalid,
+    Invalid(Box<str>),
 
     // Main Components
     NumericLiteral,

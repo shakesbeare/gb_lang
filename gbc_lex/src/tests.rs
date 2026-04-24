@@ -6,7 +6,7 @@ use super::*;
 
 fn simple_lex_test(input: &str, expected: TokenKind) {
     let len = input.len();
-    let tok = Lexer::new(input).next().unwrap().unwrap();
+    let tok = Lexer::new(input).next().unwrap();
     let actual_lit = &input[tok.span.clone()];
     dbg!(&tok.span);
     assert_eq!(actual_lit, input);
@@ -259,8 +259,8 @@ fn lex_back_slash() {
 fn skip_whitespace() {
     let input = "    word     \n\t\r1234";
     let mut l = Lexer::new(input);
-    let first = l.next().unwrap().unwrap();
-    let second = l.next().unwrap().unwrap();
+    let first = l.next().unwrap();
+    let second = l.next().unwrap();
     assert_eq!(first.kind, TokenKind::Identifier);
     assert_eq!(second.kind, TokenKind::NumericLiteral);
 }

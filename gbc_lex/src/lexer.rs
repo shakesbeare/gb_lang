@@ -1,14 +1,13 @@
 use gbc_shared::Span;
 
 use crate::TokenTypeExt;
-use crate::{position_chars::PositionChars, SyntaxError, Token, TokenKind};
+use crate::{position_chars::PositionChars, Token, TokenKind};
 
 #[derive(Clone)]
 #[readonly::make]
 pub struct Lexer<'input> {
     pub input: &'input str,
     iter: PositionChars<'input>,
-    errors: Vec<SyntaxError>,
 }
 
 impl<'input> Lexer<'input> {
@@ -17,19 +16,7 @@ impl<'input> Lexer<'input> {
         Self {
             input,
             iter: PositionChars::from(input),
-            errors: vec![],
         }
-    }
-
-    fn syntax_error(&mut self, span: Span, message: &'static str) -> SyntaxError {
-        let e = SyntaxError { span, msg: message };
-
-        #[cfg(feature = "eager_error_printing")]
-        {
-            println!("{}", e);
-        }
-        self.errors.push(e.clone());
-        e
     }
 
     fn read_until(&mut self, needle: char, second: Option<char>) -> Option<()> {
@@ -118,19 +105,19 @@ impl<'input> Lexer<'input> {
         }
     }
 
-    fn lex_string_literal(&mut self) -> Result<Token, SyntaxError> {
+    fn lex_string_literal(&mut self) -> Token {
         let start = self.iter.pos().unwrap();
         if self.read_until('"', None).is_none() {
-            return Err(self.syntax_error(
-                Span::new(start, self.iter.pos().unwrap()),
-                "Unterminated string literal",
-            ));
+            return Token {
+                kind: TokenKind::Invalid(Box::from("\"")),
+                span: Span::new(start, self.iter.peek_pos()),
+            };
         }
         let end = self.iter.peek_pos();
-        Ok(Token {
+        Token {
             kind: TokenKind::StringLiteral,
             span: Span::new(start, end),
-        })
+        }
     }
 
     fn lex_comment(&mut self) -> Token {
@@ -155,7 +142,7 @@ impl<'input> Lexer<'input> {
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<Token, SyntaxError>;
+    type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
         let char_read = self.iter.next()?;
@@ -164,49 +151,49 @@ impl<'a> Iterator for Lexer<'a> {
         // All infallible tokens must be wrapped in Ok()
         // fallible lexing functions must return Result<Token<'a>, SyntaxError>
         //     and need not be wrapped in Ok()
-        let lex_result = match (char_read, peek) {
+        Some(match (char_read, peek) {
             (mut c, _) if c.is_whitespace() => {
                 while c.is_whitespace() {
                     c = self.iter.next()?;
                 }
                 self.next()?
             }
-            (c, _) if c.is_numeric() => Ok(self.lex_numeral()),
-            (c, _) if c.is_alphabetic() || c == '_' => Ok(self.lex_identifier()),
+            (c, _) if c.is_numeric() => self.lex_numeral(),
+            (c, _) if c.is_alphabetic() || c == '_' => self.lex_identifier(),
             ('"', _) => self.lex_string_literal(),
-            ('/', Some('/')) => Ok(self.lex_comment()),
-            ('/', Some('*')) => Ok(self.lex_block_comment()),
+            ('/', Some('/')) => self.lex_comment(),
+            ('/', Some('*')) => self.lex_block_comment(),
 
-            ('(', _) => Ok(self.lex_symbol(TokenKind::LParen)),
-            (')', _) => Ok(self.lex_symbol(TokenKind::RParen)),
-            ('{', _) => Ok(self.lex_symbol(TokenKind::LBrace)),
-            ('}', _) => Ok(self.lex_symbol(TokenKind::RBrace)),
-            ('[', _) => Ok(self.lex_symbol(TokenKind::LBracket)),
-            (']', _) => Ok(self.lex_symbol(TokenKind::RBracket)),
+            ('(', _) => self.lex_symbol(TokenKind::LParen),
+            (')', _) => self.lex_symbol(TokenKind::RParen),
+            ('{', _) => self.lex_symbol(TokenKind::LBrace),
+            ('}', _) => self.lex_symbol(TokenKind::RBrace),
+            ('[', _) => self.lex_symbol(TokenKind::LBracket),
+            (']', _) => self.lex_symbol(TokenKind::RBracket),
 
-            ('&', Some('&')) => Ok(self.lex_symbol(TokenKind::AndAnd)),
-            ('=', Some('=')) => Ok(self.lex_symbol(TokenKind::EqualEqual)),
-            ('+', Some('=')) => Ok(self.lex_symbol(TokenKind::PlusEqual)),
-            ('-', Some('=')) => Ok(self.lex_symbol(TokenKind::MinusEqual)),
-            ('*', Some('=')) => Ok(self.lex_symbol(TokenKind::StarEqual)),
-            ('*', Some('*')) => Ok(self.lex_symbol(TokenKind::StarStar)),
-            ('/', Some('=')) => Ok(self.lex_symbol(TokenKind::ForwardSlashEqual)),
-            ('>', Some('>')) => Ok(self.lex_symbol(TokenKind::GreaterGreater)),
-            ('<', Some('<')) => Ok(self.lex_symbol(TokenKind::LessLess)),
-            ('|', Some('|')) => Ok(self.lex_symbol(TokenKind::PipePipe)),
+            ('&', Some('&')) => self.lex_symbol(TokenKind::AndAnd),
+            ('=', Some('=')) => self.lex_symbol(TokenKind::EqualEqual),
+            ('+', Some('=')) => self.lex_symbol(TokenKind::PlusEqual),
+            ('-', Some('=')) => self.lex_symbol(TokenKind::MinusEqual),
+            ('*', Some('=')) => self.lex_symbol(TokenKind::StarEqual),
+            ('*', Some('*')) => self.lex_symbol(TokenKind::StarStar),
+            ('/', Some('=')) => self.lex_symbol(TokenKind::ForwardSlashEqual),
+            ('>', Some('>')) => self.lex_symbol(TokenKind::GreaterGreater),
+            ('<', Some('<')) => self.lex_symbol(TokenKind::LessLess),
+            ('|', Some('|')) => self.lex_symbol(TokenKind::PipePipe),
 
-            ('!', _) => Ok(self.lex_symbol(TokenKind::Bang)),
-            ('^', _) => Ok(self.lex_symbol(TokenKind::Carat)),
-            ('&', _) => Ok(self.lex_symbol(TokenKind::And)),
-            ('=', _) => Ok(self.lex_symbol(TokenKind::Equal)),
-            ('+', _) => Ok(self.lex_symbol(TokenKind::Plus)),
-            ('-', _) => Ok(self.lex_symbol(TokenKind::Minus)),
-            ('*', _) => Ok(self.lex_symbol(TokenKind::Star)),
-            ('/', _) => Ok(self.lex_symbol(TokenKind::ForwardSlash)),
-            ('\\', _) => Ok(self.lex_symbol(TokenKind::BackSlash)),
-            ('>', _) => Ok(self.lex_symbol(TokenKind::GreaterThan)),
-            ('<', _) => Ok(self.lex_symbol(TokenKind::LessThan)),
-            ('|', _) => Ok(self.lex_symbol(TokenKind::Pipe)),
+            ('!', _) => self.lex_symbol(TokenKind::Bang),
+            ('^', _) => self.lex_symbol(TokenKind::Carat),
+            ('&', _) => self.lex_symbol(TokenKind::And),
+            ('=', _) => self.lex_symbol(TokenKind::Equal),
+            ('+', _) => self.lex_symbol(TokenKind::Plus),
+            ('-', _) => self.lex_symbol(TokenKind::Minus),
+            ('*', _) => self.lex_symbol(TokenKind::Star),
+            ('/', _) => self.lex_symbol(TokenKind::ForwardSlash),
+            ('\\', _) => self.lex_symbol(TokenKind::BackSlash),
+            ('>', _) => self.lex_symbol(TokenKind::GreaterThan),
+            ('<', _) => self.lex_symbol(TokenKind::LessThan),
+            ('|', _) => self.lex_symbol(TokenKind::Pipe),
 
             _ => {
                 // skipping forward to the next space gives us a pretty reasonable chance
@@ -215,11 +202,12 @@ impl<'a> Iterator for Lexer<'a> {
                 let start = self.iter.pos().unwrap();
                 self.read_until(' ', None);
                 let end = self.iter.peek_pos();
-                Err(self.syntax_error(Span::new(start, end), "Unexpected character"))
+                Token {
+                    kind: TokenKind::Invalid(Box::from("valid char")),
+                    span: Span::new(start, end),
+                }
             }
-        };
-
-        Some(lex_result)
+        })
     }
 }
 
