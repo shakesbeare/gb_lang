@@ -5,18 +5,18 @@ mod position_chars;
 #[cfg(test)]
 mod tests;
 
-use gbc_macros::TokenTypeExt as TokenTypeExtD;
-use gbc_shared::Location;
+use gbc_macros::TokenKindExt as TokenKindExtD;
+use gbc_shared::Span;
 
 // 1) take in any kind of string to process
 // 2) define patterns with regex-like syntax
 // 3) output a sequence of tokens
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
-#[error("{msg} at {location}")]
+#[error("{msg}")]
 #[readonly::make]
 pub struct SyntaxError {
-    pub location: Location,
+    pub span: Span,
     pub msg: &'static str,
 }
 
@@ -29,8 +29,8 @@ pub trait TokenTypeExt {
     fn is_double_length(&self) -> bool;
 }
 
-#[derive(TokenTypeExtD, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum TokenType {
+#[derive(TokenKindExtD, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TokenKind {
     /// An invalid token, constructed as part of an error
     Invalid,
 
@@ -109,12 +109,12 @@ pub enum TokenType {
     Pipe,
 }
 
-#[derive(TokenTypeExtD, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(TokenKindExtD, Debug, Clone, PartialEq, Eq)]
 #[readonly::make]
-pub struct Token<'input> {
-    pub literal: &'input str,
-    pub ty: TokenType,
-    pub location: Location,
+pub struct Token {
+    pub span: Span,
+    pub kind: TokenKind,
+    // pub location: Location,
 }
 
 pub trait GbLexer<'input> {

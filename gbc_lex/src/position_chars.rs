@@ -3,7 +3,7 @@ use std::{iter::Peekable, str::Chars};
 #[derive(Clone)]
 pub struct PositionChars<'a> {
     iter: Peekable<Chars<'a>>,
-    /// The position in characters along the input str
+    /// The position of the next character to be read in characters along the input str
     position: usize,
     original: &'a str,
     /// The human-readable line number of the current position
@@ -38,7 +38,7 @@ impl<'a> From<&'a str> for PositionChars<'a> {
             iter: value.chars().peekable(),
             position: 0,
             original: value,
-            line: 0,
+            line: 1,
             col: 0,
             last_char: '\0',
         }
@@ -56,18 +56,27 @@ impl<'a> PositionChars<'a> {
         &self.original[start..end]
     }
 
+    /// Get the position of the character that was just read
     #[inline]
-    pub fn get_position(&self) -> usize {
+    pub fn pos(&self) -> Option<usize> {
+        self.position.checked_sub(1)
+    }
+
+    /// Get the position of the next char to be read
+    #[inline]
+    pub fn peek_pos(&self) -> usize {
         self.position
     }
 
+    /// Get the line of the last char read
     #[inline]
-    pub fn get_line(&self) -> usize {
+    pub fn line(&self) -> usize {
         self.line
     }
 
+    /// Get the column of the last char read
     #[inline]
-    pub fn get_col(&self) -> usize {
-        self.col
+    pub fn col(&self) -> usize {
+        self.col - 1
     }
 }

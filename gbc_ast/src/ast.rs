@@ -1,4 +1,4 @@
-use crate::token::RichToken;
+use gbc_lex::Token;
 use gbc_shared::Span;
 
 #[derive(Debug, Clone)]
@@ -9,7 +9,7 @@ pub struct Expr {
 
 #[derive(Debug, Clone)]
 pub enum ExprKind {
-    Literal(RichToken),
+    Literal(Token),
     Unary(UnOp, Box<Expr>),
     Binary(Box<Expr>, BinOp, Box<Expr>),
 }

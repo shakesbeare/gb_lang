@@ -9,7 +9,7 @@ fn main() {
 
     for tok in input.gb_lexer() {
         let _ = tok.map(|t| {
-            print!("{:?} ", t.ty);
+            print!("{:?} ", t.kind);
         });
     }
     println!();

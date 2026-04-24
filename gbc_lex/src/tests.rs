@@ -4,61 +4,57 @@ use crate::GbLexer as _;
 
 use super::*;
 
-fn simple_lex_test(input: &str, expected: TokenType) {
+fn simple_lex_test(input: &str, expected: TokenKind) {
+    let len = input.len();
     let tok = Lexer::new(input).next().unwrap().unwrap();
-    assert_eq!(tok.literal, input);
-    assert_eq!(tok.ty, expected);
-    assert_eq!(
-        tok.location,
-        Location {
-            offset: 0,
-            line: 0,
-            col: 0
-        }
-    )
+    let actual_lit = &input[tok.span.clone()];
+    dbg!(&tok.span);
+    assert_eq!(actual_lit, input);
+    assert_eq!(tok.kind, expected);
+    assert_eq!(tok.span, Span::new(0, len),)
 }
 
 #[test]
 fn lex_int_literal() {
-    simple_lex_test("12345", TokenType::NumericLiteral);
+    simple_lex_test("12345", TokenKind::NumericLiteral);
 }
 
 #[test]
 fn lex_binary_literal() {
-    simple_lex_test("0b101", TokenType::NumericLiteral);
+    simple_lex_test("0b101", TokenKind::NumericLiteral);
 }
 
 #[test]
 fn lex_float_literal() {
-    simple_lex_test("12.345", TokenType::NumericLiteral);
+    simple_lex_test("12.345", TokenKind::NumericLiteral);
 }
 
 #[test]
 fn lex_numeral_separators() {
-    simple_lex_test("12_345", TokenType::NumericLiteral);
+    simple_lex_test("12_345", TokenKind::NumericLiteral);
 }
 
 #[test]
 fn lex_hexadecimal_literal() {
-    simple_lex_test("0xff", TokenType::NumericLiteral);
+    simple_lex_test("0xff", TokenKind::NumericLiteral);
 }
 
 #[test]
 fn lex_identifier() {
-    simple_lex_test("_word123", TokenType::Identifier);
+    simple_lex_test("_word123", TokenKind::Identifier);
 }
 
 #[test]
 fn lex_string_literal() {
     simple_lex_test(
         "\"Hello, World! #1234567890+[{(&=)}]*\"",
-        TokenType::StringLiteral,
+        TokenKind::StringLiteral,
     );
 }
 
 #[test]
 fn lex_comment() {
-    simple_lex_test("// this is a comment", TokenType::Comment);
+    simple_lex_test("// this is a comment", TokenKind::Comment);
 }
 
 #[test]
@@ -66,197 +62,197 @@ fn lex_block_comment() {
     simple_lex_test(
         "/* this is a block
             comment */",
-        TokenType::Comment,
+        TokenKind::Comment,
     );
 }
 
 #[test]
 fn lex_l_paren() {
-    simple_lex_test("(", TokenType::LParen);
+    simple_lex_test("(", TokenKind::LParen);
 }
 #[test]
 fn lex_r_paren() {
-    simple_lex_test(")", TokenType::RParen);
+    simple_lex_test(")", TokenKind::RParen);
 }
 
 #[test]
 fn lex_l_brace() {
-    simple_lex_test("{", TokenType::LBrace);
+    simple_lex_test("{", TokenKind::LBrace);
 }
 
 #[test]
 fn lex_r_brace() {
-    simple_lex_test("}", TokenType::RBrace);
+    simple_lex_test("}", TokenKind::RBrace);
 }
 
 #[test]
 fn lex_l_bracket() {
-    simple_lex_test("[", TokenType::LBracket);
+    simple_lex_test("[", TokenKind::LBracket);
 }
 
 #[test]
 fn lex_r_bracket() {
-    simple_lex_test("]", TokenType::RBracket);
+    simple_lex_test("]", TokenKind::RBracket);
 }
 
 #[test]
 fn lex_true() {
-    simple_lex_test("true", TokenType::True);
+    simple_lex_test("true", TokenKind::True);
 }
 
 #[test]
 fn lex_false() {
-    simple_lex_test("false", TokenType::False);
+    simple_lex_test("false", TokenKind::False);
 }
 
 #[test]
 fn lex_return() {
-    simple_lex_test("return", TokenType::Return);
+    simple_lex_test("return", TokenKind::Return);
 }
 
 #[test]
 fn lex_fn() {
-    simple_lex_test("fn", TokenType::Fn);
+    simple_lex_test("fn", TokenKind::Fn);
 }
 
 #[test]
 fn lex_while() {
-    simple_lex_test("while", TokenType::While);
+    simple_lex_test("while", TokenKind::While);
 }
 
 #[test]
 fn lex_for() {
-    simple_lex_test("for", TokenType::For);
+    simple_lex_test("for", TokenKind::For);
 }
 
 #[test]
 fn lex_continue() {
-    simple_lex_test("continue", TokenType::Continue);
+    simple_lex_test("continue", TokenKind::Continue);
 }
 
 #[test]
 fn lex_break() {
-    simple_lex_test("break", TokenType::Break);
+    simple_lex_test("break", TokenKind::Break);
 }
 
 #[test]
 fn lex_struct() {
-    simple_lex_test("struct", TokenType::Struct);
+    simple_lex_test("struct", TokenKind::Struct);
 }
 
 #[test]
 fn lex_enum() {
-    simple_lex_test("enum", TokenType::Enum);
+    simple_lex_test("enum", TokenKind::Enum);
 }
 
 #[test]
 fn lex_assign() {
-    simple_lex_test("=", TokenType::Equal);
+    simple_lex_test("=", TokenKind::Equal);
 }
 
 #[test]
 fn lex_add() {
-    simple_lex_test("+", TokenType::Plus);
+    simple_lex_test("+", TokenKind::Plus);
 }
 
 #[test]
 fn lex_subtract() {
-    simple_lex_test("-", TokenType::Minus);
+    simple_lex_test("-", TokenKind::Minus);
 }
 
 #[test]
 fn lex_multiply() {
-    simple_lex_test("*", TokenType::Star);
+    simple_lex_test("*", TokenKind::Star);
 }
 
 #[test]
 fn lex_divide() {
-    simple_lex_test("/", TokenType::ForwardSlash);
+    simple_lex_test("/", TokenKind::ForwardSlash);
 }
 
 #[test]
 fn lex_greater_than() {
-    simple_lex_test(">", TokenType::GreaterThan);
+    simple_lex_test(">", TokenKind::GreaterThan);
 }
 
 #[test]
 fn lex_less_than() {
-    simple_lex_test("<", TokenType::LessThan);
+    simple_lex_test("<", TokenKind::LessThan);
 }
 
 #[test]
 fn lex_bitwise_and() {
-    simple_lex_test("&", TokenType::And);
+    simple_lex_test("&", TokenKind::And);
 }
 
 #[test]
 fn lex_bitwise_or() {
-    simple_lex_test("|", TokenType::Pipe);
+    simple_lex_test("|", TokenKind::Pipe);
 }
 
 #[test]
 fn lex_bitwise_xor() {
-    simple_lex_test("^", TokenType::Carat);
+    simple_lex_test("^", TokenKind::Carat);
 }
 
 #[test]
 fn lex_not() {
-    simple_lex_test("!", TokenType::Bang);
+    simple_lex_test("!", TokenKind::Bang);
 }
 
 #[test]
 fn lex_double_equal() {
-    simple_lex_test("==", TokenType::EqualEqual);
+    simple_lex_test("==", TokenKind::EqualEqual);
 }
 
 #[test]
 fn lex_double_and() {
-    simple_lex_test("&&", TokenType::AndAnd);
+    simple_lex_test("&&", TokenKind::AndAnd);
 }
 
 #[test]
 fn lex_less_less() {
-    simple_lex_test("<<", TokenType::LessLess);
+    simple_lex_test("<<", TokenKind::LessLess);
 }
 
 #[test]
 fn lex_greater_greater() {
-    simple_lex_test(">>", TokenType::GreaterGreater);
+    simple_lex_test(">>", TokenKind::GreaterGreater);
 }
 
 #[test]
 fn lex_plus_equal() {
-    simple_lex_test("+=", TokenType::PlusEqual);
+    simple_lex_test("+=", TokenKind::PlusEqual);
 }
 
 #[test]
 fn lex_minus_equal() {
-    simple_lex_test("-=", TokenType::MinusEqual);
+    simple_lex_test("-=", TokenKind::MinusEqual);
 }
 
 #[test]
 fn lex_star_equal() {
-    simple_lex_test("*=", TokenType::StarEqual);
+    simple_lex_test("*=", TokenKind::StarEqual);
 }
 
 #[test]
 fn lex_forward_slash_equal() {
-    simple_lex_test("/=", TokenType::ForwardSlashEqual);
+    simple_lex_test("/=", TokenKind::ForwardSlashEqual);
 }
 
 #[test]
 fn lex_star_star() {
-    simple_lex_test("**", TokenType::StarStar);
+    simple_lex_test("**", TokenKind::StarStar);
 }
 
 #[test]
 fn lex_pipe_pipe() {
-    simple_lex_test("||", TokenType::PipePipe);
+    simple_lex_test("||", TokenKind::PipePipe);
 }
 
 #[test]
 fn lex_back_slash() {
-    simple_lex_test("\\", TokenType::BackSlash);
+    simple_lex_test("\\", TokenKind::BackSlash);
 }
 
 #[test]
@@ -265,8 +261,8 @@ fn skip_whitespace() {
     let mut l = Lexer::new(input);
     let first = l.next().unwrap().unwrap();
     let second = l.next().unwrap().unwrap();
-    assert_eq!(first.ty, TokenType::Identifier);
-    assert_eq!(second.ty, TokenType::NumericLiteral);
+    assert_eq!(first.kind, TokenKind::Identifier);
+    assert_eq!(second.kind, TokenKind::NumericLiteral);
 }
 
 #[test]

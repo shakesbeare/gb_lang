@@ -3,15 +3,15 @@ use syn::Ident;
 use synstructure::Structure;
 use proc_macro2::TokenStream;
 
-pub fn derive_token_type_ext(s: Structure) -> TokenStream {
+pub fn derive_token_kind_ext(s: Structure) -> TokenStream {
     match s.ast().data {
         syn::Data::Struct(ref data_struct) => {
             let field = data_struct.fields.iter().find(|f| match f.ty {
-                syn::Type::Path(ref type_path) => type_path.path.is_ident("TokenType"),
+                syn::Type::Path(ref type_path) => type_path.path.is_ident("TokenKind"),
                 _ => false,
             });
             let Some(field) = field else {
-                panic!("Requires field with type `gbc_lex::TokenType`");
+                panic!("Requires field with type `gbc_lex::TokenKind`");
             };
 
             let field_name = &field.ident;
