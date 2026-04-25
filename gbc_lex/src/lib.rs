@@ -5,6 +5,8 @@ mod position_chars;
 #[cfg(test)]
 mod tests;
 
+use std::sync::Arc;
+
 use gbc_macros::TokenKindExt as TokenKindExtD;
 use gbc_shared::Span;
 
@@ -20,7 +22,7 @@ pub trait TokenTypeExt {
 #[derive(TokenKindExtD, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TokenKind {
     /// An invalid token, constructed as part of an error
-    Invalid(Box<str>),
+    Invalid(Arc<str>),
 
     // Main Components
     NumericLiteral,
@@ -114,7 +116,7 @@ where
     T: AsRef<str> + 'input,
 {
     fn gb_lexer(&'input self) -> lexer::Lexer<'input> {
-        let input = self.as_ref();
-        lexer::Lexer::new(input)
+        lexer::Lexer::new(self.as_ref())
     }
 }
+

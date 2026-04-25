@@ -31,4 +31,6 @@ alias b := build
 lint:
     cargo clippy --all -- -Dwarnings
 
+alias check := lint
+
 ci: check-fmt lint test-all

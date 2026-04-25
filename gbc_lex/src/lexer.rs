@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use gbc_shared::Span;
 
 use crate::TokenTypeExt;
@@ -8,6 +10,9 @@ use crate::{position_chars::PositionChars, Token, TokenKind};
 pub struct Lexer<'input> {
     pub input: &'input str,
     iter: PositionChars<'input>,
+    peeked: Option<Option<Arc<Token>>>,
+    peeked_pos: usize,
+    pos: usize,
 }
 
 impl<'input> Lexer<'input> {
@@ -16,6 +21,9 @@ impl<'input> Lexer<'input> {
         Self {
             input,
             iter: PositionChars::from(input),
+            peeked: None,
+            pos: 0,
+            peeked_pos: 0,
         }
     }
 
@@ -40,24 +48,24 @@ impl<'input> Lexer<'input> {
 
     fn lex_symbol(&mut self, kind: TokenKind) -> Token {
         if kind.is_double_length() {
-            let start = self.iter.pos().unwrap();
+            let start = self.pos().unwrap();
             self.iter.next();
-            let end = self.iter.peek_pos();
+            let end = self.peek_pos();
             let span = Span::new(start, end);
             Token { kind, span }
         } else {
-            let span = Span::new(self.iter.pos().unwrap(), self.iter.peek_pos());
+            let span = Span::new(self.pos().unwrap(), self.peek_pos());
             Token { kind, span }
         }
     }
 
     fn lex_numeral(&mut self) -> Token {
-        let start = self.iter.pos().unwrap();
+        let start = self.pos().unwrap();
         if self.iter.last_char == '0' {
             let Some(next) = self.iter.next() else {
                 return Token {
                     kind: TokenKind::NumericLiteral,
-                    span: Span::new(start, self.iter.peek_pos()),
+                    span: Span::new(start, self.peek_pos()),
                 };
             };
 
@@ -69,7 +77,7 @@ impl<'input> Lexer<'input> {
         } else {
             self.consume_decimal_digits();
         }
-        let end = self.iter.peek_pos();
+        let end = self.peek_pos();
 
         Token {
             kind: TokenKind::NumericLiteral,
@@ -93,12 +101,12 @@ impl<'input> Lexer<'input> {
     }
 
     fn lex_identifier(&mut self) -> Token {
-        let start = self.iter.pos().unwrap();
+        let start = self.pos().unwrap();
         while matches!(
             self.iter.next(),
             Some('a'..='z' | 'A'..='Z' | '_' | '0'..='9')
         ) {}
-        let end = self.iter.peek_pos();
+        let end = self.peek_pos();
         Token {
             kind: try_keyword(self.iter.get_slice(start, end)),
             span: Span::new(start, end),
@@ -106,14 +114,14 @@ impl<'input> Lexer<'input> {
     }
 
     fn lex_string_literal(&mut self) -> Token {
-        let start = self.iter.pos().unwrap();
+        let start = self.pos().unwrap();
         if self.read_until('"', None).is_none() {
             return Token {
-                kind: TokenKind::Invalid(Box::from("\"")),
-                span: Span::new(start, self.iter.peek_pos()),
+                kind: TokenKind::Invalid(Arc::from("\"")),
+                span: Span::new(start, self.peek_pos()),
             };
         }
-        let end = self.iter.peek_pos();
+        let end = self.peek_pos();
         Token {
             kind: TokenKind::StringLiteral,
             span: Span::new(start, end),
@@ -121,9 +129,9 @@ impl<'input> Lexer<'input> {
     }
 
     fn lex_comment(&mut self) -> Token {
-        let start = self.iter.pos().unwrap();
+        let start = self.pos().unwrap();
         self.read_until('\n', None);
-        let end = self.iter.peek_pos();
+        let end = self.peek_pos();
         Token {
             kind: TokenKind::Comment,
             span: Span::new(start, end),
@@ -131,20 +139,16 @@ impl<'input> Lexer<'input> {
     }
 
     fn lex_block_comment(&mut self) -> Token {
-        let start = self.iter.pos().unwrap();
+        let start = self.pos().unwrap();
         self.read_until('*', Some('/'));
-        let end = self.iter.peek_pos();
+        let end = self.peek_pos();
         Token {
             kind: TokenKind::Comment,
             span: Span::new(start, end),
         }
     }
-}
 
-impl<'a> Iterator for Lexer<'a> {
-    type Item = Token;
-
-    fn next(&mut self) -> Option<Self::Item> {
+    fn lex(&mut self) -> Option<Token> {
         let char_read = self.iter.next()?;
         let peek = self.iter.peek();
 
@@ -156,7 +160,7 @@ impl<'a> Iterator for Lexer<'a> {
                 while c.is_whitespace() {
                     c = self.iter.next()?;
                 }
-                self.next()?
+                self.lex()?
             }
             (c, _) if c.is_numeric() => self.lex_numeral(),
             (c, _) if c.is_alphabetic() || c == '_' => self.lex_identifier(),
@@ -199,15 +203,50 @@ impl<'a> Iterator for Lexer<'a> {
                 // skipping forward to the next space gives us a pretty reasonable chance
                 // to recover lexing the rest of the file
                 // A more robust strategy is probably warranted
-                let start = self.iter.pos().unwrap();
+                let start = self.pos().unwrap();
                 self.read_until(' ', None);
-                let end = self.iter.peek_pos();
+                let end = self.peek_pos();
                 Token {
-                    kind: TokenKind::Invalid(Box::from("valid char")),
+                    kind: TokenKind::Invalid(Arc::from("valid char")),
                     span: Span::new(start, end),
                 }
             }
         })
+    }
+
+    #[inline]
+    pub fn pos(&self) -> Option<usize> {
+        self.iter.pos()
+    }
+
+    #[inline]
+    pub fn peek_pos(&self) -> usize {
+        self.iter.peek_pos()
+    }
+
+    #[inline]
+    pub fn peek(&mut self) -> Option<&Arc<Token>> {
+        match self.peeked {
+            Some(ref v) => v.as_ref(),
+            None => {
+                self.peeked = Some(self.next());
+                self.peeked.as_ref().unwrap().as_ref()
+            }
+        }
+    }
+}
+
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Arc<Token>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.peeked.take() {
+            Some(v) => {
+                self.pos = self.iter.pos().unwrap();
+                v
+            }
+            None => self.lex().map(Arc::from),
+        }
     }
 }
 
@@ -215,6 +254,7 @@ impl<'a> std::iter::FusedIterator for Lexer<'a> {}
 
 /// Returns the appropriate keyword token if the &str matches a keyword
 /// Otherwise, returns `TokenKind::Identifier`
+#[inline]
 fn try_keyword(literal: &str) -> TokenKind {
     match literal {
         "true" => TokenKind::True,

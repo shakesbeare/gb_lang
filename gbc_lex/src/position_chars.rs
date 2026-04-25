@@ -67,16 +67,4 @@ impl<'a> PositionChars<'a> {
     pub fn peek_pos(&self) -> usize {
         self.position
     }
-
-    /// Get the line of the last char read
-    #[inline]
-    pub fn line(&self) -> usize {
-        self.line
-    }
-
-    /// Get the column of the last char read
-    #[inline]
-    pub fn col(&self) -> usize {
-        self.col - 1
-    }
 }

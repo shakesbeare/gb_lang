@@ -3,5 +3,11 @@ name = "gbc_shared"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+macro_debug = ["gbc_macros/debug_print"]
+
 [dependencies]
 readonly = "0.2.13"
+gbc_macros = { path = "../gbc_macros" }
+trait-bounds = "0.1.1"
+
