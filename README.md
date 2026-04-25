@@ -5,156 +5,9 @@ Gb is a project I created to learn more about the inner workings of programming
 languages. While it is not fully functional, it has achieved this goal and (usually)
 works within its extremely constrained scope. 
 
-# Why Gb? 
-
-Gb is intended to be a lightweight scripting language that combines the type system of
-Rust with the ease of use of Python. Combine a familiar syntax with an automatic command
-line argument parsing (not implemented), Gb should be perfect for small CLI automations
-in your daily workflow. 
-
 # Does it work?
 
-Yes! The body of the interpreter is finished and the language can be used for simple
-calculations. The standard library is extremely sparse and error handling and messages
-can often be improved. 
-
-The REPL is very rudimentary, at the moment.
-
-## Using Cargo
-
-```
-cargo r                    # for REPL
-cargo r -- my_cool_file.gb # to run a file
-```
-
-## Standalone
-
-```
-cargo b -r                          # build the project
-./target/release/gb                 # for REPL
-./target/release/gb my_cool_file.gb # to run a file
-```
-
-# Features
-
-So, What makes Gb unique? Here are a few present and planned features on the docket for
-Gb. 
-
-- Top level code with auto-executing main function (if present)
-- Strong, inferred typing (not implemented)
-- Automatic parsing of command line arguments (not implemented)
-- First class support for interpreted, JIT, and compiled modes (1/3 complete)
-- Algebraic Data Types (not implemented)
-
-# Code Sample
-
-Gb is a very familiar language in its very early stages. While it looks largely
-unassuming now, it should gain additional character as development progresses.
-
-```
-fn main() {
-    let x = 0;
-    while x < 10 {
-        x = x + 1;
-    }
-    std.print(x);
-
-    let foo = fn() { std.print("Hello, foo!"); };
-    
-    x = 0;
-    while x < 10 {
-        foo();
-        x = x + 1;
-    }
-}
-```
-```
-Outputs:
-> 10
-> Hello, foo!
-> Hello, foo!
-> Hello, foo!
-> Hello, foo!
-> Hello, foo!
-> Hello, foo!
-> Hello, foo!
-> Hello, foo!
-> Hello, foo!
-> Hello, foo!
-```
-
-
-## Recursion!
-```
-fn main() {
-    std.print(fib(10));
-}
-
-fn fib(n) {
-    if n == 0 {
-        return 0;
-    } else if n == 1 {
-        return 1;
-    }
-
-    return fib(n - 1) + fib(n - 2);
-}
-```
-```
-Outputs:
-> 55
-```
-
-## Closures
-```
-fn foo() {
-    let x = 7;
-    return fn() {
-        return x + 1;
-    }
-}
-
-fn main() {
-    let a = foo();
-    print(a); // prints "8"
-}
-```
-
-## Optional Main Function
-
-Gb will automatically execute any top-level function named `main`, but this is
-not required. The following is just as valid as the previous examples.
-
-Note: Autoexecution of functions named `main` is disabled in the REPL.
-
-```
-std.print("Hello, World!");
-```
-```
-Outputs:
-> Hello, World!
-```
-
-## Working with multiple files
-
-Gb automatically attempts to load a file when namespace lookup fails. Folders are
-currently not supported. In the future, you will be able to alias paths to types.
-```
-// foo.gb
-fn foo() {
-    std.print("Hello from foo!");
-}
-```
-```
-// file.gb
-fn main() {
-    foo.foo();
-}
-```
-```
-Outputs:
-> Hello from foo!
-```
+No! The main branch is currently my development branch because I am lazy. Find the last working version since I tore everything apart [here](https://github.com/shakesbeare/gb_lang/releases/tag/LastWorking).
 
 # Why not use a parser generator?
 
@@ -173,20 +26,22 @@ which ended up being quite a convenient resource because the syntax for Monkey w
 identical to what I had planned for Gb. But the initial versions were built entirely on
 my own. 
 
-In specific, [this](https://github.com/shakesbeare/gb_lang/tree/FromTheGroundUp)
-branch represents the work I was able to put in with a parser generator. As mentioned above,
+In specific, [this](https://github.com/shakesbeare/gb_lang/releases/tag/FromTheGroundUp)
+tag represents the work I was able to put in with a parser generator. As mentioned above,
 I ended up being pretty unhappy with this approach. I especially disliked how difficult it
 was to hook into the Pest error system to emit useful error messages from Gb. 
 
-It's also worth checking out [this](https://github.com/shakesbeare/gb_lang/tree/Rewrite) branch,
+It's also worth checking out [this](https://github.com/shakesbeare/gb_lang/releases/tag/Rewrite) tag,
 which was the version I had before I began to use the *Writing an Interpreter in Go* version. 
 I learned the most from this version and ultimately decided to rewrite it again only because I
-wanted to switch to a fancier Pratt-parser rather than the grammar-based parser of this version. 
+wanted to switch to a fancier Pratt-parser rather than the grammar-based parser of this version.
 
+I'm currently in the middle of restarting the whole thing from scratch using the knowledge I've gained
+along the way. In particular, the following things were pain points for me:
 
-# The future of Gb
-
-I occasionally resume work on Gb. My plan is to one day make it a sleek scripting
-language with support for interop with Rust. As of now, development of the project
-has taken the back seat to my studies in college. 
+1) The AST was extremely cumbersome to navigate in the interpreter
+2) Adding new kinds of nodes to the AST added a lot of boilerplate which made it less enjoyable to work on
+3) The lexer was pretty clunky as well, also requiring a handful of lines to add new tokens to
+4) I really wanted the lexer to be an iterator and to handle the entire tokenization process with minimal allocations (mostly as an exercise, I'm not expecting the performance to be anything incredible but making problems harder is fun)
+5) The interpreter was honestly a disaster that felt full of hacks at every turn and I wanted to give myself a better foundation to start with so I could have a better opportunity to make good decisions
 
