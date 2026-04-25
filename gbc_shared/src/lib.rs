@@ -16,12 +16,6 @@ pub struct Span {
     inner: Range<usize>,
 }
 
-impl TreeNode for Span {
-    fn repr(&self) -> String {
-        format!("Span: {}-{}", self.inner.start, self.inner.end)
-    }
-}
-
 impl Span {
     /// Creates a new span with start inclusive and end exclusive
     pub fn new(start: usize, end: usize) -> Self {
@@ -34,6 +28,14 @@ impl Span {
 
     pub fn end(&self) -> usize {
         self.inner.end
+    }
+
+    pub fn render(&self, input: &str) -> String {
+        String::from(&input[self])
+    }
+
+    pub fn extend(&mut self, amount: usize) {
+        self.inner.end += amount
     }
 }
 
@@ -48,5 +50,13 @@ impl std::ops::Index<Span> for str {
 
     fn index(&self, index: Span) -> &Self::Output {
         self.index(index.inner)
+    }
+}
+
+impl std::ops::Index<&Span> for str {
+    type Output = str;
+
+    fn index(&self, index: &Span) -> &Self::Output {
+        self.index(index.inner.clone())
     }
 }

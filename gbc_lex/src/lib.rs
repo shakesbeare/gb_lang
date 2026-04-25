@@ -27,7 +27,7 @@ pub enum TokenKind {
     // Main Components
     NumericLiteral,
     StringLiteral,
-    Identifier,
+    Ident,
     Comment,
 
     // Delimiters
@@ -97,6 +97,10 @@ pub enum TokenKind {
     LessThan,
     #[symbol(single)]
     Pipe,
+    #[symbol(single)]
+    Semicolon,
+    #[symbol(single)]
+    Colon,
 }
 
 #[derive(TokenKindExtD, Debug, Clone, PartialEq, Eq)]

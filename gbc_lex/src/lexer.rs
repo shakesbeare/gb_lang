@@ -102,10 +102,12 @@ impl<'input> Lexer<'input> {
 
     fn lex_identifier(&mut self) -> Token {
         let start = self.pos().unwrap();
-        while matches!(
-            self.iter.next(),
-            Some('a'..='z' | 'A'..='Z' | '_' | '0'..='9')
-        ) {}
+        while let Some(c) = self.iter.peek() && matches!(
+            c,
+            'a'..='z' | 'A'..='Z' | '_' | '0'..='9'
+        ) {
+            self.iter.next();
+        }
         let end = self.peek_pos();
         Token {
             kind: try_keyword(self.iter.get_slice(start, end)),
@@ -198,6 +200,8 @@ impl<'input> Lexer<'input> {
             ('>', _) => self.lex_symbol(TokenKind::GreaterThan),
             ('<', _) => self.lex_symbol(TokenKind::LessThan),
             ('|', _) => self.lex_symbol(TokenKind::Pipe),
+            (';', _) => self.lex_symbol(TokenKind::Semicolon),
+            (':', _) => self.lex_symbol(TokenKind::Colon),
 
             _ => {
                 // skipping forward to the next space gives us a pretty reasonable chance
@@ -267,6 +271,6 @@ fn try_keyword(literal: &str) -> TokenKind {
         "break" => TokenKind::Break,
         "struct" => TokenKind::Struct,
         "enum" => TokenKind::Enum,
-        _ => TokenKind::Identifier,
+        _ => TokenKind::Ident,
     }
 }

@@ -41,7 +41,7 @@ fn lex_hexadecimal_literal() {
 
 #[test]
 fn lex_identifier() {
-    simple_lex_test("_word123", TokenKind::Identifier);
+    simple_lex_test("_word123", TokenKind::Ident);
 }
 
 #[test]
@@ -261,7 +261,7 @@ fn skip_whitespace() {
     let mut l = Lexer::new(input);
     let first = l.next().unwrap();
     let second = l.next().unwrap();
-    assert_eq!(first.kind, TokenKind::Identifier);
+    assert_eq!(first.kind, TokenKind::Ident);
     assert_eq!(second.kind, TokenKind::NumericLiteral);
 }
 

@@ -1,33 +1,45 @@
-use gbc_shared::Span;
+use gbc_shared::{Span, macros::AstNode as AstNodeDerive};
+use derive_tools::Unwrap;
 
-#[derive(Debug, PartialEq, Eq)]
+pub trait AstNode {
+    fn span(&self) -> &Span;
+    fn render(&self, input: &str) -> String {
+        String::from(&input[self.span()])
+    }
+}
+
+#[derive(AstNodeDerive, Debug, PartialEq, Eq)]
 pub struct Program {
+    pub span: Span,
     pub stmts: Vec<Stmt>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(AstNodeDerive, Debug, PartialEq, Eq)]
 pub struct Stmt {
     pub span: Span,
     pub kind: StmtKind,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Unwrap)]
+#[unwrap(ref)]
 pub enum StmtKind {
     Expr(Expr),
+    ExprTerm(Expr),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(AstNodeDerive, Debug, PartialEq, Eq)]
 pub struct Expr {
     pub span: Span,
     pub kind: ExprKind,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Unwrap)]
+#[unwrap(ref)]
 pub enum ExprKind {
-    Identifier(Identifier),
+    Ident(Ident),
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Identifier {
+#[derive(AstNodeDerive, Debug, PartialEq, Eq)]
+pub struct Ident {
     pub span: Span,
 }

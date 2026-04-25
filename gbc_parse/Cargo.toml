@@ -1,9 +1,10 @@
 [package]
 name = "gbc_parse"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 gbc_shared = { path = "../gbc_shared" }
 gbc_lex = { path = "../gbc_lex" }
 thiserror = "2.0.18"
+derive_tools = "0.65.0"

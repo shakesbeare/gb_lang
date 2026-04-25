@@ -1,3 +1,5 @@
+extern crate self as gbc_parse;
+
 mod parse_tree;
 mod syntax_error;
 #[cfg(test)]
@@ -9,13 +11,13 @@ use gbc_lex::{lexer::Lexer, Token, TokenKind};
 use gbc_shared::Span;
 
 use crate::{
-    parse_tree::{Expr, ExprKind, Identifier, Program, Stmt, StmtKind},
+    parse_tree::{Expr, ExprKind, Ident, Program, Stmt, StmtKind},
     syntax_error::{SyntaxError, SyntaxErrorKind},
 };
 
 pub struct Parser<'input> {
     lexer: Lexer<'input>,
-    end_of_file_reached: bool
+    end_of_file_reached: bool,
 }
 
 impl<'input> Parser<'input> {
@@ -42,6 +44,14 @@ impl<'input> Parser<'input> {
         }
     }
 
+    fn guess_peek(&mut self, kind: TokenKind) -> bool {
+        if let Some(tok) = self.peek_token() && tok.kind == kind {
+            true
+        } else {
+            false
+        }
+    }
+
     fn next_token(&mut self) -> Option<Arc<Token>> {
         let tok = self.lexer.next();
         if tok.is_none() {
@@ -60,7 +70,7 @@ impl<'input> Parser<'input> {
         self.parse_program()
     }
 
-    pub fn parse_program(&mut self) -> Program {
+    fn parse_program(&mut self) -> Program {
         let mut out = vec![];
         let mut syntax_errors = vec![];
 
@@ -71,25 +81,36 @@ impl<'input> Parser<'input> {
             }
         }
 
-        Program { stmts: out }
+        Program {
+            span: Span::new(0, self.lexer.pos().unwrap_or(0)),
+            stmts: out,
+        }
     }
 
-    pub fn parse_stmt(&mut self) -> Result<Stmt, SyntaxError> {
-        _ = self.expect_peek(TokenKind::Identifier)?;
+    fn parse_stmt(&mut self) -> Result<Stmt, SyntaxError> {
+        _ = self.expect_peek(TokenKind::Ident)?;
 
         let expr = self.parse_expr()?;
+        let mut span = expr.span.clone();
+        let kind = if self.guess_peek(TokenKind::Semicolon) {
+            _ = self.next_token(); // pass over the semicolon
+            span.extend(1);
+            StmtKind::ExprTerm(expr)
+        } else {
+            StmtKind::Expr(expr)
+        };
 
         Ok(Stmt {
-            span: expr.span.clone(),
-            kind: StmtKind::Expr(expr),
+            span,
+            kind,
         })
     }
 
-    pub fn parse_expr(&mut self) -> Result<Expr, SyntaxError> {
+    fn parse_expr(&mut self) -> Result<Expr, SyntaxError> {
         let token = self.next_token().unwrap();
         Ok(Expr {
             span: token.span.clone(),
-            kind: ExprKind::Identifier(Identifier {
+            kind: ExprKind::Ident(Ident {
                 span: token.span.clone(),
             }),
         })

@@ -1,14 +1,8 @@
 [package]
 name = "gbc_lex"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Lexing for G♭."
-
-[profile.dev]
-features = ["eager_error_printing"]
-
-[features]
-eager_error_printing = []
 
 [dependencies]
 thiserror = "2.0.12"
